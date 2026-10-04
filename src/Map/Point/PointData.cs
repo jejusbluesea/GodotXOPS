@@ -35,6 +35,11 @@ namespace GodotXOPS
         public const int PointEventLast = 19;
 
         private const int k_maxParameterCount = 20;
+        // 한 맵에 둘 수 있는 사람 수 (원본 MAX_HUMAN). 치트로 사람을 추가할 때의 상한이다.
+        private const int k_maxHumans = 96;
+        // 복제한 사람을 놓는 자리: 원본 사람의 정면 1 m, 위로 0.5 m (원본 gamemain.cpp:2436-2438 — 10.0, 5.0).
+        private const float k_cloneForwardOffset = 1.0f;
+        private const float k_cloneHeightOffset = 0.5f;
 
         private Node3D m_humanRoot;
         private Node3D m_objectRoot;
@@ -44,6 +49,7 @@ namespace GodotXOPS
         private readonly List<string> m_messages = new List<string>();
         private readonly Dictionary<string, ShaderMaterial> m_entityMaterialCache = new Dictionary<string, ShaderMaterial>();
         private readonly HumanCollision m_humanCollision = new HumanCollision();
+        private readonly AIController m_aiController = new AIController();
         private ShaderMaterial m_untexturedMaterial;
         private Human m_player;
 
@@ -144,6 +150,7 @@ namespace GodotXOPS
 
             loader.m_stats.Reset();
             SimClock.Register(loader.m_humanCollision);
+            SimClock.Register(loader.m_aiController);
             SimClock.Register(loader.m_stats);
             return true;
         }
@@ -260,7 +267,9 @@ namespace GodotXOPS
             MapLoader loader = Instance;
 
             SimClock.Unregister(loader.m_humanCollision);
+            SimClock.Unregister(loader.m_aiController);
             SimClock.Unregister(loader.m_stats);
+            if (EventManager.Loaded) EventManager.Instance.StopMission();
             if (BulletManager.Loaded) BulletManager.Instance.Clear();
             if (WeaponManager.Loaded) WeaponManager.Instance.Clear();
             if (EffectManager.Loaded) EffectManager.Instance.Clear();
@@ -301,7 +310,9 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// AI 경로 포인트를 식별번호로 조회한다. AIPATH 먼저, 없으면 RAND_AIPATH. 원본 SearchPointdata 대응.
+        /// AI 경로 포인트를 식별번호로 조회한다. 경로(AIPATH)에서 먼저 찾고, 없으면 랜덤 분기(RAND_AIPATH)에서 찾는다.
+        /// 원본 SearchPointdata 는 종류를 가리지 않고 같은 번호의 첫 포인트를 찾아서, 번호가 같은 다른 종류의 포인트가 파일 앞쪽에 있으면 경로가 끊긴다.
+        /// 그 동작은 따르지 않고 종류별로 찾는다.
         /// </summary>
         /// <param name="id">식별번호.</param>
         /// <returns>첫 매치. 없으면 null (경로 끝).</returns>
@@ -311,7 +322,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 이벤트 포인트를 식별번호로 조회한다. 이벤트 종류(10~19) 전체에서 찾는다.
+        /// 이벤트 포인트를 식별번호로 조회한다. 이벤트 종류(10~19) 전체에서 찾는다. 경로와 마찬가지로 다른 종류의 포인트는 보지 않는다.
         /// </summary>
         /// <param name="id">식별번호.</param>
         /// <returns>첫 매치. 없으면 null (이벤트 줄 끝).</returns>
@@ -353,6 +364,48 @@ namespace GodotXOPS
         public static void SetPlayer(Human human)
         {
             if (human != null) Instance.m_player = human;
+        }
+
+        /// <summary>
+        /// 치트(F9) — 사람 하나를 복제해 그 앞에 세운다. 원본 gamemain.cpp:2411-2455: 종류·팀·무기 종류를 그대로 쓰고 탄약은 새로 채운다.
+        /// 복제된 사람의 식별번호는 0 이고 경로가 없다. AI 는 호출한 쪽이 AIBrain.SetHoldTracking / SetHoldWait 로 정한다.
+        /// </summary>
+        /// <param name="source">복제할 사람.</param>
+        /// <returns>새로 만든 사람. 사람 수가 상한이거나 맵이 로드돼 있지 않으면 null.</returns>
+        public static Human SpawnHumanClone(Human source)
+        {
+            MapLoader loader = Instance;
+            if (source == null || loader.m_sortedRawPointData == null || loader.m_humans.Count >= k_maxHumans) return null;
+
+            float yaw = source.Controller.Yaw;
+            var point = new RawPointData
+            {
+                position = source.Controller.Position + Coord.YawForward(yaw) * k_cloneForwardOffset + Vector3.Up * k_cloneHeightOffset,
+                look = yaw,
+                param0 = PointHuman,
+                param1 = source.HumanParam.param1,
+                // 어떤 포인트의 식별번호도 아닌 값이라 경로가 없는 사람이 된다.
+                param2 = -1,
+                param3 = 0,
+            };
+            var info = new RawPointData
+            {
+                param0 = PointHumanInfo,
+                param1 = source.HumanDataParam.param1,
+                param2 = source.Team,
+                param3 = source.HumanParam.param1,
+            };
+
+            var human = new Human { Name = $"Human_{loader.m_humans.Count}" };
+            loader.m_humanRoot.AddChild(human);
+            human.CreateHuman(point, info);
+            for (int slot = 0; slot < Human.WeaponSlotCount; slot++)
+            {
+                human.SetWeapon(slot, source.GetWeapon(slot).WeaponIndex);
+            }
+            human.SetSelectWeapon(source.SelectWeapon);
+            loader.m_humans.Add(human);
+            return human;
         }
 
         /// <summary>

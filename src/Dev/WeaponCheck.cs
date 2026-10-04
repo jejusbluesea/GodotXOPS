@@ -25,6 +25,9 @@ namespace GodotXOPS.Dev
 
         public override void _Ready()
         {
+            // 무기와 총알만 따로 확인하므로 사람들이 스스로 움직이거나 쏘지 않게 한다.
+            AIController.Enabled = false;
+
             if (!MapLoader.LoadMissionData(0, false, 0) || !MapLoader.LoadBlockData(MapLoader.Instance.MissionBD1Path))
             {
                 GD.Print("문제: 미션 0 을 로드하지 못함");

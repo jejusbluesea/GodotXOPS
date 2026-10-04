@@ -68,9 +68,13 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/weapon_check.tscn` — 무기·총알·히트박스·떨어진 무기·소물·통계와 이펙트·소리 호출을 수치로 확인한다 (헤드리스). 사람들을 블록이 없는 공중으로 옮겨 놓고 무기 틱과 총알 틱만 직접 돌린다. 무기, 총알, 피격 코드를 고친 뒤에 돌린다.
 
+- `res://scenes/dev/ai_check.tscn` — AI(시야·청각·경계·조준 예측·무기 운용·좀비·경로·복제)와 미션 이벤트·판정을 수치로 확인한다 (헤드리스). 점검용 PD1 을 임시 폴더에 만들어 로드하고, 사람들을 공중에 놓은 채 AI 틱과 무기 틱만 직접 돌린다. AI, 이벤트, 포인트 조회 코드를 고친 뒤에 돌린다.
+
+`play_test.tscn` 은 AI 와 이벤트를 켠 채로 돈다. `--noai` 로 끄고 시작하고, 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), F9+↑/↓(복제), Insert(플레이어 무적), Home(디버그 텍스트 켜기/끄기)을 쓴다. `--invincible`, `--notext` 로 켜고 끈 채 시작할 수 있다. AI 가 꺼져 있어야 하는 점검 도구는 `AIController.Enabled = false` 로 둔다 (`WeaponCheck` 참조).
+
 ## 시뮬레이션과 캐릭터
 
-- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (사람 10 → 떨어진 무기 30 → 총알 40 → 인간간 충돌 100 → AI 200 → 이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
+- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (사람 10 → 떨어진 무기 30 → 총알 40 → 인간간 충돌 100 → AI 200 → 미션 판정·이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
 - 사람 틱(10) 안의 순서는 원본 한 프레임과 같다: 무기 입력 소비(발사 등) → 무기 카운터 감소·조준 오차 갱신(`Human.TickWeapon`) → 이동·충돌 → 사망 상태 → 다리·팔 동작. 총알은 이동 전 위치에서 나간다.
 - 시간 카운터(발사 간격, 재장전, 전환, 탄환 수명)는 정수 틱으로 센다. 데이터의 초 단위 값은 `RoundToInt(초 × SimClock.FrameRate)`로 바꾼다. 실수 초를 틱마다 빼면 잔차 때문에 원본보다 한 틱 늦어진다.
 - 게임 결과에 영향을 주는 난수는 `GameRandom.Gameplay`(틱에서만), 연출용 난수는 `GameRandom.Visual`을 쓴다.
@@ -97,6 +101,24 @@ dotnet build GodotXOPS.csproj
 - 소리는 `SoundManager.PlayAt(경로, 위치, 볼륨)`으로 낸다. `AudioStreamPlayer3D`를 쓰지 않는다 (원본의 선형 감쇠를 낼 수 없다). 헤드리스에서는 실제 재생을 하지 않는다.
 - 소리가 나는 자리에서는 `WorldSound.EmitPointSound`로 AI 에게도 알린다 (듣는 거리는 `aiHear*` 데이터).
 
+## AI, 이벤트, 미션 판정
+
+- `AIBrain`(순수 클래스, `src/Map/Human/AI/`의 partial 6개)을 `Human`이 하나씩 갖는다 (`human.Brain`). `AIController`(순수 `ISimTickable`, SimOrder 200)가 틱마다 `MapLoader.Player`만 건너뛰고 전부 돌린다. `AIController.DrivePlayer`를 켜면 플레이어도 AI 가 움직인다 (메뉴 데모용).
+- AI 는 사람에게 `Controller.SetInput`(이동·조준)과 `Human`의 무기 함수(`ShotWeapon`, `ReloadWeapon`, `SetSelectWeapon`, `DropCurrentWeapon`, `ApplyWeaponAction`)로만 손을 댄다. AI 가 넣은 이동 입력은 다음 틱의 이동이 소비한다.
+- 계산은 원본 `ai.cpp` 기준이다. 다만 아래는 사용자 결정으로 원본과 다르다:
+  - 회전·경로 이동 의사는 매 틱 새로 정한다. 틱을 넘어 유지되는 것은 두리번거림과 전투 중 회피 이동뿐이다 (원본은 모든 플래그를 유지하고 확률로 해제한다).
+  - 아군 시체를 보고 경계하는 조건(`CheckCorpse`)은 넣지 않는다.
+  - 좀비는 적의 이동을 앞질러 겨누지 않는다 (원본 `AItrackability` 는 데이터에 없다).
+  - 맨손인 사람의 팔은 전투(좀비 공격, 항복) 중에만 조준 방향을 따른다.
+  - AI 는 무기 관리 때 스코프를 해제하지 않는다.
+  - 경로·이벤트 포인트는 종류별로 찾는다 (아래).
+- 원본대로 둔 것: 적의 이동을 앞질러 겨누기와 수류탄 높이 보정, 원거리 발견의 1/4 확정, 경계가 끝나면 시작한 자리로 돌아가기, 원거리 교전 중 근거리 적 재탐색, 수류탄·단발/연발 전환, 점프 판정, 좀비 공격은 겨눈 적 한 명만. 원본의 "끼었을 때 좌우로 돌기"는 조건이 늘 거짓이라 실행되지 않는 코드여서 옮기지 않았다.
+- 시야와 사선은 블록만 가린다 (`MapLoader.RaycastBlock`). 사람과 소물은 가리지 않는다.
+- 경로와 이벤트의 다음 포인트는 **종류별로** 찾는다 (`MapLoader.GetPathPoint`, `GetEventPoint`). 원본 `SearchPointdata`는 종류와 무관하게 같은 번호의 첫 포인트를 찾아서 번호가 겹치면 줄이 끊기는데, 원본의 버그로 보고 따르지 않는다 (사용자 결정).
+- 소리 신호(`Human.NotifyThreatHeard`)는 `AIController`가 매 틱 비운다. 원본보다 한 틱 빨리 듣는다 (원본은 이중 버퍼라 다음 프레임에 듣는다).
+- 발소리는 `HumanController`가 매 틱 `WorldSound.EmitFootstep(사람, 종류)`로 낸다. 지금은 달리는 소리를 다른 팀 AI 에게 알리기만 한다 (원본도 WAV 를 재생하지 않는다). 발소리 WAV 를 넣을 자리는 그 함수 하나다.
+- `EventManager`(Autoload, SimOrder 300)가 이벤트 세 줄과 자동 판정을 돌린다. `BeginMission()`을 부른 뒤에만 돌고 맵을 내리면 멈춘다. UI(GDScript)는 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`와 프로퍼티 `Result`, `EndTicks`, `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`를 쓴다.
+
 ## 맵과 렌더링
 
 - `MapLoader`(Autoload)가 블록·스카이·미션 정보를 들고 있고, 씬이 바뀌어도 유지된다. 로드 함수는 이전 것을 먼저 언로드한다.
@@ -110,7 +132,7 @@ dotnet build GodotXOPS.csproj
 
 ## Autoload 순서
 
-`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader` → `BulletManager` → `WeaponManager` → `EffectManager` → `SoundManager`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
+`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader` → `BulletManager` → `WeaponManager` → `EffectManager` → `SoundManager` → `EventManager`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
 
 ## 설정과 입력
 

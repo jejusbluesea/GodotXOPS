@@ -4,9 +4,9 @@
 
 ## 현재 상태 (2026-10-04)
 
-브랜치 `main`. 7단계까지 커밋·푸시했다. 저장소: https://github.com/jejusbluesea/GodotXOPS
+브랜치 `main`. 8단계까지 커밋·푸시했다. 저장소: https://github.com/jejusbluesea/GodotXOPS
 
-맵을 로드해 플레이어로 걸어 다니며 무기를 쏘고, 버리고, 줍고, 사람과 소물을 맞힐 수 있다. 이펙트와 효과음이 나온다. AI, 이벤트, 게임 화면(UI)은 아직 없다.
+맵을 로드해 플레이어로 걸어 다니며 무기를 쏘고, 버리고, 줍고, 사람과 소물을 맞힐 수 있다. 이펙트와 효과음이 나온다. AI 가 경로를 돌고, 보고 듣고, 싸운다. 미션 이벤트와 클리어·실패 판정이 돈다. 게임 화면(UI)은 아직 없다.
 
 | 단계 | 상태 | 주요 파일 |
 |---|---|---|
@@ -17,8 +17,8 @@
 | 5. SimClock, 캐릭터 (이동·충돌, 모델, 플레이어 조작) | 완료 | `src/Map/SimClock.cs`, `src/Map/Human/`, `src/Map/Point/` |
 | 6. 무기, 총알, 히트박스 | 완료 | `src/Map/Weapon/`, `src/Map/Bullet/`, `src/Map/Human/HumanWeapon.cs`, `HumanAim.cs`, `HumanHitbox.cs` |
 | 7. 이펙트, 사운드, 무기 드롭/줍기, 소물 | 완료 (소리와 화면 연출은 사용자 확인 필요) | `src/Map/Effect/`, `src/Map/Sound/`, `src/Map/Object/`, `src/Map/Weapon/WeaponManager.cs`, `src/Map/MissionStats.cs`, `shaders/effect_blend.gdshader` |
-| 8. AI, 이벤트, 미션 판정 | **다음** | — |
-| 9. 씬 UI (오프닝, 메뉴, 브리핑, HUD, 결과) | 대기 | — |
+| 8. AI, 이벤트, 미션 판정 | 완료 (사용자가 창에서 동작 확인) | `src/Map/Human/AI/`, `src/Map/Event/`, `src/Map/Human/WorldSound.cs`, `src/Dev/AICheck.cs` |
+| 9. 씬 UI (오프닝, 메뉴, 브리핑, HUD, 결과) | **다음** | — |
 | 10. 원본 대조 마무리 | 대기 | — |
 
 ## 점검 씬 (작업을 마칠 때마다 전부 통과해야 한다)
@@ -31,11 +31,14 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 | `res://scenes/dev/data_check.tscn` | — | `godotdata/` JSON과 로드된 값의 키 단위 대조 |
 | `res://scenes/dev/config_input_check.tscn` | — | 설정 읽기/쓰기/되돌리기, 입력 조회 |
 | `res://scenes/dev/map_viewer.tscn` | `--selftest` | 59개 미션 블록 로드와 충돌 레이 |
-| `res://scenes/dev/play_test.tscn` | `--selftest` | 59개 미션에서 사람 1,057명이 150틱 동안 맵 아래로 빠지지 않는지, 맵 배치 무기 449개와 소물 210개 스폰 |
+| `res://scenes/dev/play_test.tscn` | `--selftest` | 59개 미션에서 AI 와 이벤트를 켠 채 300틱을 돌려 사람 1,057명이 맵 아래로 빠지거나 좌표가 깨지지 않는지, 맵 배치 무기 449개와 소물 210개 스폰 |
 | `res://scenes/dev/weapon_check.tscn` | — | 110항목: 부위 명중, 스침, 관통, 연사 간격, 재장전, 조준 오차, 전체 무기 발사, 폭발, 수류탄 비행, 벽, 사망, 버리기·낙하·줍기, 소물 피격·파괴, 통계, 이펙트·소리 호출, 소리 거리 감쇠 |
+
+| `res://scenes/dev/ai_check.tscn` | — | 78항목: 시야(정면·등 뒤·같은 팀·비전투·벽), 청각(총성·발소리·피격 방향), 경계 시간과 팔 각도, 조준 예측, 재장전·버리기·무기 들기, 좀비 근접 공격, 경로(걷기·대기·랜덤 분기·번호 겹침·우선적 달리기·5초 정지), 이벤트 세 줄, 자동 판정, 복제 |
 
 눈으로 확인하는 도구 (`--headless` 없이): `asset_viewer.tscn`, `map_viewer.tscn`, `play_test.tscn`. 뒤의 둘은 `--screenshot 경로.png`로 화면을 저장한다.
 `play_test.tscn`은 무기 확인용 인자를 받는다: `--weapon 번호`, `--fire`, `--hitbox`, `--look yaw,pitch`, `--pos x,y,z`, `--drop`. 훈련장(미션 0)의 플레이어는 맨손이므로 `--weapon 1`(MP5)처럼 쥐여 주거나 F7+←/→로 바꾼다.
+`play_test.tscn`은 AI 와 이벤트를 켠 채로 돈다 (`--noai` 로 끈다). 화면 왼쪽 위에 AI 상태별 인원, 미션 결과, 메시지, 가까운 사람 6명의 AI 상태가 나온다. F2 AI 정지/재개, F4 전원 비전투, End 전원 경계, F9+↑/↓ 복제, Insert 플레이어 무적, Home 디버그 텍스트 켜기/끄기 (`--invincible`, `--notext` 로 시작 상태를 정한다).
 
 ## 지금 구현이 돌아가는 흐름 (새 세션은 여기부터 읽는다)
 
@@ -57,8 +60,8 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 | 30 | `WeaponManager` | 떨어진 무기 낙하, 줍기 |
 | 40 | `BulletManager` | 직선 탄 전부(판정 → 이동), 그다음 수류탄 전부 |
 | 100 | `HumanCollision` | 사람끼리 밀어내기 (더한 속도는 다음 틱 이동이 소비) |
-| 200 | (비어 있음) | **8단계 AI 자리.** AI 가 정한 입력은 다음 틱의 10 이 소비한다 (원본의 1프레임 지연) |
-| 300 | `MissionStats` | 플레이 시간. **8단계 이벤트·미션 판정 자리** |
+| 200 | `AIController` | 플레이어가 아닌 사람마다 `AIBrain.Tick`. AI 가 정한 입력은 다음 틱의 10 이 소비한다 (원본의 1프레임 지연) |
+| 300 | `MissionStats`, `EventManager` | 플레이 시간, 자동 판정 → 이벤트 세 줄 → 메시지 시간 |
 
 ### 누가 무엇을 갖는가
 
@@ -77,7 +80,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 - 좌표·각도 변환은 `Coord`만 쓴다. 각도는 UnityXOPS 규약(도, yaw 오른쪽 +, pitch 아래 +).
 - JSON 에 있는 값은 그대로 읽는다. 원본 상수로 하드코딩하지 않는다.
 - 조작감에 직결되는 코드는 UnityXOPS 와 원본 C++ 를 함께 대조하고, 계산 방식이 다르면 표로 사용자에게 올려 결정을 받는다. 지금까지의 경향: 원본의 어색한 동작을 UnityXOPS 가 고친 것은 UnityXOPS 를, UnityXOPS 가 엔진 사정으로 근사한 것(물리 레이, 실수 초 타이머, 렌더 프레임 계산)은 원본 방식을 택했다.
-- 작업을 마치면 점검 씬 6개를 전부 돌리고, `--headless --path . --import`로 새 `.cs.uid`를 만든 뒤 함께 커밋한다. 빌드 경고 0개.
+- 작업을 마치면 점검 씬 7개를 전부 돌리고, `--headless --path . --import`로 새 `.cs.uid`를 만든 뒤 함께 커밋한다. 빌드 경고 0개.
 
 ## 6단계에서 정한 것
 
@@ -98,52 +101,28 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 - **통계**(`MapLoader.Stats`)는 쏜 사람이 플레이어일 때만 기록한다. 플레이 시간은 틱 수로 센다.
 - UnityXOPS 값과 다르게 한 것: 사망 시 무기가 흩어지는 속도는 5.0 m/s (원본 프레임당 1.5. UnityXOPS 는 0.15 m/s 로 단위가 어긋나 있었다), 폭발 혈흔 높이는 발 위 1.5 m (원본 hy + 15. UnityXOPS 는 발 위치), 이펙트에도 안개를 적용한다 (원본 고정 파이프라인).
 
-## 다음 작업: 8단계 — AI, 이벤트, 미션 판정
+## 8단계에서 정한 것
 
-**설계 논의부터 한다.** 아래를 읽고 UnityXOPS 코드와 원본을 대조한 뒤, 결정이 필요한 것을 권고안과 함께 사용자에게 올린다. 구현은 결정을 받은 다음이다.
+- **구조**: `AIBrain`(순수 클래스)을 `Human`이 갖고, `AIController`(순수 `ISimTickable`, 200)를 `MapLoader`가 등록한다. `EventManager`는 시그널을 가진 Autoload(300)다.
+- **계산은 원본 `ai.cpp` 기준**이고, 사용자 결정으로 다르게 한 것은 아래 다섯 가지와 포인트 검색이다:
+  1. 회전·경로 이동 의사는 매 틱 새로 정한다 (UnityXOPS 방식). 유지되는 것은 두리번거림과 전투 중 회피 이동뿐이다.
+  2. 아군 시체를 보고 경계하는 조건(`CheckCorpse`)은 넣지 않았다. OpenXOPS 코드에는 있지만 사용자가 원본 게임에서 본 적이 없다고 했다. 넣으려면 `AIBrain.NormalMain`의 경계 진입 조건에 한 줄을 더하면 된다 (원본 ai.cpp:1447-1486, 1738).
+  3. 좀비는 적의 이동을 앞질러 겨누지 않는다. 원본 `AItrackability`(사람 종류별 0~3)는 데이터에 필드가 없고 추가하지 않기로 했다.
+  4. 맨손인 사람의 팔은 전투 중에만 조준 방향을 따른다 (UnityXOPS 방식).
+  5. AI 는 무기 관리 때 스코프를 해제하지 않는다. 지금 AI 가 스코프를 켜는 코드는 없고, 스코프 종류별 AI 값(`aiScopeData`: 발사 허용각, 탐색 거리 가산)만 쓴다. "AI 가 스코프로 조준하는 것을 살리자"는 요청을 이렇게 해석했으므로, AI 가 실제로 스코프를 켜야 한다는 뜻이었다면 추가 작업이 필요하다.
+- **원본에서 실행되지 않는 코드**: `MoveTarget`의 "끼었을 때 좌우로 돌기"(ai.cpp:212-220)는 조건(현재 이동 플래그, 누적 이동량)이 그 시점에 늘 0 이어서 원본에서도 돌지 않는다. UnityXOPS 는 이것을 살려 놓았는데, 원본대로 옮기지 않았다.
+- **포인트 검색**은 UnityXOPS 처럼 종류별로 한다 (`MapLoader.GetPathPoint`, `GetEventPoint`). 원본은 종류와 무관하게 같은 번호의 첫 포인트를 찾아서 번호가 겹치면 경로·이벤트가 끊기는데, 사용자가 원본의 버그라고 판단했다.
+- **발소리**는 AI 청각 신호만 낸다. `WorldSound.EmitFootstep`이 걷기·전진·후진·좌우·점프·착지를 모두 받으므로 WAV 를 넣을 때는 그 함수에서 재생하면 된다 (발밑 블록의 텍스처 번호가 필요하면 사람에서 구한다).
+- **소리를 듣는 시점**은 원본보다 한 틱 빠르다 (같은 틱에 듣는다).
+- **UnityXOPS 의 무장 좀비**(리치 `zombieMaxMeleeRange`, 무기 데미지 가산, 발사 속도 주기)는 유지했다. 판정 대상은 원본처럼 겨눈 적 한 명이다.
+- **`--selftest`의 실패 조건**은 "좌표가 깨짐"과 "플레이어가 아닌 사람이 맵 아래로 빠짐"이다. AI 가 서로 싸우므로 사망 수는 출력만 한다.
 
-### 옮길 대상
+### 9단계가 쓸 것
 
-UnityXOPS `C:\Users\twoj2\Desktop\Project\UnityXOPS\Assets\UnityXOPS\Runtime\Map\` (브랜치 `QoL-road-to-multiplay(0.4)`):
-
-| 파일 | 줄 수 | 내용 |
-|---|---|---|
-| `Human/AIController.cs` | 84 | AI 틱 진입점 (`SimOrder` 200). 사람마다 `AIBrain`을 돌리고 이동 의사를 컨트롤러에 넣는다 |
-| `Human/AIBrain.cs` | 329 | 상태(통상·경계·전투 등)와 전이, 피격·소리 반응 |
-| `Human/AIBrainAim.cs` | 191 | 조준, 시야 판정 |
-| `Human/AIBrainCombat.cs` | 210 | 적 탐색, 사격 판단 |
-| `Human/AIBrainNavigation.cs` | 204 | 경로 따라가기, 장애물 대응 |
-| `Human/AIBrainWeapon.cs` | 76 | 무기 선택, 재장전 |
-| `Human/AIBrainZombie.cs` | 222 | 좀비 근접 공격 |
-| `Human/AIMoveNavi.cs` | 138 | PD1 경로 포인트 순회 (치트 F9 용 고정 목표 포함) |
-| `Event/EventManager.cs`, `EventType.cs` | 274, 21 | 미션 이벤트 줄 처리, 클리어·실패 판정 (`SimOrder` 300) |
-
-원본 대조 대상: `OpenXOPS/ai.cpp`(2,371줄), `event.cpp`(352줄), `gamemain.cpp`의 미션 판정·치트 부분, `objectmanager.cpp`의 `CheckZombieAttack` / `HitZombieAttack`(2416-2530), 발소리(`SetFootsteps`, 2760-2805).
-데이터: `godotdata/human/ai.json`(`HumanAIParameterData`, AI 레벨별 값과 `aiHear*` 청취 거리), `type.json`(좀비 여부, 근접 데미지).
-
-### 설계할 때 정해야 하는 것
-
-- **AI 클래스 구조.** UnityXOPS 는 `AIBrain` partial 5개다. Godot 에서도 순수 클래스(노드 아님)로 두고 `Human`이 하나씩 갖게 할지, 플레이어가 된 사람(F8 로 교체)의 AI 를 어떻게 멈출지 정한다. 원본은 플레이어 번호만 건너뛴다.
-- **시야·사선 판정.** UnityXOPS 가 `Physics.Raycast`를 쓴 곳은 `MapLoader.RaycastBlock`으로 바꾼다. 원본 `ai.cpp`의 판정(블록만 보는지, 사람·소물도 보는지)을 확인해 그대로 따른다.
-- **난수.** AI 판단의 `GetRand`는 전부 `GameRandom.Gameplay`. 호출 순서가 원본과 같아야 하는 곳이 있는지 확인한다.
-- **AI 의 틱 주기.** 원본은 매 프레임 돌지만 일부 판단은 카운터로 쉰다. UnityXOPS 가 실수 초 타이머로 바꾼 곳은 정수 틱으로 되돌린다.
-- **이벤트.** PD1 이벤트 포인트(종류 10~19)를 `MapLoader.GetEventPoint`로 따라간다. 메시지 표시와 클리어·실패 결과를 9단계 UI 가 읽을 수 있게 어디에 둘지(시그널을 가진 창구 Autoload) 정한다. GDScript 는 C# static 을 못 본다.
-- **발소리.** 원본은 소리 재생과 AI 청각을 한 함수로 한다. 데이터에 `aiHearFootstep*`가 있다. `HumanController.SimTick`에 넣을 자리와, 발소리 WAV 를 실제로 낼지(UnityXOPS 가 냈는지)를 확인한다.
-- **맨손 팔.** 원본은 플레이어가 아닌 맨손 사람의 팔이 조준 방향을 따른다 (`object.cpp:3431-3438`). UnityXOPS 는 좀비 공격·항복 동작 때만 따르게 했다. `Human.SetUnarmedArmDynamic`이 준비돼 있다. 어느 쪽으로 할지 사용자에게 묻는다.
-- **검증 방법.** AI 는 눈으로 봐야 하는 부분이 많다. `play_test`에 AI 켜기/끄기, AI 상태 표시를 넣고, `--selftest`는 AI 를 켠 채 59개 미션을 일정 틱 돌려 예외·맵 이탈이 없는지 본다. 지금 `--selftest`는 "서 있기만 한 사람이 죽으면 실패"로 보는데, AI 가 켜지면 서로 쏘므로 이 조건을 바꿔야 한다.
-
-### 이미 준비돼 있는 것
-
-- AI 청각 신호: `WorldSound.EmitPointSound`가 총성·착탄·피격·폭발·소물 피격에서 호출되고, 총알 통과는 `Bullet.NotifyBulletPass`가 알린다. AI 는 `Human.ConsumeThreatHeard()` / `ConsumeHit(out 공격자 방향)` 으로 소비한다. `SimClock.TickEnabled` 가 false 면 신호를 내지 않는다.
-- 무기 조작: `Human.QueueWeaponInput` 또는 `ShotWeapon` / `ReloadWeapon` / `SetSelectWeapon` / `DropCurrentWeapon`. 연속 발사 수 제한(단발 무기)이 사람 쪽에 있어 AI 가 매 틱 발사를 요청해도 원본처럼 동작한다.
-- 사람 정보: `Human.AILevel`, `PathStartId`, `Team`, `Identifier`, `HumanTypeData.zombie`, `CurrentErrorRange()`, `IsReloading`, `Controller.Position` / `Yaw` / `Pitch` / `Grounded` / `MoveVelocity`.
-- 찾기: `MapLoader.SearchHuman`, `SearchSmallObject`, `GetPathPoint`, `GetEventPoint`, `GetMessageText`, `Human.SetTeam`(팀 변경 이벤트).
-- 밀기: `Controller.AddKnockback` / `AddKnockbackVector`, 순간 이동: `Controller.Teleport`.
-
-### 아직 없는 것
-
-- 발소리, 좀비 근접 공격과 그 혈흔·소리, 치트 F9(복제).
-- HUD(9단계): 조준선(`Human.CurrentErrorRange()`), 스코프 화면, 탄약 표시, 스코프 중 마우스 감도, 피격 화면 번쩍임(`Human.ConsumeHit`), 통계 화면(`MapLoader.Stats`).
+- `EventManager.Instance.BeginMission()` — 메인게임 씬이 맵·사람을 로드한 뒤 부른다. 난수 재시드는 로드 전에 `GameRandom.ReseedEntropy()`로 따로 한다 (랜덤 무기 스폰이 로드 중에 난수를 쓴다).
+- 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`. 프로퍼티 `Result`(0 진행, 1 클리어, 2 실패), `EndTicks`(끝난 뒤 지난 틱, 원본 `end_framecnt` — 끝나는 연출 4초의 기준), `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`.
+- 메뉴·오프닝 데모는 `AIController.DrivePlayer = true` 로 플레이어까지 AI 가 움직이게 하고, 이벤트는 시작하지 않는다 (원본 데모).
+- HUD: 조준선(`Human.CurrentErrorRange()`), 스코프 화면, 탄약 표시, 스코프 중 마우스 감도, 피격 화면 번쩍임(`Human.ConsumeHit` — 플레이어는 AI 가 소비하지 않는다), 통계 화면(`MapLoader.Stats`).
 
 ## 아직 옮기지 않은 것 (단계별)
 
@@ -151,6 +130,10 @@ UnityXOPS `C:\Users\twoj2\Desktop\Project\UnityXOPS\Assets\UnityXOPS\Runtime\Map
 - **옮기지 않기로 한 것**: `Runtime/Modding/` 전체와 Lua, `LetterboxController`(Godot 창 스케일로 대체), 자체 BMP/DDS/TGA/WAV 파서(Godot 내장 로더로 대체)
 
 ## 확인이 덜 된 것
+
+- **AI 의 움직임**은 수치(`ai_check`)와 59개 미션 300틱 실행으로 확인했고, 사용자가 창에서 플레이해 보고 잘 된다고 했다 (2026-10-04). 미션별 난이도와 좀비 미션까지 하나하나 본 것은 아니다.
+- **이벤트**는 점검용 포인트로 종류별 동작을 확인했다. 실제 미션의 이벤트 줄이 끝까지 진행되는지(메시지 순서, 클리어 조건)는 플레이해 봐야 한다. `--selftest`에서 300틱 안에 끝난 미션은 3개다.
+- **치트 F9**(복제)는 수치로만 확인했다. 창에서 복제가 따라오고 싸우는 모양은 확인하지 않았다.
 
 - **효과음**은 재생 호출과 볼륨 계산만 점검했다. 실제로 들리는 소리(음량 균형, 거리감, 통과음)는 사용자가 창에서 확인해야 한다.
 - **이펙트 모양**은 총구 화염·탄피·연기를 스크린샷으로 봤다. 혈흔, 벽 데칼, 착탄 연기, 폭발은 호출 수만 점검했고 화면은 확인하지 않았다.

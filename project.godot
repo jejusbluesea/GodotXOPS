@@ -26,6 +26,7 @@ BulletManager="*res://src/Map/Bullet/BulletManager.cs"
 WeaponManager="*res://src/Map/Weapon/WeaponManager.cs"
 EffectManager="*res://src/Map/Effect/EffectManager.cs"
 SoundManager="*res://src/Map/Sound/SoundManager.cs"
+EventManager="*res://src/Map/Event/EventManager.cs"
 
 [display]
 

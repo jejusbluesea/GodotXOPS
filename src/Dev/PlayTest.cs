@@ -7,19 +7,24 @@ namespace GodotXOPS.Dev
     /// <summary>
     /// 개발용 플레이 점검 씬. 미션의 맵과 사람을 로드하고 플레이어를 직접 조작해 이동·충돌·카메라·무기를 확인한다.
     /// 조작: 마우스 시점, 이동 키, Space 점프, Tab 걷기, 좌클릭 발사, R 재장전, 1/2 슬롯, Z/X 무기 종류 전환, Shift 스코프,
-    /// F1 1인칭/3인칭, F3 총알 판정 원기둥 표시, F5+Enter 상승, F6+Enter 탄약 추가, F7+←/→ 무기 교체, F8+←/→ 조작 대상 교체, Delete 플레이어 사망, Esc 마우스 풀기/잡기.
+    /// F1 1인칭/3인칭, F3 총알 판정 원기둥 표시, F5+Enter 상승, F6+Enter 탄약 추가, F7+←/→ 무기 교체, F8+←/→ 조작 대상 교체,
+    /// F9+↑/↓ 복제(따라오기/제자리), F2 AI 정지/재개, F4 전원 비전투 켜기/끄기, End 전원 경계, Insert 플레이어 무적 켜기/끄기,
+    /// Home 디버그 텍스트 켜기/끄기, Delete 플레이어 사망, Esc 마우스 풀기/잡기.
     /// 명령행 인자("--" 뒤): --selftest 는 모든 미션에서 틱을 돌려 보고 종료, --screenshot 경로 는 화면을 PNG 로 저장하고 종료,
     /// --mission 번호 / --addon 은 시작 미션, --third 는 3인칭으로 시작, --walk 는 스크린샷 전까지 전진 입력을 넣는다,
     /// --fire 는 스크린샷 전까지 발사 입력을 넣는다, --weapon 번호 는 플레이어의 현재 무기를 바꾼다, --hitbox 는 판정 원기둥을 켠 채 시작한다,
     /// --look yaw,pitch 는 스크린샷 동안 시선을 고정한다, --pos x,y,z 는 플레이어를 그 자리로 옮긴다, --drop 은 시작할 때 현재 무기를 버린다,
-    /// --probe x,y,z,yaw,틱수 는 플레이어를 그 자리에 놓고 전진시킨 결과를 출력하고 종료한다.
+    /// --probe x,y,z,yaw,틱수 는 플레이어를 그 자리에 놓고 전진시킨 결과를 출력하고 종료한다, --noai 는 AI 를 끈 채 시작한다,
+    /// --invincible 은 플레이어 무적을 켠 채 시작한다, --notext 는 디버그 텍스트를 끈 채 시작한다.
     /// </summary>
     public partial class PlayTest : Node3D
     {
         private const int k_screenshotWaitFrames = 90;
         // 스크린샷 전에 최소한 이만큼의 시간(초)이 지나야 한다. 프레임이 매우 빠를 때 틱이 거의 돌지 않은 화면이 찍히는 것을 막는다.
         private const double k_screenshotWaitSeconds = 0.7;
-        private const int k_selfTestTicks = 150;
+        private const int k_selfTestTicks = 300;
+        // 상태 표시에 올리는 사람 수 (플레이어에게 가까운 순).
+        private const int k_aiInfoCount = 6;
         // 판정 원기둥을 그릴 때 둘레를 나누는 수.
         private const int k_hitboxSegments = 16;
 
@@ -40,6 +45,11 @@ namespace GodotXOPS.Dev
         private float m_lookYaw;
         private float m_lookPitch;
 
+        private bool m_noFight;
+        // 플레이어 무적. 조작 대상이 바뀌면(치트 F8) 새 대상으로 옮겨 간다.
+        private bool m_invincible;
+        private Human m_invinciblePlayer;
+        private bool m_showText = true;
         private bool m_showHitbox;
         private MeshInstance3D m_hitboxMesh;
         private ImmediateMesh m_hitboxLines;
@@ -64,6 +74,8 @@ namespace GodotXOPS.Dev
             BuildMissionList();
 
             string[] args = OS.GetCmdlineUserArgs();
+            AIController.Enabled = Array.IndexOf(args, "--noai") < 0;
+            AIController.DrivePlayer = false;
             if (Array.IndexOf(args, "--selftest") >= 0)
             {
                 RunSelfTest();
@@ -95,6 +107,8 @@ namespace GodotXOPS.Dev
             m_autoWalk = Array.IndexOf(args, "--walk") >= 0;
             m_autoFire = Array.IndexOf(args, "--fire") >= 0;
             m_showHitbox = Array.IndexOf(args, "--hitbox") >= 0;
+            m_invincible = Array.IndexOf(args, "--invincible") >= 0;
+            m_showText = Array.IndexOf(args, "--notext") < 0;
 
             int weaponArg = Array.IndexOf(args, "--weapon");
             if (weaponArg >= 0 && weaponArg + 1 < args.Length && int.TryParse(args[weaponArg + 1], out int weaponIndex) && MapLoader.Player != null)
@@ -139,6 +153,11 @@ namespace GodotXOPS.Dev
                 m_screenshotCountdown = k_screenshotWaitFrames;
                 m_missionSelect.Visible = false;
             }
+            else if (!m_showText)
+            {
+                m_missionSelect.Visible = false;
+                SetMouseCaptured(true);
+            }
             else
             {
                 SetMouseCaptured(true);
@@ -147,6 +166,7 @@ namespace GodotXOPS.Dev
 
         public override void _Process(double delta)
         {
+            ApplyInvincible();
             UpdateInfo();
             UpdateHitboxLines();
 
@@ -177,16 +197,45 @@ namespace GodotXOPS.Dev
                 return;
             }
 
-            // Delete — 플레이어를 즉시 죽여 사망 동작과 사망 카메라를 확인한다.
+            // Delete — 플레이어를 즉시 죽여 사망 동작과 사망 카메라를 확인한다. 무적이 켜져 있으면 끈다.
             Human player = MapLoader.Player;
             if (player != null && InputManager.Instance.WasKeyPressed(Key.Delete))
             {
+                m_invincible = false;
+                player.SetInvincible(false);
                 player.ApplyDamage(player.HP);
+            }
+
+            if (InputManager.Instance.WasKeyPressed(Key.Insert))
+            {
+                m_invincible = !m_invincible;
+            }
+
+            // 디버그 텍스트만 끈다. 치트 키와 점검 기능은 그대로 동작한다.
+            if (InputManager.Instance.WasKeyPressed(Key.Home))
+            {
+                m_showText = !m_showText;
+                m_missionSelect.Visible = m_showText;
             }
 
             if (InputManager.Instance.WasKeyPressed(Key.F3))
             {
                 m_showHitbox = !m_showHitbox;
+            }
+
+            // AI 디버그 치트 (원본은 콘솔 명령): F2 AI 정지/재개, F4 전원 비전투, End 전원 경계.
+            if (InputManager.Instance.WasKeyPressed(Key.F2))
+            {
+                AIController.Enabled = !AIController.Enabled;
+            }
+            if (InputManager.Instance.WasKeyPressed(Key.F4))
+            {
+                m_noFight = !m_noFight;
+                AIController.SetNoFightAll(m_noFight);
+            }
+            if (InputManager.Instance.WasKeyPressed(Key.End))
+            {
+                AIController.SetCautionAll();
             }
 
             if (InputManager.Instance.WasPressed(InputManager.Escape))
@@ -198,6 +247,21 @@ namespace GodotXOPS.Dev
         public override void _ExitTree()
         {
             SimClock.TickEnabled = false;
+        }
+
+        /// <summary>
+        /// 무적 설정을 지금의 플레이어에게 맞춘다. 조작 대상이 바뀌었으면 옛 대상의 무적을 푼다.
+        /// </summary>
+        private void ApplyInvincible()
+        {
+            Human player = MapLoader.Player;
+            if (m_invinciblePlayer != player && IsInstanceValid(m_invinciblePlayer))
+            {
+                m_invinciblePlayer.SetInvincible(false);
+            }
+
+            m_invinciblePlayer = player;
+            player?.SetInvincible(m_invincible);
         }
 
         private void SetMouseCaptured(bool captured)
@@ -351,6 +415,8 @@ namespace GodotXOPS.Dev
             bool blocks = MapLoader.LoadBlockData(loader.MissionBD1Path);
             MapLoader.LoadSkyData(loader.SkyIndex);
             bool points = MapLoader.LoadPointData(loader.MissionPD1Path);
+            m_noFight = false;
+            if (blocks && points) EventManager.Instance.BeginMission();
             return blocks && points;
         }
 
@@ -359,6 +425,12 @@ namespace GodotXOPS.Dev
         /// </summary>
         private void UpdateInfo()
         {
+            if (!m_showText)
+            {
+                m_info.Text = "Home 디버그 텍스트 켜기";
+                return;
+            }
+
             MapLoader loader = MapLoader.Instance;
             Human player = MapLoader.Player;
             if (player == null)
@@ -375,20 +447,71 @@ namespace GodotXOPS.Dev
             Weapon weapon = player.CurrentWeapon;
             string weaponState = player.IsReloading ? "재장전 중" : player.IsSwitchingWeapon ? "전환 중" : player.IsScoping ? "스코프" : "대기";
             int alive = 0;
+            int normal = 0;
+            int caution = 0;
+            int action = 0;
             foreach (Human human in MapLoader.Humans)
             {
-                if (human.Alive) alive++;
+                if (!human.Alive) continue;
+
+                alive++;
+                if (human == player) continue;
+                switch (human.Brain.Mode)
+                {
+                    case AIBattleMode.Action: action++; break;
+                    case AIBattleMode.Caution: caution++; break;
+                    default: normal++; break;
+                }
             }
+
+            EventManager events = EventManager.Instance;
+            string result = events.Result == (int)MissionResult.Complete ? "클리어" : events.Result == (int)MissionResult.Failed ? "실패" : "진행 중";
+            string message = events.MessageId >= 0 ? $"  메시지 #{events.MessageId}: {events.MessageText}" : string.Empty;
 
             m_info.Text =
                 $"{loader.MissionFullname}  |  사람 {MapLoader.HumanCount} (생존 {alive}), 추가 충돌 {(loader.AdjustCollision ? "켜짐" : "꺼짐")}  |  {Engine.GetFramesPerSecond():0} fps\n" +
-                $"플레이어 #{MapLoader.PlayerIndex} {player.HumanData?.name}  팀 {player.Team}  HP {player.HP:0}  상태 {player.DeadState}\n" +
+                $"플레이어 #{MapLoader.PlayerIndex} {player.HumanData?.name}  팀 {player.Team}  HP {player.HP:0}{(player.Invincible ? " (무적)" : string.Empty)}  상태 {player.DeadState}\n" +
                 $"위치 ({position.X:0.00}, {position.Y:0.00}, {position.Z:0.00})  수평 속도 {horizontalSpeed:0.00} m/s  수직 {velocity.Y:0.00}  접지 {(controller.Grounded ? "예" : "아니오")}\n" +
                 $"yaw {controller.Yaw:0.0} pitch {controller.Pitch:0.0}  시점 {m_playerController.ViewMode}\n" +
                 $"무기 [슬롯 {player.SelectWeapon}] #{weapon.WeaponIndex} {weapon.Data.name}  탄약 {weapon.Magazine}/{weapon.Reserve}  {weaponState}  조준 오차 {player.CurrentErrorRange()}  날아가는 탄환 {BulletManager.Instance.CountActive()}\n" +
                 $"떨어진 무기 {WeaponManager.Instance.CountActive()}  소물 {MapLoader.SmallObjects.Count}  이펙트 {EffectManager.Instance.CountActive()}  |  발사 {MapLoader.Stats.Fire} 명중 {MapLoader.Stats.OnTargetInt} 헤드샷 {MapLoader.Stats.Headshot} 킬 {MapLoader.Stats.Kill}  {MapLoader.Stats.PlayTime:0.0}초\n" +
+                $"AI {(AIController.Enabled ? "켜짐" : "정지")}{(m_noFight ? " (비전투)" : string.Empty)}  평상시 {normal} 경계 {caution} 전투 {action}  |  미션 {result}{message}\n" +
+                NearestAIInfo(player) +
                 "이동 키 | Space 점프 | Tab 걷기 | 좌클릭 발사 | R 재장전 | 1/2 슬롯 | Z/X 종류 전환 | G 버리기 | Shift 스코프\n" +
-                "F1 시점 | F3 판정 원기둥 | F5+Enter 상승 | F6+Enter 탄약 | F7+←/→ 무기 교체 | F8+←/→ 대상 교체 | Delete 사망 | Esc 마우스";
+                "F1 시점 | F3 판정 원기둥 | F5+Enter 상승 | F6+Enter 탄약 | F7+←/→ 무기 교체 | F8+←/→ 대상 교체 | F9+↑/↓ 복제 | Delete 사망 | Esc 마우스\n" +
+                "F2 AI 정지/재개 | F4 전원 비전투 | End 전원 경계 | Insert 무적 | Home 디버그 텍스트 끄기";
+        }
+
+        /// <summary>
+        /// 플레이어에게 가까운 사람 몇 명의 AI 상태를 한 줄씩 만든다: 번호, 팀, 상태, 이동 모드, 표적, 거리.
+        /// </summary>
+        /// <param name="player">플레이어.</param>
+        /// <returns>표시할 문자열 (줄마다 줄바꿈으로 끝난다).</returns>
+        private static string NearestAIInfo(Human player)
+        {
+            var nearest = new List<(float distance, int index)>();
+            IReadOnlyList<Human> humans = MapLoader.Humans;
+            for (int i = 0; i < humans.Count; i++)
+            {
+                if (humans[i] == player || !humans[i].Alive) continue;
+                nearest.Add(((humans[i].Controller.Position - player.Controller.Position).Length(), i));
+            }
+            nearest.Sort((a, b) => a.distance.CompareTo(b.distance));
+
+            var text = new System.Text.StringBuilder();
+            for (int i = 0; i < nearest.Count && i < k_aiInfoCount; i++)
+            {
+                Human human = humans[nearest[i].index];
+                AIBrain brain = human.Brain;
+                string enemy = "-";
+                for (int j = 0; j < humans.Count; j++)
+                {
+                    if (humans[j] == brain.Enemy) enemy = $"#{j}";
+                }
+                string range = brain.Mode == AIBattleMode.Action ? (brain.LongAttack ? " 원거리" : " 근거리") : string.Empty;
+                text.Append($"  #{nearest[i].index} 팀 {human.Team} {brain.Mode}{range} 경로 {brain.Navi.Mode} 표적 {enemy} 거리 {nearest[i].distance:0.0} m HP {human.HP:0}\n");
+            }
+            return text.ToString();
         }
 
         /// <summary>
@@ -408,6 +531,7 @@ namespace GodotXOPS.Dev
             }
 
             GameRandom.Reseed(1u);
+            AIController.Enabled = false;
             HumanController controller = human.Controller;
             var start = new Vector3(v[0], v[1], v[2]);
             controller.Teleport(start);
@@ -428,7 +552,8 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
-        /// 모든 미션을 로드해 플레이어에게 전진 입력을 넣고 틱을 돌린 뒤, 사람이 맵 아래로 빠지거나 좌표가 깨지지 않았는지 확인하고 종료한다.
+        /// 모든 미션을 로드해 AI 와 이벤트를 켠 채 플레이어에게 전진 입력을 넣고 틱을 돌린 뒤, 사람이 맵 아래로 빠지거나 좌표가 깨지지 않았는지 확인하고 종료한다.
+        /// AI 가 서로 싸우므로 죽은 사람 수는 문제로 보지 않고 합계만 출력한다.
         /// </summary>
         private void RunSelfTest()
         {
@@ -436,6 +561,9 @@ namespace GodotXOPS.Dev
             int loaded = 0;
             int totalHumans = 0;
             int totalDead = 0;
+            int totalAction = 0;
+            int totalMoved = 0;
+            int totalEnded = 0;
             int totalWeapons = 0;
             int totalObjects = 0;
             int embeddedObjects = 0;
@@ -452,6 +580,8 @@ namespace GodotXOPS.Dev
 
                 loaded++;
                 GameRandom.Reseed(1u);
+                // 소리가 AI 에게 전달되려면 시뮬레이션이 켜져 있어야 한다. 틱은 아래에서 직접 돌린다.
+                SimClock.TickEnabled = true;
                 totalWeapons += WeaponManager.Instance.CountActive();
                 totalObjects += MapLoader.SmallObjects.Count;
                 foreach (SmallObject smallObject in MapLoader.SmallObjects)
@@ -467,6 +597,7 @@ namespace GodotXOPS.Dev
                     player.SetInput(in input);
                     SimClock.Step();
                 }
+                SimClock.TickEnabled = false;
 
                 int fellOut = 0;
                 int dead = 0;
@@ -475,23 +606,28 @@ namespace GodotXOPS.Dev
                 {
                     Vector3 position = human.Controller.Position;
                     if (!position.IsFinite()) broken = true;
-                    if (position.Y <= deadlineY + 0.001f) fellOut++;
-                    // 플레이어는 계속 전진시키므로 지붕 등에서 떨어져 죽을 수 있다. 서 있기만 한 다른 사람이 죽는 것만 문제로 본다.
+                    // 플레이어는 계속 전진시키므로 지붕 등에서 떨어질 수 있다. AI 가 움직이는 다른 사람이 맵 아래로 빠지는 것만 문제로 본다.
+                    if (position.Y <= deadlineY + 0.001f && human != MapLoader.Player) fellOut++;
                     if (!human.Alive && human != MapLoader.Player) dead++;
+                    if (human != MapLoader.Player && human.Alive)
+                    {
+                        if (human.Brain.Mode == AIBattleMode.Action) totalAction++;
+                        if ((human.Controller.Position - human.HumanParam.position).Length() > 1f) totalMoved++;
+                    }
                 }
+                if (EventManager.Instance.Result != (int)MissionResult.InProgress) totalEnded++;
 
                 totalHumans += MapLoader.HumanCount;
                 totalDead += dead;
                 if (broken) failures.Add($"{label}: 좌표가 깨진 사람이 있음");
                 if (fellOut > 0) failures.Add($"{label}: 맵 아래로 빠진 사람 {fellOut}명 / {MapLoader.HumanCount}명");
-                if (dead > fellOut) failures.Add($"{label}: 낙하 등으로 죽은 사람 {dead - fellOut}명");
                 if (!MapLoader.Player.Alive) continue;
                 if ((player.Position - start).Length() < 0.01f) failures.Add($"{label}: 플레이어가 전진 입력에도 움직이지 않음");
             }
 
             MapLoader.UnloadPointData();
             if (embeddedObjects > 0) failures.Add($"좌표가 깨진 소물 {embeddedObjects}개");
-            GD.Print($"미션 {m_entries.Count}개 중 {loaded}개 로드, 사람 합계 {totalHumans}명, 맵 배치 무기 {totalWeapons}개, 소물 {totalObjects}개, 틱 {k_selfTestTicks}회 — 사망 {totalDead}명, 문제 {failures.Count}건");
+            GD.Print($"미션 {m_entries.Count}개 중 {loaded}개 로드, 사람 합계 {totalHumans}명, 맵 배치 무기 {totalWeapons}개, 소물 {totalObjects}개, 틱 {k_selfTestTicks}회 — 사망 {totalDead}명, 전투 중 {totalAction}명, 1 m 넘게 움직인 생존자 {totalMoved}명, 끝난 미션 {totalEnded}개, 문제 {failures.Count}건");
             foreach (string failure in failures)
             {
                 GD.Print($"문제: {failure}");

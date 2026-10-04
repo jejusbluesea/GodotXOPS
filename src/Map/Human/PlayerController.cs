@@ -95,6 +95,13 @@ namespace GodotXOPS
                 if (input.WasKeyPressed(Key.Right) && CyclePlayer(-1)) return;
             }
 
+            // 치트 F9 — F9 를 누른 채 ↑ 로 따라오는 복제, ↓ 로 제자리를 지키는 복제를 만든다 (원본 gamemain.cpp:2411-2455).
+            if (input.IsKeyPressed(Key.F9))
+            {
+                if (input.WasKeyPressed(Key.Up)) SpawnClone(true);
+                else if (input.WasKeyPressed(Key.Down)) SpawnClone(false);
+            }
+
             if (m_player.Alive)
             {
                 // F1 — 1인칭 ↔ 3인칭 (원본 gamemain.cpp:2293-2304).
@@ -313,6 +320,19 @@ namespace GodotXOPS
 
             MapLoader.SetPlayer(MapLoader.GetHuman(next));
             return true;
+        }
+
+        /// <summary>
+        /// 치트(F9) — 플레이어를 복제해 앞에 세운다. 종류·팀·무기 종류가 같고, 플레이어를 따라오거나 그 자리를 지킨다.
+        /// </summary>
+        /// <param name="follow">true 면 플레이어를 따라오고, false 면 만들어진 자리에서 대기한다.</param>
+        private void SpawnClone(bool follow)
+        {
+            Human clone = MapLoader.SpawnHumanClone(m_player);
+            if (clone == null) return;
+
+            if (follow) clone.Brain.SetHoldTracking(m_player);
+            else clone.Brain.SetHoldWait(clone.Controller.Position, clone.Controller.Yaw);
         }
 
         /// <summary>

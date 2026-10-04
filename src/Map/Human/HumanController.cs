@@ -28,6 +28,8 @@ namespace GodotXOPS
         private const float k_embedPredictionTime = 0.33f; // 원본 move*11.0 (11프레임 뒤)
         private const float k_abnormalMoveMargin = 0.1f; // 원본 Dist − speed > 1.0
         private const float k_fallSubstep = 0.33f; // 원본 pos_y += move_y*0.33 (3회 반복, 합 0.99)
+        // 착지 소리를 내는 최소 낙하 속도 (m/s). 원본 object.cpp:1790 — move_y < HUMAN_MAPCOLLISION_GROUND_HEIGHT(프레임당 −0.5).
+        private const float k_landingSoundSpeed = -0.05f * SimClock.FrameRate;
 
         // 추가 충돌 플래그(MapLoader.AdjustCollision)가 켜진 미션에서만 쓰는 중심축 검사 높이 (원본 HUMAN_MAPCOLLISION_ADD_HEIGHT_A/B).
         private const float k_addHeightA = 0.9f;
@@ -66,6 +68,8 @@ namespace GodotXOPS
         private bool m_cheatRise;
         // 접지 여부 — 원본 move_y_flag 의 반전. 스폰 직후 첫 틱 전까지는 접지로 간주한다.
         private bool m_grounded = true;
+        // 이번 틱에 소리가 날 만큼 빠르게 착지했는지 (원본 move_y_landing).
+        private bool m_landedHard;
 
         // 사망 회전: 각속도(deg/s), 각도(deg, + 앞으로 엎어짐 / − 뒤로 자빠짐), 방향(+1/−1).
         private float m_deadAddRy;
@@ -200,6 +204,25 @@ namespace GodotXOPS
             // 원본 human::ProcessObject 말미의 MotionCtrl->ProcessObject 대응 — 이번 틱 입력으로 다리 애니메이션/회전 갱신.
             m_human.HumanVisual?.TickLeg(SimClock.FrameTime, m_moveFlagLt, m_rotationX, m_human.Alive);
             m_human.HumanVisual?.TickArmReaction(m_human.ArmHeld);
+
+            EmitFootsteps();
+        }
+
+        /// <summary>
+        /// 이번 틱의 움직임에 맞는 발소리를 낸다. 원본 ObjectManager::Process 의 발소리 부분 (objectmanager.cpp:2771-2805).
+        /// 종류는 이번 틱에 소비한 이동 입력으로 정하고 (걷기 → 전진 → 후진 → 좌우 순으로 먼저 걸리는 것), 점프와 착지는 따로 낸다.
+        /// </summary>
+        private void EmitFootsteps()
+        {
+            if (!m_human.Alive || m_human.HP <= 0f) return;
+
+            if ((m_moveFlagLt & HumanMoveFlag.Walk) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Walk);
+            else if ((m_moveFlagLt & HumanMoveFlag.Forward) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Forward);
+            else if ((m_moveFlagLt & HumanMoveFlag.Back) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Back);
+            else if ((m_moveFlagLt & (HumanMoveFlag.Left | HumanMoveFlag.Right)) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Side);
+
+            if (m_landedHard) WorldSound.EmitFootstep(m_human, FootstepKind.Landing);
+            else if ((m_moveFlagLt & HumanMoveFlag.Jump) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Jump);
         }
 
         /// <summary>
@@ -421,6 +444,7 @@ namespace GodotXOPS
             }
 
             m_grounded = landed;
+            m_landedHard = landed && m_moveVelocity.Y < k_landingSoundSpeed;
 
             // 5. 접지 처리: 낙하 데미지, 점프, 급경사 미끄러짐
             if (landed)

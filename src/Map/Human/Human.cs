@@ -19,6 +19,7 @@ namespace GodotXOPS
         private HumanTypeData m_humanTypeData;
         private HumanController m_controller;
         private HumanVisual m_humanVisual;
+        private AIBrain m_brain;
         private HumanHitboxSizeData m_hitboxSize;
         private RawPointData m_humanParam;
         private RawPointData m_humanDataParam;
@@ -30,6 +31,8 @@ namespace GodotXOPS
         private bool m_hitPending;
         // 적 총성·총알 통과·폭발 등 위협 소리를 들었다는 신호. AI 가 매 틱 소비해 경계로 전환한다.
         private bool m_threatHeard;
+        // 데미지를 받지 않는지 (원본 human::Invincible). 점검 도구가 켠다.
+        private bool m_invincible;
 
         public float HP => m_hp;
         public int Team => m_team;
@@ -39,12 +42,15 @@ namespace GodotXOPS
         public HumanTypeData HumanTypeData => m_humanTypeData;
         public HumanController Controller => m_controller;
         public HumanVisual HumanVisual => m_humanVisual;
+        // 이 사람의 AI. 플레이어가 조작하는 동안에는 돌지 않고 상태만 남아 있다.
+        public AIBrain Brain => m_brain;
         // 이 사람 체형의 총알 판정 원기둥 (머리·상반신·다리). 데이터가 없으면 null.
         public HumanHitboxSizeData HitboxSize => m_hitboxSize;
         public RawPointData HumanParam => m_humanParam;
         public RawPointData HumanDataParam => m_humanDataParam;
         public int Identifier => m_identifier;
         public float HitYaw => m_hitYaw;
+        public bool Invincible => m_invincible;
         public float CameraHeight => m_controller.CameraHeight;
 
         // AI 레벨 = HumanData.aiIndex (원본 HumanParameter.AIlevel).
@@ -94,6 +100,8 @@ namespace GodotXOPS
 
             EquipInitialWeapons();
 
+            m_brain = new AIBrain(this);
+
             SimClock.Register(m_controller);
             m_controller.ApplyVisual();
         }
@@ -119,6 +127,15 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 무적 여부를 정한다. 무적이면 HP 가 줄지 않는다. 맞은 반응(조준 흐트러짐, 밀림, 피격 방향)은 그대로 받는다. 원본 human::SetInvincibleFlag.
+        /// </summary>
+        /// <param name="value">true 면 무적.</param>
+        public void SetInvincible(bool value)
+        {
+            m_invincible = value;
+        }
+
+        /// <summary>
         /// 사망 상태를 설정한다. 전이 로직은 HumanController 가 호출한다.
         /// </summary>
         /// <param name="value">새 사망 상태.</param>
@@ -138,7 +155,7 @@ namespace GodotXOPS
         /// <param name="damage">데미지. 0 이하는 무시.</param>
         public void ApplyDamage(float damage)
         {
-            if (!Alive || damage <= 0f) return;
+            if (!Alive || damage <= 0f || m_invincible) return;
 
             m_hp -= damage;
             if (m_hp < 0f) m_hp = 0f;
@@ -200,6 +217,16 @@ namespace GodotXOPS
         {
             ApplyDamage(damage);
             SetHitReaction(DataManager.Instance.HumanParameterData.humanGeneralData.grenadeHitReaction);
+        }
+
+        /// <summary>
+        /// 좀비의 근접 공격 데미지와 조준 흐트러짐을 적용한다. 원본 human::HitZombieAttack (object.cpp:1063-1069).
+        /// </summary>
+        /// <param name="damage">데미지.</param>
+        public void HitZombieAttack(int damage)
+        {
+            ApplyDamage(damage);
+            SetHitReaction(DataManager.Instance.HumanParameterData.humanGeneralData.zombieHitReaction);
         }
 
         /// <summary>
