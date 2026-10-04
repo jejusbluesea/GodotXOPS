@@ -5,8 +5,8 @@ namespace GodotXOPS
 {
     /// <summary>
     /// 무기 모델을 표시하는 노드. 무기 모델 데이터의 메시들을 자식으로 조립한다.
-    /// 이 노드의 위치는 손에 쥔 자리(WeaponData.position)이고, 그 아래 Visual 노드가 정면 보정(Y 180°)과 크기를 갖는다.
-    /// 사람의 무기 부착 루트 아래에 붙여 쓴다.
+    /// 손에 쥔 무기: 이 노드의 위치는 쥔 자리(WeaponData.position)이고, 그 아래 Visual 노드가 정면 보정(Y 180°)과 크기를 갖는다. 사람의 무기 부착 루트 아래에 붙인다.
+    /// 떨어진 무기: 이 노드는 원점에 있고 Visual 노드가 무기 스케일까지 곱한 크기를 갖는다. 위치와 방향은 부모 노드(WeaponManager 의 풀 자리)가 정한다.
     /// </summary>
     public partial class WeaponVisual : Node3D
     {
@@ -17,12 +17,12 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="data">무기 데이터 (쥐는 위치, 크기).</param>
         /// <param name="modelData">무기 모델 데이터. null 이면 모델 없음.</param>
-        public void Build(WeaponData data, WeaponModelData modelData)
+        /// <param name="dropped">true 면 떨어진 무기용으로 조립한다.</param>
+        public void Build(WeaponData data, WeaponModelData modelData, bool dropped = false)
         {
             if (m_visualRoot == null)
             {
-                // 원본 모델은 정면이 반대라 Y 180° 돌려 놓는다. 부착 루트의 Y 180° 와 상쇄된다.
-                m_visualRoot = new Node3D { Name = "Visual", Rotation = new Vector3(0f, Mathf.Pi, 0f) };
+                m_visualRoot = new Node3D { Name = "Visual" };
                 AddChild(m_visualRoot);
             }
 
@@ -32,9 +32,22 @@ namespace GodotXOPS
                 child.Free();
             }
 
-            Position = Coord.FromUnity(data.position);
+            if (dropped)
+            {
+                // 떨어진 무기는 부착 루트(월드 스케일 = 무기 스케일, Y 180°) 밖에 있으므로 스케일을 직접 곱하고 정면 보정은 하지 않는다.
+                float weaponScale = DataManager.Instance.WeaponParameterData.weaponGeneralData.weaponScale;
+                Position = Vector3.Zero;
+                m_visualRoot.Rotation = Vector3.Zero;
+                m_visualRoot.Scale = Vector3.One * (data.size * weaponScale);
+            }
+            else
+            {
+                // 원본 모델은 정면이 반대라 Y 180° 돌려 놓는다. 부착 루트의 Y 180° 와 상쇄된다.
+                Position = Coord.FromUnity(data.position);
+                m_visualRoot.Rotation = new Vector3(0f, Mathf.Pi, 0f);
+                m_visualRoot.Scale = Vector3.One * data.size;
+            }
             Rotation = Vector3.Zero;
-            m_visualRoot.Scale = Vector3.One * data.size;
 
             if (modelData != null)
             {
@@ -49,11 +62,22 @@ namespace GodotXOPS
         /// <param name="modelData">무기 모델 데이터.</param>
         public static void BuildModelParts(Node3D parent, WeaponModelData modelData)
         {
-            for (int i = 0; i < modelData.modelData.Count; i++)
+            BuildModelParts(parent, modelData.textures, modelData.modelData);
+        }
+
+        /// <summary>
+        /// 텍스처 목록과 메시 목록으로 모델을 parent 아래에 만든다. 무기와 소물이 함께 쓴다.
+        /// </summary>
+        /// <param name="parent">메시 노드를 붙일 부모.</param>
+        /// <param name="textures">텍스처 경로 목록.</param>
+        /// <param name="models">메시 목록. 각 항목의 textureIndex 가 텍스처 목록을 가리킨다.</param>
+        public static void BuildModelParts(Node3D parent, System.Collections.Generic.List<string> textures, System.Collections.Generic.List<ModelData> models)
+        {
+            for (int i = 0; i < models.Count; i++)
             {
-                ModelData model = modelData.modelData[i];
-                string texturePath = model.textureIndex >= 0 && model.textureIndex < modelData.textures.Count
-                    ? modelData.textures[model.textureIndex]
+                ModelData model = models[i];
+                string texturePath = model.textureIndex >= 0 && model.textureIndex < textures.Count
+                    ? textures[model.textureIndex]
                     : null;
                 string meshPath = GamePath.Resolve(model.modelPath);
 

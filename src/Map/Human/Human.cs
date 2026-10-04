@@ -101,6 +101,7 @@ namespace GodotXOPS
         public override void _Process(double delta)
         {
             m_controller?.ApplyVisual();
+            PlayPendingFireEffects((float)delta);
         }
 
         public override void _ExitTree()
@@ -149,7 +150,8 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="part">맞은 부위.</param>
         /// <param name="attacks">총알의 현재 위력.</param>
-        public void HitBullet(HumanHitPart part, int attacks)
+        /// <returns>난수를 뺀 기본 데미지. 혈흔이 튀는 양을 정하는 데 쓴다.</returns>
+        public int HitBullet(HumanHitPart part, int attacks)
         {
             HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
             float multiplier = 1f;
@@ -184,9 +186,10 @@ namespace GodotXOPS
                     break;
             }
 
-            int damage = (int)(attacks * multiplier) + GameRandom.Gameplay.Range(randomAdd.min, randomAdd.max);
-            ApplyDamage(damage);
+            int baseDamage = (int)(attacks * multiplier);
+            ApplyDamage(baseDamage + GameRandom.Gameplay.Range(randomAdd.min, randomAdd.max));
             SetHitReaction(reaction);
+            return baseDamage;
         }
 
         /// <summary>

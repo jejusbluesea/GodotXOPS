@@ -23,6 +23,9 @@ MaterialManager="*res://src/Data/Material/MaterialManager.cs"
 SimClock="*res://src/Map/SimClock.cs"
 MapLoader="*res://src/Map/MapLoader.cs"
 BulletManager="*res://src/Map/Bullet/BulletManager.cs"
+WeaponManager="*res://src/Map/Weapon/WeaponManager.cs"
+EffectManager="*res://src/Map/Effect/EffectManager.cs"
+SoundManager="*res://src/Map/Sound/SoundManager.cs"
 
 [display]
 

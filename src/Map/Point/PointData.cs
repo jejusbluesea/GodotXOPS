@@ -37,7 +37,10 @@ namespace GodotXOPS
         private const int k_maxParameterCount = 20;
 
         private Node3D m_humanRoot;
+        private Node3D m_objectRoot;
         private readonly List<Human> m_humans = new List<Human>();
+        private readonly List<SmallObject> m_smallObjects = new List<SmallObject>();
+        private readonly MissionStats m_stats = new MissionStats();
         private readonly List<string> m_messages = new List<string>();
         private readonly Dictionary<string, ShaderMaterial> m_entityMaterialCache = new Dictionary<string, ShaderMaterial>();
         private readonly HumanCollision m_humanCollision = new HumanCollision();
@@ -51,13 +54,17 @@ namespace GodotXOPS
         // 스폰된 전체 Human 목록 (스폰 순서).
         public static IReadOnlyList<Human> Humans => Instance.m_humans;
         public static int HumanCount => Instance.m_humans.Count;
+        // 스폰된 전체 소물 목록 (스폰 순서). 부서진 것도 남아 있다.
+        public static IReadOnlyList<SmallObject> SmallObjects => Instance.m_smallObjects;
+        // 플레이어의 미션 통계.
+        public static MissionStats Stats => Instance.m_stats;
         public static int MessageCount => Instance.m_messages.Count;
 
         // m_humans 내 플레이어 인덱스. 플레이어가 없으면 -1.
         public static int PlayerIndex => Instance.m_player != null ? Instance.m_humans.IndexOf(Instance.m_player) : -1;
 
         /// <summary>
-        /// PD1 파일을 읽어 포인트를 정리하고 사람을 스폰한다. 이전에 로드된 포인트와 사람은 먼저 제거한다.
+        /// PD1 파일을 읽어 포인트를 정리하고 사람·무기·소물을 스폰한다. 이전에 로드된 것은 먼저 제거한다.
         /// 같은 이름의 .msg 파일이 있으면 메시지도 읽는다.
         /// </summary>
         /// <param name="filepath">PD1 파일 전체 경로.</param>
@@ -132,19 +139,139 @@ namespace GodotXOPS
                 loader.m_messages.AddRange(EncodingHelper.ReadAllLines(msgPath));
             }
 
+            SpawnWeapons(points);
+            SpawnSmallObjects(points);
+
+            loader.m_stats.Reset();
             SimClock.Register(loader.m_humanCollision);
+            SimClock.Register(loader.m_stats);
             return true;
         }
 
         /// <summary>
-        /// 로드된 포인트, 스폰된 사람, 메시지를 모두 제거한다.
+        /// 무기 포인트에 떨어진 무기를 놓는다. 원본 ObjectManager::AddWeaponIndex (objectmanager.cpp:367-414).
+        /// 일반 무기(종류 2): param1 = 무기 번호, param2 = 전체 탄 수.
+        /// 랜덤 무기(종류 7): param1 과 param2 중 하나를 반반 확률로 고르고, 탄 수는 장탄수 × 초기 탄약 배수다.
+        /// </summary>
+        /// <param name="points">파일 순서대로의 포인트.</param>
+        private static void SpawnWeapons(RawPointData[] points)
+        {
+            if (!WeaponManager.Loaded) return;
+
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            foreach (RawPointData raw in points)
+            {
+                if (raw.param0 != PointWeapon && raw.param0 != PointRandomWeapon) continue;
+
+                int weaponIndex = raw.param1;
+                int totalBullets = raw.param2;
+                if (raw.param0 == PointRandomWeapon)
+                {
+                    weaponIndex = GameRandom.Gameplay.Range(0, 2) == 0 ? raw.param1 : raw.param2;
+                    if (weaponIndex < 0 || weaponIndex >= parameter.weaponData.Count) continue;
+                    totalBullets = parameter.weaponData[weaponIndex].magazineSize * Weapon.DefaultAutoBulletMultiplier;
+                }
+
+                if (weaponIndex < 0 || weaponIndex >= parameter.weaponData.Count) continue;
+                if (weaponIndex == parameter.weaponGeneralData.noneWeaponIndex) continue;
+
+                // 전체 탄 수를 탄창과 예비로 나눈다 (원본은 탄창 0 으로 놓고 RunReload 를 한 번 부른다).
+                int magazineSize = parameter.weaponData[weaponIndex].magazineSize;
+                int magazine = Mathf.Min(totalBullets, magazineSize);
+                int reserve = Mathf.Max(0, totalBullets - magazineSize);
+
+                WeaponManager.Instance.Spawn(weaponIndex, magazine, reserve, raw.position, raw.look, Vector3.Zero);
+            }
+        }
+
+        /// <summary>
+        /// 소물 포인트(종류 5)에 소물을 놓는다. 원본 ObjectManager::AddSmallObjectIndex (objectmanager.cpp:459-484).
+        /// param1 = 소물 번호, param2 가 0 이 아니면 바닥에 붙인다, param3 = 식별번호.
+        /// </summary>
+        /// <param name="points">파일 순서대로의 포인트.</param>
+        private static void SpawnSmallObjects(RawPointData[] points)
+        {
+            MapLoader loader = Instance;
+
+            // 어드온 미션 전용 추가 사물의 자리를 먼저 채운다. 추가 사물이 없는 미션이면 자리를 비운다.
+            InitializeAddonObject();
+
+            ObjectParameterData parameter = DataManager.Instance.ObjectParameterData;
+            foreach (RawPointData raw in points)
+            {
+                if (raw.param0 != PointSmallObject) continue;
+                if (raw.param1 < 0 || raw.param1 >= parameter.objectData.Count) continue;
+
+                var smallObject = new SmallObject { Name = $"Object_{loader.m_smallObjects.Count}" };
+                loader.m_objectRoot.AddChild(smallObject);
+                smallObject.CreateObject(raw.param1, raw.param3, raw.position, raw.look);
+                if (raw.param2 != 0) smallObject.SnapToGround();
+                loader.m_smallObjects.Add(smallObject);
+            }
+        }
+
+        /// <summary>
+        /// 식별번호가 일치하는 첫 번째 소물을 찾는다. 원본 ObjectManager::SearchSmallobject 대응.
+        /// </summary>
+        /// <param name="identifier">식별번호.</param>
+        /// <returns>첫 매치. 없으면 null.</returns>
+        public static SmallObject SearchSmallObject(int identifier)
+        {
+            return Instance.m_smallObjects.Find(smallObject => smallObject.Identifier == identifier);
+        }
+
+        /// <summary>
+        /// 발사 통계를 기록한다. 쏜 사람이 플레이어일 때만 센다.
+        /// </summary>
+        /// <param name="shooter">쏜 사람.</param>
+        public static void RecordFire(Human shooter)
+        {
+            if (shooter != null && shooter == Instance.m_player) Instance.m_stats.Fire++;
+        }
+
+        /// <summary>
+        /// 명중 통계를 기록한다. 쏜 사람이 플레이어일 때만 센다.
+        /// </summary>
+        /// <param name="shooter">쏜 사람.</param>
+        /// <param name="headshot">머리에 맞았으면 true.</param>
+        /// <param name="weight">명중 가중치 (단발 1, 산탄은 2 / 탄환 수).</param>
+        public static void RecordHit(Human shooter, bool headshot, float weight)
+        {
+            if (shooter == null || shooter != Instance.m_player) return;
+
+            Instance.m_stats.OnTarget += weight;
+            if (headshot) Instance.m_stats.Headshot++;
+        }
+
+        /// <summary>
+        /// 킬 통계를 기록한다. 쏜 사람이 플레이어일 때만 센다.
+        /// </summary>
+        /// <param name="shooter">쏜 사람.</param>
+        public static void RecordKill(Human shooter)
+        {
+            if (shooter != null && shooter == Instance.m_player) Instance.m_stats.Kill++;
+        }
+
+        /// <summary>
+        /// 로드된 포인트, 스폰된 사람·무기·소물, 날아가는 탄환, 이펙트, 소리, 메시지를 모두 제거한다.
         /// </summary>
         public static void UnloadPointData()
         {
             MapLoader loader = Instance;
 
             SimClock.Unregister(loader.m_humanCollision);
+            SimClock.Unregister(loader.m_stats);
             if (BulletManager.Loaded) BulletManager.Instance.Clear();
+            if (WeaponManager.Loaded) WeaponManager.Instance.Clear();
+            if (EffectManager.Loaded) EffectManager.Instance.Clear();
+            if (SoundManager.Loaded) SoundManager.Instance.Clear();
+
+            loader.m_smallObjects.Clear();
+            foreach (Node child in loader.m_objectRoot.GetChildren())
+            {
+                loader.m_objectRoot.RemoveChild(child);
+                child.Free();
+            }
 
             loader.m_player = null;
             loader.m_humans.Clear();

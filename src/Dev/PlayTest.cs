@@ -11,12 +11,14 @@ namespace GodotXOPS.Dev
     /// 명령행 인자("--" 뒤): --selftest 는 모든 미션에서 틱을 돌려 보고 종료, --screenshot 경로 는 화면을 PNG 로 저장하고 종료,
     /// --mission 번호 / --addon 은 시작 미션, --third 는 3인칭으로 시작, --walk 는 스크린샷 전까지 전진 입력을 넣는다,
     /// --fire 는 스크린샷 전까지 발사 입력을 넣는다, --weapon 번호 는 플레이어의 현재 무기를 바꾼다, --hitbox 는 판정 원기둥을 켠 채 시작한다,
-    /// --look yaw,pitch 는 스크린샷 동안 시선을 고정한다,
+    /// --look yaw,pitch 는 스크린샷 동안 시선을 고정한다, --pos x,y,z 는 플레이어를 그 자리로 옮긴다, --drop 은 시작할 때 현재 무기를 버린다,
     /// --probe x,y,z,yaw,틱수 는 플레이어를 그 자리에 놓고 전진시킨 결과를 출력하고 종료한다.
     /// </summary>
     public partial class PlayTest : Node3D
     {
         private const int k_screenshotWaitFrames = 90;
+        // 스크린샷 전에 최소한 이만큼의 시간(초)이 지나야 한다. 프레임이 매우 빠를 때 틱이 거의 돌지 않은 화면이 찍히는 것을 막는다.
+        private const double k_screenshotWaitSeconds = 0.7;
         private const int k_selfTestTicks = 150;
         // 판정 원기둥을 그릴 때 둘레를 나누는 수.
         private const int k_hitboxSegments = 16;
@@ -31,6 +33,7 @@ namespace GodotXOPS.Dev
         private bool m_mouseCaptured;
         private string m_screenshotPath;
         private int m_screenshotCountdown = -1;
+        private double m_screenshotElapsed;
         private bool m_autoWalk;
         private bool m_autoFire;
         private bool m_fixedLook;
@@ -99,6 +102,24 @@ namespace GodotXOPS.Dev
                 MapLoader.Player.SetWeapon(MapLoader.Player.SelectWeapon, weaponIndex);
             }
 
+            int posArg = Array.IndexOf(args, "--pos");
+            if (posArg >= 0 && posArg + 1 < args.Length && MapLoader.Player != null)
+            {
+                string[] parts = args[posArg + 1].Split(',');
+                if (parts.Length == 3
+                    && float.TryParse(parts[0], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float x)
+                    && float.TryParse(parts[1], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float y)
+                    && float.TryParse(parts[2], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out float z))
+                {
+                    MapLoader.Player.Controller.Teleport(new Vector3(x, y, z));
+                }
+            }
+
+            if (Array.IndexOf(args, "--drop") >= 0 && MapLoader.Player != null)
+            {
+                MapLoader.Player.DropCurrentWeapon();
+            }
+
             int lookArg = Array.IndexOf(args, "--look");
             if (lookArg >= 0 && lookArg + 1 < args.Length)
             {
@@ -144,8 +165,11 @@ namespace GodotXOPS.Dev
                     if (m_autoFire) MapLoader.Player.QueueWeaponInput(HumanWeaponAction.Fire);
                 }
 
-                if (m_screenshotCountdown-- == 0)
+                m_screenshotElapsed += delta;
+                if (m_screenshotCountdown > 0) m_screenshotCountdown--;
+                if (m_screenshotCountdown == 0 && m_screenshotElapsed >= k_screenshotWaitSeconds)
                 {
+                    m_screenshotCountdown = -1;
                     Error error = GetViewport().GetTexture().GetImage().SavePng(m_screenshotPath);
                     GD.Print($"스크린샷 {(error == Error.Ok ? "저장" : "실패")}: {m_screenshotPath}");
                     GetTree().Quit(error == Error.Ok ? 0 : 1);
@@ -362,7 +386,8 @@ namespace GodotXOPS.Dev
                 $"위치 ({position.X:0.00}, {position.Y:0.00}, {position.Z:0.00})  수평 속도 {horizontalSpeed:0.00} m/s  수직 {velocity.Y:0.00}  접지 {(controller.Grounded ? "예" : "아니오")}\n" +
                 $"yaw {controller.Yaw:0.0} pitch {controller.Pitch:0.0}  시점 {m_playerController.ViewMode}\n" +
                 $"무기 [슬롯 {player.SelectWeapon}] #{weapon.WeaponIndex} {weapon.Data.name}  탄약 {weapon.Magazine}/{weapon.Reserve}  {weaponState}  조준 오차 {player.CurrentErrorRange()}  날아가는 탄환 {BulletManager.Instance.CountActive()}\n" +
-                "이동 키 | Space 점프 | Tab 걷기 | 좌클릭 발사 | R 재장전 | 1/2 슬롯 | Z/X 종류 전환 | Shift 스코프\n" +
+                $"떨어진 무기 {WeaponManager.Instance.CountActive()}  소물 {MapLoader.SmallObjects.Count}  이펙트 {EffectManager.Instance.CountActive()}  |  발사 {MapLoader.Stats.Fire} 명중 {MapLoader.Stats.OnTargetInt} 헤드샷 {MapLoader.Stats.Headshot} 킬 {MapLoader.Stats.Kill}  {MapLoader.Stats.PlayTime:0.0}초\n" +
+                "이동 키 | Space 점프 | Tab 걷기 | 좌클릭 발사 | R 재장전 | 1/2 슬롯 | Z/X 종류 전환 | G 버리기 | Shift 스코프\n" +
                 "F1 시점 | F3 판정 원기둥 | F5+Enter 상승 | F6+Enter 탄약 | F7+←/→ 무기 교체 | F8+←/→ 대상 교체 | Delete 사망 | Esc 마우스";
         }
 
@@ -411,6 +436,9 @@ namespace GodotXOPS.Dev
             int loaded = 0;
             int totalHumans = 0;
             int totalDead = 0;
+            int totalWeapons = 0;
+            int totalObjects = 0;
+            int embeddedObjects = 0;
             var failures = new List<string>();
 
             for (int i = 0; i < m_entries.Count; i++)
@@ -424,6 +452,12 @@ namespace GodotXOPS.Dev
 
                 loaded++;
                 GameRandom.Reseed(1u);
+                totalWeapons += WeaponManager.Instance.CountActive();
+                totalObjects += MapLoader.SmallObjects.Count;
+                foreach (SmallObject smallObject in MapLoader.SmallObjects)
+                {
+                    if (!smallObject.LogicPosition.IsFinite()) embeddedObjects++;
+                }
                 HumanController player = MapLoader.Player.Controller;
                 Vector3 start = player.Position;
 
@@ -456,7 +490,8 @@ namespace GodotXOPS.Dev
             }
 
             MapLoader.UnloadPointData();
-            GD.Print($"미션 {m_entries.Count}개 중 {loaded}개 로드, 사람 합계 {totalHumans}명, 틱 {k_selfTestTicks}회 — 사망 {totalDead}명, 문제 {failures.Count}건");
+            if (embeddedObjects > 0) failures.Add($"좌표가 깨진 소물 {embeddedObjects}개");
+            GD.Print($"미션 {m_entries.Count}개 중 {loaded}개 로드, 사람 합계 {totalHumans}명, 맵 배치 무기 {totalWeapons}개, 소물 {totalObjects}개, 틱 {k_selfTestTicks}회 — 사망 {totalDead}명, 문제 {failures.Count}건");
             foreach (string failure in failures)
             {
                 GD.Print($"문제: {failure}");

@@ -34,6 +34,16 @@ namespace GodotXOPS
         private const float k_reflectBaseCoef = 0.7f;
         // 폭발 판정 점: 발 위 0.2 m 와 머리 아래 0.2 m (원본 objectmanager.cpp:1076/1088 — +2.0, HUMAN_HEIGHT−2.0).
         private const float k_explosionPointMargin = 0.2f;
+        // 폭발에 맞은 사람의 혈흔 높이: 발 위 1.5 m (원본 objectmanager.cpp:1119 — hy + 15.0).
+        private const float k_explosionBloodHeight = 1.5f;
+        // 수류탄이 튈 때 소리를 내는 최소 속력 (틱당 m). 원본 objectmanager.cpp:2889 speed > 3.4.
+        private const float k_grenadeBoundSoundMinSpeed = 0.34f;
+
+        // 효과음 볼륨. 원본 볼륨 상수(폭발 120, 벽 착탄·바운드 95~100, 피격 75, 통과음 80)를 폭발 기준으로 나눈 값이다.
+        private const float k_explosionVolume = 1f;
+        private const float k_wallHitVolume = 0.8f;
+        private const float k_humanHitVolume = 0.625f;
+        private const float k_passingVolume = 0.667f;
 
         private BulletData m_data;
         private Human m_owner;
@@ -56,6 +66,10 @@ namespace GodotXOPS
         // 마지막으로 맞힌 사람. 같은 사람을 연달아 다시 맞히지 않게 한다 (원본 BulletObj_HumanIndex — 마지막 한 명만 기억).
         private Human m_lastHitHuman;
         private Vector3 m_visualOrigin;
+        // 명중 통계 가중치 (단발 1, 산탄은 2 / 탄환 수).
+        private float m_onTargetWeight;
+        // 카메라 옆을 스치는 소리를 이미 냈는지. 한 발에 한 번만 낸다.
+        private bool m_passingSoundDone;
 
         public bool IsActive => m_active;
         public BulletData Data => m_data;
@@ -82,8 +96,9 @@ namespace GodotXOPS
         /// <param name="pitchDeg">발사 pitch (도, 아래 +).</param>
         /// <param name="speedPerTick">틱당 이동 거리 (m).</param>
         /// <param name="visualOrigin">총구 위치.</param>
+        /// <param name="onTargetWeight">명중 통계 가중치.</param>
         public void Spawn(BulletData data, Human owner, int team, int attacks, int penetration,
-            Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin)
+            Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin, float onTargetWeight)
         {
             m_data = data;
             m_owner = owner;
@@ -101,6 +116,8 @@ namespace GodotXOPS
             m_armingTicks = Mathf.RoundToInt(data.armingDelay * SimClock.FrameRate);
             m_lastHitHuman = null;
             m_visualOrigin = visualOrigin;
+            m_onTargetWeight = onTargetWeight;
+            m_passingSoundDone = false;
             m_active = true;
         }
 
@@ -136,6 +153,12 @@ namespace GodotXOPS
 
             if (m_data.useGravity) TickGrenade();
             else TickStraight();
+
+            if (m_active)
+            {
+                TickPassingSound();
+                NotifyBulletPass();
+            }
         }
 
         /// <summary>
@@ -167,11 +190,12 @@ namespace GodotXOPS
                     return;
                 }
 
-                // 소물 판정 자리 (원본 objectmanager.cpp:810-843). 소물을 옮길 때 넣는다.
+                if (HitSmallObjectsAt(point)) return;
 
                 if (mapFlag > 0 && MapLoader.IsInsideBlock(point))
                 {
                     if (ExplodeOnTrigger(ExplosionTrigger.Block, wallEntry)) return;
+                    HitMap(wallEntry);
 
                     m_penetration--;
                     if (m_penetration >= 0) m_attacks = (int)(m_attacks * k_pierceAttenWall);
@@ -183,6 +207,7 @@ namespace GodotXOPS
             if (mapFlag == 1)
             {
                 if (ExplodeOnTrigger(ExplosionTrigger.Block, wallEntry)) return;
+                HitMap(wallEntry);
                 m_attacks = (int)(m_attacks * (m_penetration > 0 ? k_thinWallAttenPierce : k_thinWallAttenStop));
             }
 
@@ -226,6 +251,12 @@ namespace GodotXOPS
                 float acceleration = -angle * k_reflectAngleCoef + k_reflectBaseCoef;
                 Vector3 reflected = m_velocity - 2f * m_velocity.Dot(normal) * normal;
                 m_velocity = reflected * acceleration;
+
+                // 약하게 굴러가며 튀는 것은 소리를 내지 않는다.
+                if (moveDist > k_grenadeBoundSoundMinSpeed && SoundManager.Loaded)
+                {
+                    SoundManager.Instance.PlayRandomAt(m_data.wallHitSounds, m_position, k_wallHitVolume);
+                }
             }
             else
             {
@@ -275,37 +306,163 @@ namespace GodotXOPS
                 if (HumanHitbox.Contains(size.head, humanPosition, humanYaw, point))
                 {
                     if (ExplodeOnTrigger(ExplosionTrigger.Human, point)) return true;
-                    HitHuman(human, HumanHitPart.Head, k_pierceAttenHead);
+                    HitHuman(human, HumanHitPart.Head, k_pierceAttenHead, point);
                 }
                 if (HumanHitbox.Contains(size.body, humanPosition, humanYaw, point))
                 {
                     if (ExplodeOnTrigger(ExplosionTrigger.Human, point)) return true;
-                    HitHuman(human, HumanHitPart.Body, k_pierceAttenBody);
+                    HitHuman(human, HumanHitPart.Body, k_pierceAttenBody, point);
                 }
                 if (HumanHitbox.Contains(size.leg, humanPosition, humanYaw, point))
                 {
                     if (ExplodeOnTrigger(ExplosionTrigger.Human, point)) return true;
-                    HitHuman(human, HumanHitPart.Leg, k_pierceAttenLeg);
+                    HitHuman(human, HumanHitPart.Leg, k_pierceAttenLeg, point);
                 }
             }
             return false;
         }
 
         /// <summary>
-        /// 사람에 명중한 처리. 원본 ObjectManager::HitBulletHuman (objectmanager.cpp:910-992) 중 데미지·밀림·피격 방향 부분.
+        /// 사람에 명중한 처리. 원본 ObjectManager::HitBulletHuman (objectmanager.cpp:910-992): 데미지, 밀림, 피격 방향, 혈흔, 피격음, 통계.
         /// </summary>
         /// <param name="human">맞은 사람.</param>
         /// <param name="part">맞은 부위.</param>
         /// <param name="attenuation">관통 뒤 위력 배율.</param>
-        private void HitHuman(Human human, HumanHitPart part, float attenuation)
+        /// <param name="point">맞은 지점.</param>
+        private void HitHuman(Human human, HumanHitPart part, float attenuation, Vector3 point)
         {
-            human.HitBullet(part, m_attacks);
+            float hpBefore = human.HP;
+            int baseDamage = human.HitBullet(part, m_attacks);
             human.Controller.AddKnockback(m_yaw, 0f, k_hitKnockbackSpeed);
             human.SetHitYaw(m_yaw);
+
+            MapLoader.RecordHit(m_owner, part == HumanHitPart.Head, m_onTargetWeight);
+            if (hpBefore > 0f && human.HP <= 0f) MapLoader.RecordKill(m_owner);
+
+            // 혈흔은 데미지에 비례해 튄다 (원본 SetHumanBlood).
+            if (EffectManager.Loaded) EffectManager.Instance.Play(m_data.humanHitEffectIndex, point, baseDamage);
+            if (SoundManager.Loaded) SoundManager.Instance.PlayRandomAt(m_data.humanHitSounds, point, k_humanHitVolume);
+
+            HumanAIParameterData ai = DataManager.Instance.HumanParameterData.humanAIParameterData;
+            float hearDistance = part == HumanHitPart.Head ? ai.aiHearHitHumanHead : part == HumanHitPart.Body ? ai.aiHearHitHumanBody : ai.aiHearHitHumanLeg;
+            WorldSound.EmitPointSound(point, m_team, hearDistance, hearDistance);
 
             m_lastHitHuman = human;
             m_attacks = (int)(m_attacks * attenuation);
             m_penetration--;
+        }
+
+        /// <summary>
+        /// 점 하나에서 모든 소물을 검사한다. 원본 objectmanager.cpp:810-843: 점이 소물의 판정 형상 안이면
+        /// 소물에 위력 × 배율(0.25)의 데미지를 주고 총알 위력을 × 감쇠(0.7)로 줄인다. 관통력은 줄지 않는다.
+        /// 사람과 달리 "이미 맞힌 소물"을 기억하지 않으므로, 형상을 지나는 점마다 다시 맞는다.
+        /// </summary>
+        /// <param name="point">검사할 점.</param>
+        /// <returns>소물에 닿아 폭발하거나 불발로 사라져 이 탄환의 처리가 끝났으면 true.</returns>
+        private bool HitSmallObjectsAt(Vector3 point)
+        {
+            IReadOnlyList<SmallObject> objects = MapLoader.SmallObjects;
+            if (objects.Count == 0) return false;
+
+            ObjectGeneralData general = DataManager.Instance.ObjectParameterData.objectGeneralData;
+            for (int i = 0; i < objects.Count; i++)
+            {
+                SmallObject smallObject = objects[i];
+                if (!smallObject.Contains(point)) continue;
+
+                if (ExplodeOnTrigger(ExplosionTrigger.Object, point)) return true;
+
+                smallObject.HitBullet(Mathf.FloorToInt(m_attacks * general.bulletDamageMultiplier));
+                m_attacks = Mathf.FloorToInt(m_attacks * general.bulletPenetrationAttenuation);
+
+                if (EffectManager.Loaded) EffectManager.Instance.Play(m_data.objectHitEffectIndex, point);
+                float hearDistance = DataManager.Instance.HumanParameterData.humanAIParameterData.aiHearHitSmallObject;
+                WorldSound.EmitPointSound(point, m_team, hearDistance, hearDistance);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 총알이 블록에 맞은 연출: 착탄 연기와 소리, 주변 AI 가 듣는 처리. 원본 ObjectManager::HitBulletMap (objectmanager.cpp:891-898).
+        /// </summary>
+        /// <param name="position">착탄 지점.</param>
+        private void HitMap(Vector3 position)
+        {
+            if (EffectManager.Loaded) EffectManager.Instance.Play(m_data.wallHitEffectIndex, position);
+            if (SoundManager.Loaded) SoundManager.Instance.PlayRandomAt(m_data.wallHitSounds, position, k_wallHitVolume);
+
+            float hearDistance = DataManager.Instance.HumanParameterData.humanAIParameterData.aiHearBulletWallHitDist;
+            WorldSound.EmitPointSound(position, m_team, hearDistance, hearDistance);
+        }
+
+        /// <summary>
+        /// 다른 팀의 총알이 카메라 옆을 스쳐 지나가는 순간 통과음을 낸다. 원본 SoundManager::PassingBullet + CheckApproach (soundmanager.cpp:513, 626).
+        /// 플레이어 팀의 총알은 소리를 내지 않는다. 통과음이 없는 탄종(수류탄)도 내지 않는다.
+        /// </summary>
+        private void TickPassingSound()
+        {
+            if (m_passingSoundDone || !SoundManager.Loaded) return;
+            if (m_data.bulletPassingSounds == null || m_data.bulletPassingSounds.Count == 0) return;
+
+            Human player = MapLoader.Player;
+            if (player == null || m_team == player.Team) return;
+
+            if (!IsClosestApproach(m_prevPosition, m_position, SoundManager.Instance.ListenerPosition, out Vector3 closest)) return;
+
+            SoundManager.Instance.PlayRandomAt(m_data.bulletPassingSounds, closest, k_passingVolume);
+            m_passingSoundDone = true;
+        }
+
+        /// <summary>
+        /// 총알이 머리 옆을 스쳐 지나간 AI 에게 위협 신호를 남긴다. 팀을 가리지 않는다 (원본 GetWorldSound 의 BULLET, 거리 20).
+        /// </summary>
+        private void NotifyBulletPass()
+        {
+            if (!SimClock.TickEnabled) return;
+
+            float maxDistance = DataManager.Instance.HumanParameterData.humanAIParameterData.aiHearBulletDist;
+            Human player = MapLoader.Player;
+            IReadOnlyList<Human> humans = MapLoader.Humans;
+
+            for (int i = 0; i < humans.Count; i++)
+            {
+                Human human = humans[i];
+                if (human == player || !human.Alive) continue;
+
+                Vector3 head = human.Controller.Position + Vector3.Up * human.CameraHeight;
+                if (IsClosestApproach(m_prevPosition, m_position, head, out Vector3 closest)
+                    && (closest - head).LengthSquared() < maxDistance * maxDistance)
+                {
+                    human.NotifyThreatHeard();
+                }
+            }
+        }
+
+        /// <summary>
+        /// 이번 틱이 듣는 위치에 가장 가까이 지나가는 틱인지 본다. 직전·현재·다음 위치의 거리를 비교한다 (원본 CheckApproach).
+        /// </summary>
+        /// <param name="previous">직전 틱 위치.</param>
+        /// <param name="current">현재 위치.</param>
+        /// <param name="listener">듣는 위치.</param>
+        /// <param name="closest">경로 위에서 듣는 위치에 가장 가까운 점.</param>
+        /// <returns>가장 가까이 지나가는 틱이면 true.</returns>
+        private static bool IsClosestApproach(Vector3 previous, Vector3 current, Vector3 listener, out Vector3 closest)
+        {
+            closest = current;
+
+            Vector3 move = current - previous;
+            float d1 = (listener - previous).LengthSquared();
+            float d2 = (listener - current).LengthSquared();
+            float d3 = (listener - (current + move)).LengthSquared();
+            if (!(d1 > d2 && d2 < d3)) return false;
+
+            float length = move.Length();
+            if (length > 1e-5f)
+            {
+                Vector3 direction = move / length;
+                closest = current + direction * (listener - current).Dot(direction);
+            }
+            return true;
         }
 
         /// <summary>
@@ -330,14 +487,20 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 폭발. 원본 ObjectManager::GrenadeExplosion (objectmanager.cpp:1039-1230) 중 사람 데미지와 폭풍 부분.
+        /// 폭발. 원본 ObjectManager::GrenadeExplosion (objectmanager.cpp:1039-1230).
         /// 팀을 가리지 않고(쏜 사람 포함) 살아 있는 모든 사람의 발·머리 두 점에 거리 비례 데미지를 준다. 블록에 가려진 점은 데미지가 없다.
+        /// 소물은 중심 한 점으로 같은 방식의 데미지를 받는다.
         /// </summary>
         private void Explode()
         {
             Vector3 origin = m_position;
             float radius = m_data.explosionRadius;
             BulletManager.NotifyExplosion(origin);
+
+            if (SoundManager.Loaded) SoundManager.Instance.PlayAt(m_data.explosionSound, origin, k_explosionVolume);
+            if (EffectManager.Loaded) EffectManager.Instance.Play(m_data.explosionEffectIndex, origin);
+            float hearDistance = DataManager.Instance.HumanParameterData.humanAIParameterData.aiHearExplosionDist;
+            WorldSound.EmitPointSound(origin, m_team, hearDistance, hearDistance);
 
             if (radius > 0f)
             {
@@ -355,12 +518,33 @@ namespace GodotXOPS
                                + ExplosionDamage(origin, feet + Vector3.Up * (height - k_explosionPointMargin), radius, m_data.humanExplosiveHeadDamageMax);
                     if (damage <= 0) continue;
 
+                    float hpBefore = human.HP;
                     human.HitGrenadeExplosion(damage);
                     PushByExplosion(human, origin, feet, radius);
+
+                    // 수류탄은 킬만 통계에 넣는다 (원본 objectmanager.cpp:1113-1115). 혈흔은 튀지 않는 한 덩이만 낸다.
+                    if (hpBefore > 0f && human.HP <= 0f) MapLoader.RecordKill(m_owner);
+                    if (EffectManager.Loaded) EffectManager.Instance.Play(m_data.humanHitEffectIndex, feet + Vector3.Up * k_explosionBloodHeight);
+                }
+
+                // 소물 (원본 objectmanager.cpp:1171-1211).
+                if (m_data.objectExplosiveDamageMax > 0f)
+                {
+                    IReadOnlyList<SmallObject> objects = MapLoader.SmallObjects;
+                    for (int i = 0; i < objects.Count; i++)
+                    {
+                        SmallObject smallObject = objects[i];
+                        if (smallObject.IsDestroyed) continue;
+
+                        Vector3 toObject = smallObject.LogicPosition - origin;
+                        float dist = toObject.Length();
+                        if (dist > radius) continue;
+                        if (dist > 1e-6f && MapLoader.RaycastBlock(origin, toObject / dist, dist, out _)) continue;
+
+                        smallObject.HitGrenadeExplosion((int)m_data.objectExplosiveDamageMax - (int)(m_data.objectExplosiveDamageMax / radius * dist));
+                    }
                 }
             }
-
-            // 소물 폭발 데미지 자리 (원본 objectmanager.cpp:1171-1211). 소물을 옮길 때 넣는다.
 
             Deactivate();
         }

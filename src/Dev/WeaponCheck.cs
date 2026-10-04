@@ -5,7 +5,7 @@ using Godot;
 namespace GodotXOPS.Dev
 {
     /// <summary>
-    /// 개발용 점검 씬 스크립트. 무기·총알·히트박스를 수치로 확인하고 종료한다. 문제가 있으면 종료 코드 1.
+    /// 개발용 점검 씬 스크립트. 무기·총알·히트박스·떨어진 무기·소물·통계와 이펙트·소리 호출을 수치로 확인하고 종료한다. 문제가 있으면 종료 코드 1.
     /// 미션 하나를 로드한 뒤 사람들을 블록이 없는 공중으로 옮겨 놓고, 이동 틱 없이 무기 틱과 총알 틱만 직접 돌린다.
     /// 벽 관통과 수류탄 반사는 로드한 맵의 블록을 그대로 쓴다.
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/weapon_check.tscn
@@ -44,6 +44,9 @@ namespace GodotXOPS.Dev
             CheckGrenadeFlight();
             CheckWalls();
             CheckDeath();
+            CheckDropAndPickup();
+            CheckSmallObjects();
+            CheckStatsEffectsSounds();
 
             MapLoader.UnloadPointData();
             GD.Print($"무기 점검 {m_checks}항목 — 문제 {m_problems.Count}건");
@@ -711,6 +714,245 @@ namespace GodotXOPS.Dev
 
             Expect(thickDone, "두꺼운 벽 사례를 맵에서 찾지 못해 확인하지 못함");
             Expect(thinDone, "얇은 벽 사례를 맵에서 찾지 못해 확인하지 못함");
+        }
+
+        /// <summary>
+        /// 떨어진 무기: 버리면 앞으로 날아가 바닥 바로 위에 멈추고, 맨손인 사람이 범위 안에 들어오면 탄약째로 줍는다. 죽으면 든 무기가 모두 떨어진다.
+        /// </summary>
+        private void CheckDropAndPickup()
+        {
+            MapLoader.LoadMissionData(0, false, 0);
+            MapLoader.LoadBlockData(MapLoader.Instance.MissionBD1Path);
+            MapLoader.LoadPointData(MapLoader.Instance.MissionPD1Path);
+            GameRandom.Reseed(1u);
+
+            Human player = MapLoader.Player;
+            if (player == null) { Expect(false, "떨어진 무기: 플레이어 없음"); return; }
+
+            int mp5 = FindWeapon("MP5");
+            int slot = player.SelectWeapon;
+            player.SetWeapon(slot, mp5, 12, 34);
+            int before = WeaponManager.Instance.CountActive();
+            Vector3 start = player.Controller.Position;
+
+            Expect(player.DropCurrentWeapon() && player.CurrentWeapon.IsNone, "무기를 버렸는데 슬롯이 비지 않음");
+            Expect(WeaponManager.Instance.CountActive() == before + 1, "버린 무기가 맵에 생기지 않음");
+
+            // 버린 무기를 찾는다 (탄약 12/34 인 MP5).
+            int dropped = -1;
+            for (int i = 0; i < WeaponManager.PoolSize; i++)
+            {
+                if (WeaponManager.Instance.TryGetDropped(i, out Weapon weapon, out _, out _)
+                    && weapon.WeaponIndex == mp5 && weapon.Magazine == 12 && weapon.Reserve == 34)
+                {
+                    dropped = i;
+                }
+            }
+            if (dropped < 0) { Expect(false, "버린 무기를 풀에서 찾지 못함"); return; }
+
+            int ticks = 0;
+            bool falling = true;
+            Vector3 landed = Vector3.Zero;
+            while (falling && ticks < 300)
+            {
+                WeaponManager.Instance.SimTick();
+                ticks++;
+                if (!WeaponManager.Instance.TryGetDropped(dropped, out _, out landed, out falling)) break;
+            }
+
+            float margin = DataManager.Instance.WeaponParameterData.weaponDropPhysicsData.groundCollisionMargin;
+            bool grounded = MapLoader.RaycastBlock(landed, Vector3.Down, 1f, out float groundDist);
+            Expect(!falling && grounded && Mathf.Abs(groundDist - margin) < 1e-3f && !MapLoader.IsInsideBlock(landed),
+                $"버린 무기가 {ticks}틱 뒤 바닥 위 {groundDist:0.000} m 에 멈춤 (기대 {margin})");
+            float thrown = new Vector2(landed.X - start.X, landed.Z - start.Z).Length();
+            Expect(thrown > 0.5f, $"버린 무기가 앞으로 날아가지 않음 (수평 {thrown:0.00} m)");
+            Expect(player.CurrentWeapon.IsNone, "멀리 있는 무기를 주움");
+            GD.Print($"버린 무기: {ticks}틱 뒤 착지, 수평 {thrown:0.00} m");
+
+            // 무기 자리로 가면 줍는다.
+            player.Controller.Teleport(landed - Vector3.Up * margin);
+            WeaponManager.Instance.SimTick();
+            Weapon picked = player.CurrentWeapon;
+            Expect(picked.WeaponIndex == mp5 && picked.Magazine == 12 && picked.Reserve == 34 && player.IsSwitchingWeapon,
+                $"주운 무기 #{picked.WeaponIndex} {picked.Magazine}/{picked.Reserve} (기대 #{mp5} 12/34, 전환 중)");
+            Expect(!WeaponManager.Instance.TryGetDropped(dropped, out _, out _, out _), "주운 무기가 맵에 남아 있음");
+
+            // 사망: 든 무기가 모두 떨어진다.
+            Human victim = null;
+            foreach (Human human in MapLoader.Humans)
+            {
+                if (human != player && human.Alive) { victim = human; break; }
+            }
+            if (victim == null) return;
+
+            victim.SetWeapon(0, FindWeapon("M92F"));
+            victim.SetWeapon(1, mp5);
+            before = WeaponManager.Instance.CountActive();
+            victim.ApplyDamage(victim.HP);
+            victim.Controller.SimTick();
+            Expect(WeaponManager.Instance.CountActive() == before + 2, $"사망 시 떨어진 무기 {WeaponManager.Instance.CountActive() - before}개 (기대 2)");
+        }
+
+        /// <summary>
+        /// 소물: 총알이 판정 형상을 지나는 점마다 데미지(위력 × 배율)를 주고 위력이 줄어든다. 내구력이 다하면 부서져 판정에서 빠진다.
+        /// </summary>
+        private void CheckSmallObjects()
+        {
+            // 소물이 있는 미션을 찾는다.
+            int missionCount = DataManager.Instance.MissionData.officialMissions.Count;
+            SmallObject target = null;
+            Vector3 origin = Vector3.Zero;
+            float yaw = 0f;
+            int spawned = 0;
+
+            for (int mission = 0; mission < missionCount && target == null; mission++)
+            {
+                if (!MapLoader.LoadMissionData(mission, false, 0)) continue;
+                if (!MapLoader.LoadBlockData(MapLoader.Instance.MissionBD1Path)) continue;
+                if (!MapLoader.LoadPointData(MapLoader.Instance.MissionPD1Path)) continue;
+                spawned = MapLoader.SmallObjects.Count;
+
+                foreach (SmallObject candidate in MapLoader.SmallObjects)
+                {
+                    // 소물 중심에서 0.5 m 떨어진 곳에서 중심을 향해 쏠 수 있는 방향을 찾는다 (사이에 블록이 없어야 한다).
+                    for (float tryYaw = 0f; tryYaw < 360f && target == null; tryYaw += 45f)
+                    {
+                        Vector3 direction = Coord.AimDirection(tryYaw, 0f);
+                        Vector3 from = candidate.LogicPosition - direction * 0.5f;
+                        if (MapLoader.IsInsideBlock(from) || MapLoader.RaycastBlock(from, direction, 1.5f, out _)) continue;
+                        if (!candidate.Contains(candidate.LogicPosition)) continue;
+
+                        target = candidate;
+                        origin = from;
+                        yaw = tryYaw;
+                    }
+                    if (target != null) break;
+                }
+            }
+
+            if (target == null) { Expect(false, "소물: 쏠 수 있는 소물을 찾지 못해 확인하지 못함"); return; }
+            GameRandom.Reseed(1u);
+
+            ObjectGeneralData general = DataManager.Instance.ObjectParameterData.objectGeneralData;
+            Vector3 aim = Coord.AimDirection(yaw, 0f);
+
+            // 기대값: 한 틱(12점) 동안 판정 형상 안에 드는 점마다 데미지와 감쇠를 적용한다. 경로에 다른 소물이 있으면 그것도 위력을 깎는다.
+            const int attacks = 20;
+            int expectedAttacks = attacks;
+            IReadOnlyList<SmallObject> all = MapLoader.SmallObjects;
+            var remaining = new float[all.Count];
+            for (int i = 0; i < all.Count; i++) remaining[i] = all[i].HP;
+            int targetIndex = 0;
+            int hits = 0;
+            for (int step = 1; step <= 12; step++)
+            {
+                Vector3 point = origin + aim * (k_substep * step);
+                for (int i = 0; i < all.Count; i++)
+                {
+                    if (remaining[i] <= 0f || !all[i].Contains(point)) continue;
+
+                    remaining[i] = Mathf.Max(0f, remaining[i] - Mathf.FloorToInt(expectedAttacks * general.bulletDamageMultiplier));
+                    expectedAttacks = Mathf.FloorToInt(expectedAttacks * general.bulletPenetrationAttenuation);
+                    if (all[i] == target)
+                    {
+                        targetIndex = i;
+                        hits++;
+                    }
+                }
+            }
+            float expectedHp = remaining[targetIndex];
+
+            BulletData data = DataManager.Instance.WeaponParameterData.bulletData[0];
+            int effects = EffectManager.SpawnCount;
+            Bullet bullet = BulletManager.Instance.Spawn(data, null, -99, attacks, 0, origin, yaw, 0f, 3f, origin);
+            bullet.Tick();
+
+            Expect(hits >= 1 && target.HP == expectedHp && bullet.Attacks == expectedAttacks && bullet.Penetration == 0,
+                $"소물 {target.ObjectData.name}: 명중 {hits}회 뒤 내구력 {target.HP}, 총알 위력 {bullet.Attacks} (기대 {expectedHp}, {expectedAttacks})");
+            Expect(EffectManager.SpawnCount > effects, "소물 명중 이펙트가 나오지 않음");
+            GD.Print($"소물 점검: {MapLoader.Instance.MissionName} 의 소물 {spawned}개 중 {target.ObjectData.name} at {target.LogicPosition}, 명중 {hits}회");
+
+            target.HitBullet(100000);
+            Expect(target.IsDestroyed && !target.Contains(target.LogicPosition), "부서진 소물이 판정에 남아 있음");
+
+            // 폭발: 가려지지 않은 소물은 거리 비례 데미지를 받는다.
+            SmallObject other = null;
+            foreach (SmallObject candidate in MapLoader.SmallObjects)
+            {
+                if (!candidate.IsDestroyed) { other = candidate; break; }
+            }
+            if (other == null) return;
+
+            WeaponParameterData weapons = DataManager.Instance.WeaponParameterData;
+            BulletData grenade = weapons.bulletData[weapons.weaponData[weapons.weaponGeneralData.grenadeWeaponIndex].bulletIndex];
+            Vector3 blast = other.LogicPosition + Vector3.Up * 0.3f;
+            float hp = other.HP;
+            int expectedDamage = (int)grenade.objectExplosiveDamageMax - (int)(grenade.objectExplosiveDamageMax / grenade.explosionRadius * 0.3f);
+            BulletManager.Instance.Spawn(grenade, null, -99, 0, 0, blast, 0f, 0f, 0f, blast);
+            TickBullets(Mathf.RoundToInt(grenade.lifetime * SimClock.FrameRate) + 2);
+            Expect(other.HP == Mathf.Max(0f, hp - expectedDamage), $"폭발 뒤 소물 내구력 {other.HP} (기대 {Mathf.Max(0f, hp - expectedDamage)})");
+        }
+
+        /// <summary>
+        /// 통계(발사·명중·헤드샷·킬)와, 격발·착탄·폭발에서 이펙트와 소리가 호출되는지, 소리의 거리 감쇠가 선형인지 확인한다.
+        /// </summary>
+        private void CheckStatsEffectsSounds()
+        {
+            MapLoader.LoadMissionData(0, false, 0);
+            MapLoader.LoadBlockData(MapLoader.Instance.MissionBD1Path);
+            if (!Reset()) { Expect(false, "통계: 준비 실패"); return; }
+
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            int mp5 = FindWeapon("MP5");
+            m_shooter.SetWeapon(m_shooter.SelectWeapon, mp5);
+            WeaponData data = m_shooter.CurrentWeapon.Data;
+            Idle(5);
+
+            // 표적의 머리를 눈높이에 두고 HP 를 1 로 깎아 둔다. 한 발로 명중·헤드샷·킬이 모두 기록돼야 한다.
+            Human target = m_targets[0];
+            target.Controller.Teleport(new Vector3(0f, Eye.Y - target.HitboxSize.head.position.Y, -5f));
+            target.ApplyDamage(target.HP - 1f);
+
+            int sounds = SoundManager.PlayCount;
+            Aim(0f, 0f);
+            m_shooter.QueueWeaponInput(HumanWeaponAction.Fire);
+            m_shooter.TickWeapon();
+            Expect(SoundManager.PlayCount == sounds + 1 && SoundManager.LastPlayedPath == data.soundPath, $"격발음 호출: {SoundManager.LastPlayedPath} (기대 {data.soundPath})");
+
+            // 조준 오차로 빗나가지 않도록, 통계용 한 발은 오차 없이 직접 쏜다.
+            BulletManager.Instance.Clear();
+            int effects = EffectManager.SpawnCount;
+            BulletData bulletData = parameter.bulletData[data.bulletIndex];
+            BulletManager.Instance.Spawn(bulletData, m_shooter, m_shooter.Team, 30, 0, Eye, 0f, 0f, 3f, Eye);
+            TickBullets(2);
+
+            MissionStats stats = MapLoader.Stats;
+            Expect(stats.Fire == 1 && stats.OnTarget == 1f && stats.Headshot == 1 && stats.Kill == 1,
+                $"통계: 발사 {stats.Fire}, 명중 {stats.OnTarget}, 헤드샷 {stats.Headshot}, 킬 {stats.Kill} (기대 1, 1, 1, 1)");
+            Expect(EffectManager.SpawnCount > effects, "사람 명중 혈흔 이펙트가 나오지 않음");
+            Expect(bulletData.humanHitSounds.Contains(SoundManager.LastPlayedPath), $"피격음 호출: {SoundManager.LastPlayedPath}");
+
+            // 다른 사람이 쏜 것은 통계에 넣지 않는다.
+            BulletManager.Instance.Spawn(bulletData, m_targets[1], m_targets[1].Team, 30, 0, Eye + Vector3.Up * 50f, 0f, 0f, 3f, Eye);
+            MapLoader.RecordFire(m_targets[1]);
+            Expect(stats.Fire == 1, "플레이어가 아닌 사람의 발사가 통계에 들어감");
+
+            // 폭발 이펙트와 폭발음.
+            BulletData grenade = parameter.bulletData[parameter.weaponData[parameter.weaponGeneralData.grenadeWeaponIndex].bulletIndex];
+            Vector3 blast = s_arena + new Vector3(200f, 0f, 0f);
+            effects = EffectManager.SpawnCount;
+            BulletManager.Instance.Clear();
+            BulletManager.Instance.Spawn(grenade, m_shooter, m_shooter.Team, 0, 0, blast, 0f, 0f, 0f, blast);
+            TickBullets(Mathf.RoundToInt(grenade.lifetime * SimClock.FrameRate) + 2);
+            Expect(SoundManager.LastPlayedPath == grenade.explosionSound, $"폭발음 호출: {SoundManager.LastPlayedPath}");
+            int expectedEffects = DataManager.Instance.EffectParameterData.effectData[grenade.explosionEffectIndex].emitters.Count;
+            Expect(EffectManager.SpawnCount - effects == expectedEffects, $"폭발 이펙트 {EffectManager.SpawnCount - effects}개 (기대 {expectedEffects})");
+
+            // 소리의 거리 감쇠: 1 m 까지 최대, 33.5 m 에서 0, 그 사이 선형.
+            Expect(Mathf.IsEqualApprox(SoundManager.Attenuation(new Vector3(0.5f, 0f, 0f), Vector3.Zero), 1f)
+                && Mathf.IsEqualApprox(SoundManager.Attenuation(new Vector3(17.25f, 0f, 0f), Vector3.Zero), 0.5f)
+                && SoundManager.Attenuation(new Vector3(40f, 0f, 0f), Vector3.Zero) == 0f,
+                "소리의 거리 감쇠가 선형(1 m ~ 33.5 m)이 아님");
         }
 
         /// <summary>

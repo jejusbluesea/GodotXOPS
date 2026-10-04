@@ -98,9 +98,10 @@ namespace GodotXOPS
         /// <param name="pitchDeg">발사 pitch (도, 아래 +).</param>
         /// <param name="speedPerTick">틱당 이동 거리 (m).</param>
         /// <param name="visualOrigin">총구 위치.</param>
+        /// <param name="onTargetWeight">명중 통계 가중치 (단발 1, 산탄은 2 / 탄환 수).</param>
         /// <returns>발사된 탄환. 풀이 가득 찼으면 null.</returns>
         public Bullet Spawn(BulletData data, Human owner, int team, int attacks, int penetration,
-            Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin)
+            Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin, float onTargetWeight = 1f)
         {
             if (data == null) return null;
 
@@ -109,7 +110,7 @@ namespace GodotXOPS
                 Bullet bullet = m_pool[i];
                 if (bullet.IsActive) continue;
 
-                bullet.Spawn(data, owner, team, attacks, penetration, position, yawDeg, pitchDeg, speedPerTick, visualOrigin);
+                bullet.Spawn(data, owner, team, attacks, penetration, position, yawDeg, pitchDeg, speedPerTick, visualOrigin, onTargetWeight);
                 ApplyVisual(i, data, bullet);
                 SpawnCount++;
                 return bullet;

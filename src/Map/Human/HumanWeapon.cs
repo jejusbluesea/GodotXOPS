@@ -8,6 +8,12 @@ namespace GodotXOPS
         // 들 수 있는 무기 수. 원본 TOTAL_HAVEWEAPON. 슬롯 0 = 보조, 슬롯 1 = 주 무기.
         public const int WeaponSlotCount = 2;
 
+        // 무기를 버리거나 떨어뜨릴 때 놓는 자리: 던지는 방향으로 0.5 m, 위로 1.6 m (원본 weapon::Dropoff, object.cpp:2308-2322 — 5.0, 16.0).
+        private const float k_dropForwardOffset = 0.5f;
+        private const float k_dropHeight = 1.6f;
+        // 사망 시 무기가 흩어지는 수평 속도 (m/s). 원본 Dropoff(..., 1.5f) = 프레임당 1.5.
+        private const float k_deathDropSpeed = 1.5f * Coord.Scale * SimClock.FrameRate;
+
         private readonly Weapon[] m_weapons = new Weapon[WeaponSlotCount];
         private readonly WeaponVisual[] m_weaponVisuals = new WeaponVisual[WeaponSlotCount];
         private int m_selectWeapon;
@@ -24,6 +30,11 @@ namespace GodotXOPS
         // 다음 틱이 소비할 무기 입력. 렌더 프레임마다 OR 로 쌓인다.
         private HumanWeaponAction m_pendingWeapon;
 
+        // 틱에서 쏜 뒤 화면 갱신 때 낼 발사 이펙트. 무기 모델이 틱 사이를 보간해 움직이므로, 이펙트도 그 프레임의 모델 위치에서 낸다.
+        private WeaponModelData m_fireEffectModel;
+        private WeaponModelData m_shellEffectModel;
+        private float m_shellEffectDelay;
+
         public Weapon CurrentWeapon => m_weapons[m_selectWeapon];
         public int SelectWeapon => m_selectWeapon;
         public bool IsSwitchingWeapon => m_selectWeaponTicks > 0 || m_changeIdTicks > 0;
@@ -31,6 +42,9 @@ namespace GodotXOPS
         public bool IsChanging => IsSwitchingWeapon || IsReloading;
         // 재장전·무기 종류 전환 중이라 팔을 내린 자세로 잡아 둬야 하는지 (원본 MotionCtrl 에 넘기는 ReloadCnt / ChangeWeaponIDCnt).
         public bool ArmHeld => !CurrentWeapon.IsNone && (m_reloadTicks > 0 || m_changeIdTicks > 0);
+        // 떨어진 무기를 주울 수 있는 상태인지. 현재 슬롯이 맨손이고, 전환·재장전 중이 아니고, 무기를 주울 수 있는 종류여야 한다 (원본은 좀비가 줍지 못한다).
+        public bool CanPickupWeapon => Alive && m_hp > 0f && !IsChanging && CurrentWeapon.IsNone
+            && (m_humanTypeData == null || m_humanTypeData.canPickupWeapon);
 
         /// <summary>
         /// 슬롯 번호로 무기를 조회한다.
@@ -106,6 +120,7 @@ namespace GodotXOPS
             if ((action & HumanWeaponAction.SelectSecond) != 0) SetSelectWeapon(1);
             if ((action & HumanWeaponAction.SwitchPrevious) != 0) SwitchWeaponID(CurrentWeapon.Data.previousWeaponIndex);
             if ((action & HumanWeaponAction.SwitchNext) != 0) SwitchWeaponID(CurrentWeapon.Data.nextWeaponIndex);
+            if ((action & HumanWeaponAction.Drop) != 0) DropCurrentWeapon();
             if ((action & HumanWeaponAction.Scope) != 0) ToggleScope();
         }
 
@@ -160,6 +175,23 @@ namespace GodotXOPS
 
             Vector3 muzzle = MuzzlePosition(weapon, shotPosition);
             SpawnBullets(data, parameter.bulletData[data.bulletIndex], shotPosition, muzzle, yaw, pitch, errorRange);
+
+            // 발사 통계는 총만 센다 (원본 gamemain.cpp:2240 — 수류탄은 세지 않는다).
+            if (weapon.WeaponIndex != parameter.weaponGeneralData.grenadeWeaponIndex) MapLoader.RecordFire(this);
+
+            if (data.soundVolume > 0f)
+            {
+                // 격발음과, 주변 AI 가 총성을 듣는 처리 (원본 objectmanager.cpp:2051). 소음기 무기는 듣는 거리가 짧다.
+                if (SoundManager.Loaded) SoundManager.Instance.PlayAt(data.soundPath, shotPosition, data.soundVolume);
+
+                HumanAIParameterData ai = DataManager.Instance.HumanParameterData.humanAIParameterData;
+                WorldSound.EmitPointSound(shotPosition, m_team, data.suppressor ? ai.aiHearGunfireSilencerDist : ai.aiHearGunfireDist, ai.aiHearGunfireAllyDist);
+            }
+
+            // 총구 화염·연기·탄피는 다음 화면 갱신 때 낸다. 탄피는 무기별 지연 뒤에 나온다 (원본 yakkyou_delay).
+            m_fireEffectModel = weapon.ModelData;
+            m_shellEffectModel = weapon.ModelData;
+            m_shellEffectDelay = weapon.ModelData != null ? weapon.ModelData.shellEjectDelay : 0f;
 
             // 다 쓴 수류탄은 무기째 사라진다 (원본 object.cpp:733-736).
             if (depleted) SetWeapon(m_selectWeapon, parameter.weaponGeneralData.noneWeaponIndex, 0, 0);
@@ -236,6 +268,104 @@ namespace GodotXOPS
 
             m_changeIdTicks = switchTicks;
             m_burstShots = 0;
+        }
+
+        /// <summary>
+        /// 현재 무기를 앞으로 던져 버린다. 원본 human::DumpWeapon (object.cpp:787-816).
+        /// </summary>
+        /// <returns>버렸으면 true.</returns>
+        public bool DropCurrentWeapon()
+        {
+            if (IsChanging) return false;
+
+            Weapon weapon = CurrentWeapon;
+            if (weapon.IsNone) return false;
+
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            float yaw = m_controller.Yaw;
+            SpawnDroppedWeapon(weapon, yaw, parameter.weaponDropPhysicsData.dropoffHorizontalSpeed);
+
+            SetWeapon(m_selectWeapon, parameter.weaponGeneralData.noneWeaponIndex, 0, 0);
+            DisableScope();
+            return true;
+        }
+
+        /// <summary>
+        /// 떨어진 무기를 현재 슬롯(맨손)에 든다. 탄약은 그대로 넘겨받고, 슬롯 전환과 같은 시간 동안 팔을 올린다.
+        /// 원본 human::PickupWeapon (object.cpp:422-449).
+        /// </summary>
+        /// <param name="weaponIndex">주운 무기 번호.</param>
+        /// <param name="magazine">장전된 탄.</param>
+        /// <param name="reserve">예비 탄.</param>
+        public void PickupWeapon(int weaponIndex, int magazine, int reserve)
+        {
+            SetWeapon(m_selectWeapon, weaponIndex, magazine, reserve, false);
+
+            HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
+            m_humanVisual.BeginArmSlowReaction(general.armAngleReloading);
+            m_selectWeaponTicks = Mathf.RoundToInt(CurrentWeapon.Data.slotChangeTime * SimClock.FrameRate);
+        }
+
+        /// <summary>
+        /// 무기 하나를 맵에 떨어뜨린다. 던지는 방향 앞쪽 위에서 시작하고, 모델은 반대쪽을 향한다 (원본 weapon::Dropoff 의 rotation_x = rx + π).
+        /// </summary>
+        /// <param name="weapon">떨어뜨릴 무기.</param>
+        /// <param name="yawDeg">던지는 방향 yaw (도).</param>
+        /// <param name="speed">수평 속도 (m/s).</param>
+        private void SpawnDroppedWeapon(Weapon weapon, float yawDeg, float speed)
+        {
+            if (!WeaponManager.Loaded) return;
+
+            Vector3 direction = Coord.YawForward(yawDeg);
+            Vector3 position = m_controller.Position + direction * k_dropForwardOffset + Vector3.Up * k_dropHeight;
+            WeaponManager.Instance.Spawn(weapon.WeaponIndex, weapon.Magazine, weapon.Reserve, position, yawDeg + 180f, direction * speed);
+        }
+
+        /// <summary>
+        /// 틱에서 쏜 발사의 총구 화염·연기·탄피를 낸다. 매 렌더 프레임 호출된다.
+        /// 원본 ObjectManager::ShotWeaponEffect / ShotWeaponYakkyou (objectmanager.cpp:2065-2160).
+        /// </summary>
+        /// <param name="dt">프레임 시간.</param>
+        private void PlayPendingFireEffects(float dt)
+        {
+            if (m_fireEffectModel == null && m_shellEffectModel == null) return;
+            if (!EffectManager.Loaded || !Alive)
+            {
+                m_fireEffectModel = null;
+                m_shellEffectModel = null;
+                return;
+            }
+
+            if (m_fireEffectModel != null)
+            {
+                WeaponModelData model = m_fireEffectModel;
+                m_fireEffectModel = null;
+                if (model.muzzleFlashSize > 0f)
+                {
+                    Node3D attach = model.fixRightArm ? m_humanVisual.FixedWeaponAttachRoot : m_humanVisual.DynamicWeaponAttachRoot;
+                    Vector3 muzzle = attach.GlobalTransform * Coord.FromUnity(model.muzzleFlashOffset);
+                    Basis orientation = attach.GlobalBasis.Orthonormalized();
+                    EffectManager.Instance.Play(model.muzzleFlashEffectIndex, muzzle, orientation, model.muzzleFlashSize, Vector3.Zero);
+                    EffectManager.Instance.Play(model.gunfireSmokeEffectIndex, muzzle, orientation, model.muzzleFlashSize, Vector3.Zero);
+                }
+            }
+
+            if (m_shellEffectModel != null)
+            {
+                m_shellEffectDelay -= dt;
+                if (m_shellEffectDelay > 0f) return;
+
+                WeaponModelData model = m_shellEffectModel;
+                m_shellEffectModel = null;
+                if (model.shellSize > 0f)
+                {
+                    Node3D attach = model.fixRightArm ? m_humanVisual.FixedWeaponAttachRoot : m_humanVisual.DynamicWeaponAttachRoot;
+                    Basis orientation = attach.GlobalBasis.Orthonormalized();
+                    Vector3 position = attach.GlobalTransform * Coord.FromUnity(model.shellEjectOffset);
+                    Vector3 velocity = orientation * Coord.FromUnity(model.shellEjectDirection.Normalized()) * model.shellEjectSpeed;
+                    EffectManager.Instance.Play(model.shellEffectIndex, position, orientation, model.shellSize, velocity);
+                }
+            }
         }
 
         /// <summary>
@@ -318,15 +448,23 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 사망 진입 시 무기 상태를 정리한다. 원본 object.cpp:1228-1247: 든 무기를 모두 떨어뜨리고 스코프와 카운터를 초기화한다.
-        /// 떨어진 무기를 맵에 만드는 것은 드롭 풀을 옮긴 뒤에 붙인다. 지금은 슬롯만 비운다.
+        /// 사망 진입 시 무기 상태를 정리한다. 원본 object.cpp:1228-1247: 든 무기를 모두 무작위 방향(10° 단위)으로 떨어뜨리고 스코프와 카운터를 초기화한다.
+        /// 떨어진 무기는 주울 수 있어 게임 결과에 영향을 주므로 방향은 게임플레이 난수로 뽑는다. 사람 종류에 사망 이펙트가 있으면 재생한다.
         /// </summary>
         public void OnDeath()
         {
             int none = DataManager.Instance.WeaponParameterData.weaponGeneralData.noneWeaponIndex;
             for (int i = 0; i < WeaponSlotCount; i++)
             {
-                if (!m_weapons[i].IsNone) SetWeapon(i, none, 0, 0);
+                if (m_weapons[i].IsNone) continue;
+
+                SpawnDroppedWeapon(m_weapons[i], GameRandom.Gameplay.Range(0, 36) * 10f, k_deathDropSpeed);
+                SetWeapon(i, none, 0, 0);
+            }
+
+            if (m_humanTypeData != null && EffectManager.Loaded)
+            {
+                EffectManager.Instance.Play(m_humanTypeData.deathEffectIndex, m_controller.Position);
             }
 
             DisableScope();
@@ -383,6 +521,8 @@ namespace GodotXOPS
             int pellets = data.pelletCount;
             int attacks = pellets > 1 ? (int)(data.damage / (pellets / 2f)) : (int)data.damage;
             float speedPerTick = data.bulletSpeed * SimClock.FrameTime;
+            // 산탄은 전탄이 맞았을 때 명중 2 로 센다 (원본 objectmanager.cpp:2002).
+            float onTargetWeight = pellets > 1 ? 2f / pellets : 1f;
 
             for (int i = 0; i < pellets; i++)
             {
@@ -397,7 +537,7 @@ namespace GodotXOPS
                 }
 
                 if (BulletManager.Instance.Spawn(bulletData, this, m_team, attacks, data.penetration,
-                    shotPosition, pelletYaw, pelletPitch, speedPerTick, muzzle) == null)
+                    shotPosition, pelletYaw, pelletPitch, speedPerTick, muzzle, onTargetWeight) == null)
                 {
                     // 풀이 가득 차면 남은 탄환은 버린다 (원본 GetNewBulletObject 실패 시 return).
                     return;

@@ -64,9 +64,9 @@ dotnet build GodotXOPS.csproj
   - `--selftest` — 모든 미션을 로드해 보고 종료 (헤드리스 가능).
   - `--mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]` — 화면을 PNG로 저장하고 종료. 렌더링을 고친 뒤 결과를 직접 확인할 때 쓴다.
 
-- `res://scenes/dev/play_test.tscn` — 미션의 맵과 사람을 로드하고 플레이어를 직접 조작한다 (`--headless` 없이 실행). 인자: `--selftest`(모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 확인, 헤드리스 가능), `--mission 번호 [--addon] [--third] [--walk] [--fire] [--weapon 번호] [--hitbox] [--look yaw,pitch] --screenshot 경로.png`.
+- `res://scenes/dev/play_test.tscn` — 미션의 맵과 사람을 로드하고 플레이어를 직접 조작한다 (`--headless` 없이 실행). 인자: `--selftest`(모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 확인, 헤드리스 가능), `--mission 번호 [--addon] [--third] [--walk] [--fire] [--weapon 번호] [--hitbox] [--look yaw,pitch] [--pos x,y,z] [--drop] --screenshot 경로.png`.
 
-- `res://scenes/dev/weapon_check.tscn` — 무기·총알·히트박스를 수치로 확인한다 (헤드리스). 사람들을 블록이 없는 공중으로 옮겨 놓고 무기 틱과 총알 틱만 직접 돌린다. 무기, 총알, 피격 코드를 고친 뒤에 돌린다.
+- `res://scenes/dev/weapon_check.tscn` — 무기·총알·히트박스·떨어진 무기·소물·통계와 이펙트·소리 호출을 수치로 확인한다 (헤드리스). 사람들을 블록이 없는 공중으로 옮겨 놓고 무기 틱과 총알 틱만 직접 돌린다. 무기, 총알, 피격 코드를 고친 뒤에 돌린다.
 
 ## 시뮬레이션과 캐릭터
 
@@ -88,6 +88,15 @@ dotnet build GodotXOPS.csproj
 - 무기·총알에서 원본대로 고친 것: 점 샘플링 판정, 피격 데미지의 부위별 난수 가산, 조준 오차·산탄 확산의 정수 난수, 연속 발사 수 제한(단발), 입력 처리 순서(발사 → 재장전 → 슬롯 → 종류 전환 → 스코프), 수류탄 이동 순서(이동 → 감쇠·중력)와 반사 시 위치 유지, 초기 예비 탄(장탄수 × (배수 − 1)).
 - 원본이 아니라 UnityXOPS가 고친 동작을 따르는 것 (사용자 결정): 피격 시 조준 흐트러짐은 더 큰 쪽 유지(원본은 대입), 가득 찬 탄창은 재장전 불가(원본은 허용), 폭풍은 항상 멀어지는 쪽(원본 식은 폭발이 위에 있으면 끌어당김), 반동 오차는 항상 누적(원본은 조준선이 보일 때만).
 
+## 떨어진 무기, 소물, 이펙트, 소리
+
+- 게임 결과에 영향을 주는 것은 틱에서, 연출은 렌더 프레임에서 한다. 떨어진 무기의 낙하·줍기(`WeaponManager`)와 소물의 내구력·파괴 판정은 틱이고, 이펙트(`EffectManager`)·부서진 소물이 튀는 움직임·소리 볼륨 갱신은 렌더 프레임이다. 연출에는 `GameRandom.Visual`만 쓴다.
+- 풀 크기는 원본 상수다: 떨어진 무기 200, 탄환 160, 이펙트 256. 풀이 가득 차면 새로 만들지 않고 버린다. 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
+- 틱에서 일어난 일의 이펙트를 무기 모델 위치에 맞춰야 하면(총구 화염, 탄피) 틱에서는 표시만 해 두고 `Human._Process`에서 낸다. 무기 모델은 틱 사이를 보간해 움직이므로 틱에서 내면 어긋난다.
+- 이펙트 프리셋·텍스처는 `effect_parameter_data.json`, 호출하는 쪽은 인덱스(무기 모델·탄환·사람 종류 데이터에 있다)와 위치만 넘긴다. 이펙트 머티리얼은 `MaterialManager.CreateEffectMaterial`, 투명도는 인스턴스 유니폼 `effect_alpha`다.
+- 소리는 `SoundManager.PlayAt(경로, 위치, 볼륨)`으로 낸다. `AudioStreamPlayer3D`를 쓰지 않는다 (원본의 선형 감쇠를 낼 수 없다). 헤드리스에서는 실제 재생을 하지 않는다.
+- 소리가 나는 자리에서는 `WorldSound.EmitPointSound`로 AI 에게도 알린다 (듣는 거리는 `aiHear*` 데이터).
+
 ## 맵과 렌더링
 
 - `MapLoader`(Autoload)가 블록·스카이·미션 정보를 들고 있고, 씬이 바뀌어도 유지된다. 로드 함수는 이전 것을 먼저 언로드한다.
@@ -101,7 +110,7 @@ dotnet build GodotXOPS.csproj
 
 ## Autoload 순서
 
-`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader` → `BulletManager`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
+`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader` → `BulletManager` → `WeaponManager` → `EffectManager` → `SoundManager`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
 
 ## 설정과 입력
 
