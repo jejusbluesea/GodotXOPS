@@ -1,320 +1,320 @@
 {
-    "sections": [
+  "sections": [
+    {
+      "name": "General",
+      "settings": [
         {
-            "name": "General",
-            "settings": [
-                {
-                    "name": "ShowFPS",
-                    "type": "bool",
-                    "value": "true",
-                    "min": 0.0,
-                    "max": 0.0
-                },
-                {
-                    "name": "UIScale",
-                    "type": "float",
-                    "value": "1",
-                    "min": 1.0,
-                    "max": 1.100000023841858
-                },
-                {
-                    "name": "aimLength",
-                    "type": "int",
-                    "value": "10",
-                    "min": 1.0,
-                    "max": 20.0
-                },
-                {
-                    "name": "aimThick",
-                    "type": "int",
-                    "value": "1",
-                    "min": 1.0,
-                    "max": 5.0
-                },
-                {
-                    "name": "aimGap",
-                    "type": "int",
-                    "value": "3",
-                    "min": 0.0,
-                    "max": 5.0
-                },
-                {
-                    "name": "StaticAim",
-                    "type": "bool",
-                    "value": "false",
-                    "min": 0.0,
-                    "max": 0.0
-                },
-                {
-                    "name": "aimColorR",
-                    "type": "float",
-                    "value": "1",
-                    "min": 0.0,
-                    "max": 1.0
-                },
-                {
-                    "name": "aimColorG",
-                    "type": "float",
-                    "value": "0",
-                    "min": 0.0,
-                    "max": 1.0
-                },
-                {
-                    "name": "aimColorB",
-                    "type": "float",
-                    "value": "0",
-                    "min": 0.0,
-                    "max": 1.0
-                },
-                {
-                    "name": "aimColorA",
-                    "type": "float",
-                    "value": "1",
-                    "min": 0.0,
-                    "max": 1.0
-                },
-                {
-                    "name": "playerName",
-                    "type": "string",
-                    "value": "xopsPlayer",
-                    "min": 0.0,
-                    "max": 0.0
-                }
-            ]
+          "name": "ShowFPS",
+          "type": "bool",
+          "value": "false",
+          "min": 0,
+          "max": 0
         },
         {
-            "name": "Input",
-            "settings": [
-                {
-                    "name": "invertY",
-                    "type": "bool",
-                    "value": "false",
-                    "min": 0.0,
-                    "max": 0.0
-                },
-                {
-                    "name": "sensitivity",
-                    "type": "float",
-                    "value": "0.1",
-                    "min": 0.009999999776482582,
-                    "max": 1.0
-                }
-            ]
+          "name": "UIScale",
+          "type": "float",
+          "value": "1",
+          "min": 1,
+          "max": 1
         },
         {
-            "name": "Graphic",
-            "settings": [
-                {
-                    "name": "brightness",
-                    "type": "float",
-                    "value": "1",
-                    "min": 0.5,
-                    "max": 1.5
-                },
-                {
-                    "name": "gamma",
-                    "type": "float",
-                    "value": "1",
-                    "min": 0.5,
-                    "max": 2.0
-                },
-                {
-                    "name": "fullscreen",
-                    "type": "bool",
-                    "value": "true",
-                    "min": 0.0,
-                    "max": 0.0
-                },
-                {
-                    "name": "resolution",
-                    "type": "int",
-                    "value": "10",
-                    "min": 0.0,
-                    "max": 15.0
-                },
-                {
-                    "name": "vsync",
-                    "type": "bool",
-                    "value": "false",
-                    "min": 0.0,
-                    "max": 0.0
-                },
-                {
-                    "name": "limitFrame",
-                    "type": "bool",
-                    "value": "false",
-                    "min": 0.0,
-                    "max": 0.0
-                },
-                {
-                    "name": "frameLimit",
-                    "type": "int",
-                    "value": "60",
-                    "min": 60.0,
-                    "max": 480.0
-                },
-                {
-                    "name": "nearClippingPlane",
-                    "type": "float",
-                    "value": "0.1",
-                    "min": 0.029999999329447748,
-                    "max": 0.10000000149011612
-                },
-                {
-                    "name": "farClippingPlane",
-                    "type": "float",
-                    "value": "80",
-                    "min": 80.0,
-                    "max": 1000.0
-                },
-                {
-                    "name": "fov",
-                    "type": "int",
-                    "value": "65",
-                    "min": 60.0,
-                    "max": 90.0
-                }
-            ]
+          "name": "aimLength",
+          "type": "int",
+          "value": "10",
+          "min": 1,
+          "max": 20
         },
         {
-            "name": "Sound",
-            "settings": [
-                {
-                    "name": "MasterVolume",
-                    "type": "float",
-                    "value": "1",
-                    "min": 0.0,
-                    "max": 1.0
-                }
-            ]
+          "name": "aimThick",
+          "type": "int",
+          "value": "1",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "name": "aimGap",
+          "type": "int",
+          "value": "3",
+          "min": 0,
+          "max": 5
+        },
+        {
+          "name": "StaticAim",
+          "type": "bool",
+          "value": "false",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "name": "aimColorR",
+          "type": "float",
+          "value": "1",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "aimColorG",
+          "type": "float",
+          "value": "0",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "aimColorB",
+          "type": "float",
+          "value": "0",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "aimColorA",
+          "type": "float",
+          "value": "1",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "playerName",
+          "type": "string",
+          "value": "xopsPlayer",
+          "min": 0,
+          "max": 0
         }
-    ],
-    "bindings": [
+      ]
+    },
+    {
+      "name": "Input",
+      "settings": [
         {
-            "name": "look",
-            "type": "PassThrough",
-            "bindings": [
-                "<Mouse>/delta"
-            ],
-            "composites": [
-                {
-                    "type": "2DVector",
-                    "up": "<Keyboard>/upArrow",
-                    "down": "<Keyboard>/downArrow",
-                    "left": "<Keyboard>/leftArrow",
-                    "right": "<Keyboard>/rightArrow"
-                }
-            ]
+          "name": "invertY",
+          "type": "bool",
+          "value": "false",
+          "min": 0,
+          "max": 0
         },
         {
-            "name": "move",
-            "type": "Value",
-            "bindings": [],
-            "composites": [
-                {
-                    "type": "2DVector",
-                    "up": "<Keyboard>/w",
-                    "down": "<Keyboard>/s",
-                    "left": "<Keyboard>/a",
-                    "right": "<Keyboard>/d"
-                }
-            ]
-        },
-        {
-            "name": "jump",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/space"
-            ],
-            "composites": []
-        },
-        {
-            "name": "walk",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/tab"
-            ],
-            "composites": []
-        },
-        {
-            "name": "drop",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/g"
-            ],
-            "composites": []
-        },
-        {
-            "name": "fire",
-            "type": "Button",
-            "bindings": [
-                "<Mouse>/leftButton"
-            ],
-            "composites": []
-        },
-        {
-            "name": "zoom",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/leftShift"
-            ],
-            "composites": []
-        },
-        {
-            "name": "previous",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/z"
-            ],
-            "composites": []
-        },
-        {
-            "name": "next",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/x"
-            ],
-            "composites": []
-        },
-        {
-            "name": "reload",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/r"
-            ],
-            "composites": []
-        },
-        {
-            "name": "first",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/1"
-            ],
-            "composites": []
-        },
-        {
-            "name": "second",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/2"
-            ],
-            "composites": []
-        },
-        {
-            "name": "interact",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/f"
-            ],
-            "composites": []
-        },
-        {
-            "name": "escape",
-            "type": "Button",
-            "bindings": [
-                "<Keyboard>/escape"
-            ],
-            "composites": []
+          "name": "sensitivity",
+          "type": "float",
+          "value": "0.1",
+          "min": 0.01,
+          "max": 1
         }
-    ]
+      ]
+    },
+    {
+      "name": "Graphic",
+      "settings": [
+        {
+          "name": "brightness",
+          "type": "float",
+          "value": "1",
+          "min": 0.5,
+          "max": 1.5
+        },
+        {
+          "name": "gamma",
+          "type": "float",
+          "value": "1",
+          "min": 0.5,
+          "max": 2
+        },
+        {
+          "name": "fullscreen",
+          "type": "bool",
+          "value": "true",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "name": "resolution",
+          "type": "int",
+          "value": "0",
+          "min": 0,
+          "max": 15
+        },
+        {
+          "name": "vsync",
+          "type": "bool",
+          "value": "false",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "name": "limitFrame",
+          "type": "bool",
+          "value": "true",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "name": "frameLimit",
+          "type": "int",
+          "value": "60",
+          "min": 60,
+          "max": 480
+        },
+        {
+          "name": "nearClippingPlane",
+          "type": "float",
+          "value": "0.1",
+          "min": 0.03,
+          "max": 0.1
+        },
+        {
+          "name": "farClippingPlane",
+          "type": "float",
+          "value": "80",
+          "min": 80,
+          "max": 1000
+        },
+        {
+          "name": "fov",
+          "type": "int",
+          "value": "65",
+          "min": 60,
+          "max": 90
+        }
+      ]
+    },
+    {
+      "name": "Sound",
+      "settings": [
+        {
+          "name": "MasterVolume",
+          "type": "float",
+          "value": "1",
+          "min": 0,
+          "max": 1
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "name": "look",
+      "type": "PassThrough",
+      "bindings": [
+        "\u003CMouse\u003E/delta"
+      ],
+      "composites": [
+        {
+          "type": "2DVector",
+          "up": "\u003CKeyboard\u003E/upArrow",
+          "down": "\u003CKeyboard\u003E/downArrow",
+          "left": "\u003CKeyboard\u003E/leftArrow",
+          "right": "\u003CKeyboard\u003E/rightArrow"
+        }
+      ]
+    },
+    {
+      "name": "move",
+      "type": "Value",
+      "bindings": [],
+      "composites": [
+        {
+          "type": "2DVector",
+          "up": "\u003CKeyboard\u003E/w",
+          "down": "\u003CKeyboard\u003E/s",
+          "left": "\u003CKeyboard\u003E/a",
+          "right": "\u003CKeyboard\u003E/d"
+        }
+      ]
+    },
+    {
+      "name": "jump",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/space"
+      ],
+      "composites": []
+    },
+    {
+      "name": "walk",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/tab"
+      ],
+      "composites": []
+    },
+    {
+      "name": "drop",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/g"
+      ],
+      "composites": []
+    },
+    {
+      "name": "fire",
+      "type": "Button",
+      "bindings": [
+        "\u003CMouse\u003E/leftButton"
+      ],
+      "composites": []
+    },
+    {
+      "name": "zoom",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/leftShift"
+      ],
+      "composites": []
+    },
+    {
+      "name": "previous",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/z"
+      ],
+      "composites": []
+    },
+    {
+      "name": "next",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/x"
+      ],
+      "composites": []
+    },
+    {
+      "name": "reload",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/r"
+      ],
+      "composites": []
+    },
+    {
+      "name": "first",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/1"
+      ],
+      "composites": []
+    },
+    {
+      "name": "second",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/2"
+      ],
+      "composites": []
+    },
+    {
+      "name": "interact",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/f"
+      ],
+      "composites": []
+    },
+    {
+      "name": "escape",
+      "type": "Button",
+      "bindings": [
+        "\u003CKeyboard\u003E/escape"
+      ],
+      "composites": []
+    }
+  ]
 }

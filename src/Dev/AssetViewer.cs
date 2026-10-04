@@ -36,6 +36,13 @@ namespace GodotXOPS.Dev
 
         public override void _Ready()
         {
+            // 게임 설정(ConfigManager)이 적용한 전체화면·저해상도 렌더를 도구용 창 설정으로 되돌린다.
+            Window root = GetTree().Root;
+            root.ContentScaleMode = Window.ContentScaleModeEnum.Disabled;
+            root.Mode = Window.ModeEnum.Windowed;
+            root.Size = new Vector2I(1280, 720);
+            root.MoveToCenter();
+
             BuildInterface();
             ScanFiles();
             ApplyFilter(string.Empty);

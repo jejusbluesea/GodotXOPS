@@ -16,7 +16,9 @@ config/icon="res://icon.svg"
 
 [autoload]
 
+ConfigManager="*res://src/Data/Config/ConfigManager.cs"
 DataManager="*res://src/Data/DataManager.cs"
+InputManager="*res://src/Data/Input/InputManager.cs"
 
 [display]
 
