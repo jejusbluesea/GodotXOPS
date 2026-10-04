@@ -1,0 +1,17 @@
+﻿{
+    "humanGeneralData": {
+        "humanBodyScale": 0.94,
+        "humanArmScale": 0.9,
+        "humanLegScale": 0.9,
+        "humanBodyHeight": -0.1,
+        "humanArmHeight": 1.6,
+        "humanLegHeight": -0.02,
+        "armAngleReloading": -20,
+        "armAngleInitial": -30,
+        "headHitReaction": 15,
+        "bodyHitReaction": 12,
+        "legHitReaction": 8,
+        "zombieHitReaction": 10,
+        "grenadeHitReaction": 10
+    }
+}

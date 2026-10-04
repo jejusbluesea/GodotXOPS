@@ -1,0 +1,10 @@
+﻿{
+    "weaponGeneralData": {
+        "noneWeaponIndex": 0,
+        "caseWeaponIndex": [
+            15
+        ],
+        "grenadeWeaponIndex": 13,
+        "weaponScale": 0.1
+    }
+}

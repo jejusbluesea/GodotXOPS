@@ -1,0 +1,12 @@
+﻿{
+    "weaponAccuracyData": {
+        "walkAccuracyPenalty": 4,
+        "forwardAccuracyPenalty": 8,
+        "backAccuracyPenalty": 6,
+        "strafeAccuracyPenalty": 7,
+        "airborneAccuracyPenalty": 22,
+        "injuryAccuracyPenalty": 3,
+        "injuryHpThreshold": 40,
+        "reactionRecoveryPerSecond": 33.333
+    }
+}

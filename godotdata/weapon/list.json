@@ -1,0 +1,1063 @@
+﻿{
+    "weaponData": [
+        {
+            "name": "NONE",
+            "modelIndex": 0,
+            "damage": 0.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 0.0,
+            "bulletSpeed": 0.0,
+            "magazineSize": 0,
+            "pelletCount": 0,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 0.0,
+            "recoil": 0.0,
+            "armReactionAngle": 0.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "crosshair": false,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "size": 0.9,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.0,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "MP5",
+            "modelIndex": 1,
+            "damage": 44.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 8.333,
+            "bulletSpeed": 100.0,
+            "magazineSize": 30,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.5,
+            "recoil": 6.0,
+            "armReactionAngle": 3.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 2.0,
+                "max": 21.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.8,
+                "y": 0.9,
+                "z": 3.5
+            },
+            "size": 7.5,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.92,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "PSG1",
+            "modelIndex": 2,
+            "damage": 70.0,
+            "penetration": 2,
+            "bulletIndex": 0,
+            "fireRate": 4.762,
+            "bulletSpeed": 140.0,
+            "magazineSize": 5,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.74,
+            "recoil": 15.0,
+            "armReactionAngle": 4.0,
+            "recoilAimVertical": {
+                "min": 2.4,
+                "max": 3.6
+            },
+            "recoilAimHorizontal": {
+                "min": -0.6,
+                "max": 0.6
+            },
+            "errorRange": {
+                "min": 0.0,
+                "max": 19.0
+            },
+            "crosshair": false,
+            "scope": true,
+            "scopeIndex": 1,
+            "position": {
+                "x": 0.8,
+                "y": 0.8,
+                "z": 4.4
+            },
+            "size": 8.0,
+            "soundPath": "data/sound/bang2.wav",
+            "soundVolume": 0.98,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "M92F",
+            "modelIndex": 3,
+            "damage": 41.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 90.0,
+            "magazineSize": 15,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.2,
+            "recoil": 10.0,
+            "armReactionAngle": 5.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 0.7,
+                "z": 5.7
+            },
+            "size": 7.0,
+            "soundPath": "data/sound/bang2.wav",
+            "soundVolume": 0.9,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "GLOCK18 SEMI",
+            "modelIndex": 4,
+            "damage": 38.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 90.0,
+            "magazineSize": 19,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.14,
+            "recoil": 9.0,
+            "armReactionAngle": 4.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 0.8,
+                "z": 5.6
+            },
+            "size": 5.0,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.9,
+            "suppressor": false,
+            "previousWeaponIndex": 16,
+            "nextWeaponIndex": 16,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "DESERT EAGLE",
+            "modelIndex": 5,
+            "damage": 68.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 100.0,
+            "magazineSize": 7,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.23,
+            "recoil": 13.0,
+            "armReactionAngle": 6.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 1.1,
+                "z": 5.9
+            },
+            "size": 11.0,
+            "soundPath": "data/sound/bang3.wav",
+            "soundVolume": 0.96,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "MAC10",
+            "modelIndex": 6,
+            "damage": 47.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 11.111,
+            "bulletSpeed": 100.0,
+            "magazineSize": 30,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.35,
+            "recoil": 9.0,
+            "armReactionAngle": 4.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 25.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 0.4,
+                "z": 5.4
+            },
+            "size": 5.5,
+            "soundPath": "data/sound/bang4.wav",
+            "soundVolume": 0.9,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "UMP",
+            "modelIndex": 7,
+            "damage": 50.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 100.0,
+            "magazineSize": 25,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.5,
+            "recoil": 7.0,
+            "armReactionAngle": 3.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 2.0,
+                "max": 19.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.8,
+                "y": 0.6,
+                "z": 2.8
+            },
+            "size": 6.0,
+            "soundPath": "data/sound/bang5.wav",
+            "soundVolume": 0.94,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "P90",
+            "modelIndex": 8,
+            "damage": 42.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 8.333,
+            "bulletSpeed": 110.0,
+            "magazineSize": 50,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 2.04,
+            "recoil": 6.0,
+            "armReactionAngle": 3.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 3.0,
+                "max": 18.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.8,
+                "y": 1.0,
+                "z": 3.0
+            },
+            "size": 6.5,
+            "soundPath": "data/sound/bang4.wav",
+            "soundVolume": 0.92,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "M4",
+            "modelIndex": 9,
+            "damage": 61.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 8.333,
+            "bulletSpeed": 110.0,
+            "magazineSize": 30,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.62,
+            "recoil": 8.0,
+            "armReactionAngle": 4.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 3.0,
+                "max": 19.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.9,
+                "y": 0.6,
+                "z": 3.7
+            },
+            "size": 6.8,
+            "soundPath": "data/sound/bang4.wav",
+            "soundVolume": 0.96,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "AK47",
+            "modelIndex": 10,
+            "damage": 65.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 8.333,
+            "bulletSpeed": 110.0,
+            "magazineSize": 30,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.56,
+            "recoil": 9.0,
+            "armReactionAngle": 4.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 3.0,
+                "max": 20.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.9,
+                "y": 1.1,
+                "z": 3.9
+            },
+            "size": 6.0,
+            "soundPath": "data/sound/bang2.wav",
+            "soundVolume": 0.96,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "AUG",
+            "modelIndex": 11,
+            "damage": 60.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 110.0,
+            "magazineSize": 30,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.68,
+            "recoil": 7.0,
+            "armReactionAngle": 3.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 2.0,
+                "max": 18.0
+            },
+            "crosshair": true,
+            "scope": true,
+            "scopeIndex": 0,
+            "position": {
+                "x": 0.8,
+                "y": 1.0,
+                "z": 3.7
+            },
+            "size": 7.8,
+            "soundPath": "data/sound/bang5.wav",
+            "soundVolume": 0.98,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "M249",
+            "modelIndex": 12,
+            "damage": 59.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 8.333,
+            "bulletSpeed": 110.0,
+            "magazineSize": 100,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 2.55,
+            "recoil": 7.0,
+            "armReactionAngle": 3.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 22.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.8,
+                "y": 1.2,
+                "z": 4.4
+            },
+            "size": 7.5,
+            "soundPath": "data/sound/bang4.wav",
+            "soundVolume": 0.98,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "GRENADE",
+            "modelIndex": 13,
+            "damage": 0.0,
+            "penetration": 0,
+            "bulletIndex": 1,
+            "fireRate": 0.952,
+            "bulletSpeed": 26.667,
+            "magazineSize": 1,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 3,
+            "reloadTime": 0.0,
+            "recoil": 0.0,
+            "armReactionAngle": 20.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "ignoreAimError": true,
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.1,
+                "y": 0.6,
+                "z": 5.7
+            },
+            "size": 8.0,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.0,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": true
+        },
+        {
+            "name": "MP5SD",
+            "modelIndex": 14,
+            "damage": 37.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 8.333,
+            "bulletSpeed": 90.0,
+            "magazineSize": 30,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.5,
+            "recoil": 6.0,
+            "armReactionAngle": 3.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 2.0,
+                "max": 21.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.7,
+                "y": 0.8,
+                "z": 3.5
+            },
+            "size": 7.5,
+            "soundPath": "data/sound/ka.wav",
+            "soundVolume": 0.84,
+            "suppressor": true,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "CASE",
+            "modelIndex": 15,
+            "damage": 0.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 0.0,
+            "bulletSpeed": 0.0,
+            "magazineSize": 0,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 0.0,
+            "recoil": 0.0,
+            "armReactionAngle": 0.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "crosshair": false,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 1.5,
+                "y": -0.2,
+                "z": 3.5
+            },
+            "size": 5.0,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.0,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "GLOCK18 FULL",
+            "modelIndex": 4,
+            "damage": 38.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 11.111,
+            "bulletSpeed": 90.0,
+            "magazineSize": 19,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.14,
+            "recoil": 9.0,
+            "armReactionAngle": 4.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 0.8,
+                "z": 5.6
+            },
+            "size": 5.0,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.9,
+            "suppressor": false,
+            "previousWeaponIndex": 4,
+            "nextWeaponIndex": 4,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "M1911",
+            "modelIndex": 16,
+            "damage": 46.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 90.0,
+            "magazineSize": 7,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.05,
+            "recoil": 11.0,
+            "armReactionAngle": 5.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 5.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 0.7,
+                "z": 6.1
+            },
+            "size": 6.8,
+            "soundPath": "data/sound/bang4.wav",
+            "soundVolume": 0.94,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "GLOCK17",
+            "modelIndex": 17,
+            "damage": 38.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 90.0,
+            "magazineSize": 17,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.11,
+            "recoil": 9.0,
+            "armReactionAngle": 4.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 4.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 0.8,
+                "z": 5.6
+            },
+            "size": 5.0,
+            "soundPath": "data/sound/bang1.wav",
+            "soundVolume": 0.9,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "M1",
+            "modelIndex": 18,
+            "damage": 90.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 4.167,
+            "bulletSpeed": 90.0,
+            "magazineSize": 7,
+            "pelletCount": 6,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 3.0,
+            "recoil": 18.0,
+            "armReactionAngle": 9.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 5.0,
+                "max": 23.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.8,
+                "y": 0.7,
+                "z": 4.5
+            },
+            "size": 7.7,
+            "soundPath": "data/sound/bang3.wav",
+            "soundVolume": 0.98,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "FAMAS",
+            "modelIndex": 19,
+            "damage": 55.0,
+            "penetration": 1,
+            "bulletIndex": 0,
+            "fireRate": 11.111,
+            "bulletSpeed": 110.0,
+            "magazineSize": 25,
+            "pelletCount": 1,
+            "burstMode": 0,
+            "burstCount": 0,
+            "reloadStyle": 0,
+            "reloadTime": 1.65,
+            "recoil": 7.0,
+            "armReactionAngle": 3.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 3.0,
+                "max": 19.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.9,
+                "y": 1.0,
+                "z": 3.2
+            },
+            "size": 8.0,
+            "soundPath": "data/sound/bang5.wav",
+            "soundVolume": 0.96,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "MK23",
+            "modelIndex": 20,
+            "damage": 48.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 90.0,
+            "magazineSize": 12,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.26,
+            "recoil": 10.0,
+            "armReactionAngle": 5.0,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 2.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 1.1,
+                "z": 6.0
+            },
+            "size": 5.0,
+            "soundPath": "data/sound/bang5.wav",
+            "soundVolume": 0.92,
+            "suppressor": false,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        },
+        {
+            "name": "MK23 SD",
+            "modelIndex": 21,
+            "damage": 39.0,
+            "penetration": 0,
+            "bulletIndex": 0,
+            "fireRate": 6.667,
+            "bulletSpeed": 90.0,
+            "magazineSize": 12,
+            "pelletCount": 1,
+            "burstMode": 1,
+            "burstCount": 1,
+            "reloadStyle": 0,
+            "reloadTime": 1.29,
+            "recoil": 9.0,
+            "armReactionAngle": 4.5,
+            "recoilAimVertical": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontal": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "errorRange": {
+                "min": 3.0,
+                "max": 26.0
+            },
+            "crosshair": true,
+            "scope": false,
+            "scopeIndex": -1,
+            "position": {
+                "x": 0.2,
+                "y": 1.1,
+                "z": 6.0
+            },
+            "size": 5.0,
+            "soundPath": "data/sound/ka.wav",
+            "soundVolume": 0.86,
+            "suppressor": true,
+            "previousWeaponIndex": -1,
+            "nextWeaponIndex": -1,
+            "switchTime": 0.0,
+            "slotChangeTime": 0.3,
+            "discardAfterAutoReloadIfNoAmmo": false
+        }
+    ]
+}

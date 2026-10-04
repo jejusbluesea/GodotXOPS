@@ -1,0 +1,146 @@
+﻿{
+    "scopeData": [
+        {
+            "fovDegrees": 30.0,
+            "errorRangeAdjust": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimVerticalAdjust": {
+                "min": 1.2,
+                "max": 2.0
+            },
+            "recoilAimHorizontalAdjust": {
+                "min": -0.4,
+                "max": 0.4
+            },
+            "texturePath": "data/scope.dds",
+            "textureAspect": 1.333,
+            "hideCrosshair": true,
+            "lines": [
+                {
+                    "start": {
+                        "x": -49.0,
+                        "y": 0.0
+                    },
+                    "end": {
+                        "x": -4.0,
+                        "y": 0.0
+                    },
+                    "color": {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0,
+                        "a": 1.0
+                    },
+                    "width": 1.0
+                },
+                {
+                    "start": {
+                        "x": 4.0,
+                        "y": 0.0
+                    },
+                    "end": {
+                        "x": 49.0,
+                        "y": 0.0
+                    },
+                    "color": {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0,
+                        "a": 1.0
+                    },
+                    "width": 1.0
+                },
+                {
+                    "start": {
+                        "x": 0.0,
+                        "y": 49.0
+                    },
+                    "end": {
+                        "x": 0.0,
+                        "y": 4.0
+                    },
+                    "color": {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0,
+                        "a": 1.0
+                    },
+                    "width": 1.0
+                },
+                {
+                    "start": {
+                        "x": 0.0,
+                        "y": -4.0
+                    },
+                    "end": {
+                        "x": 0.0,
+                        "y": -49.0
+                    },
+                    "color": {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0,
+                        "a": 1.0
+                    },
+                    "width": 1.0
+                }
+            ]
+        },
+        {
+            "fovDegrees": 15.0,
+            "errorRangeAdjust": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimVerticalAdjust": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "recoilAimHorizontalAdjust": {
+                "min": 0.0,
+                "max": 0.0
+            },
+            "texturePath": "data/scope.dds",
+            "textureAspect": 1.333,
+            "hideCrosshair": true,
+            "lines": [
+                {
+                    "start": {
+                        "x": -180.0,
+                        "y": 0.0
+                    },
+                    "end": {
+                        "x": 180.0,
+                        "y": 0.0
+                    },
+                    "color": {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0,
+                        "a": 1.0
+                    },
+                    "width": 1.0
+                },
+                {
+                    "start": {
+                        "x": 0.0,
+                        "y": 180.0
+                    },
+                    "end": {
+                        "x": 0.0,
+                        "y": -180.0
+                    },
+                    "color": {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 0.0,
+                        "a": 1.0
+                    },
+                    "width": 1.0
+                }
+            ]
+        }
+    ]
+}

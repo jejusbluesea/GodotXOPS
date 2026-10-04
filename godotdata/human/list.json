@@ -1,0 +1,391 @@
+﻿{
+    "humanData": [
+        {
+            "name": "Special Force Black A",
+            "hp": 120,
+            "modelIndex": 21,
+            "aiIndex": 3,
+            "weaponIndex0": 21,
+            "weaponIndex1": 8,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force Black B",
+            "hp": 120,
+            "modelIndex": 21,
+            "aiIndex": 3,
+            "weaponIndex0": 21,
+            "weaponIndex1": 2,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force Green A",
+            "hp": 110,
+            "modelIndex": 23,
+            "aiIndex": 2,
+            "weaponIndex0": 3,
+            "weaponIndex1": 6,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force Green B",
+            "hp": 110,
+            "modelIndex": 23,
+            "aiIndex": 2,
+            "weaponIndex0": 3,
+            "weaponIndex1": 10,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force Green C",
+            "hp": 110,
+            "modelIndex": 23,
+            "aiIndex": 2,
+            "weaponIndex0": 3,
+            "weaponIndex1": 2,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force White A",
+            "hp": 110,
+            "modelIndex": 25,
+            "aiIndex": 2,
+            "weaponIndex0": 4,
+            "weaponIndex1": 7,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force White B",
+            "hp": 110,
+            "modelIndex": 25,
+            "aiIndex": 2,
+            "weaponIndex0": 4,
+            "weaponIndex1": 2,
+            "typeIndex": 0
+        },
+        {
+            "name": "Skinhead",
+            "hp": 100,
+            "modelIndex": 10,
+            "aiIndex": 3,
+            "weaponIndex0": 4,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force Purple",
+            "hp": 110,
+            "modelIndex": 24,
+            "aiIndex": 3,
+            "weaponIndex0": 22,
+            "weaponIndex1": 14,
+            "typeIndex": 0
+        },
+        {
+            "name": "Special Force Blue",
+            "hp": 120,
+            "modelIndex": 22,
+            "aiIndex": 2,
+            "weaponIndex0": 3,
+            "weaponIndex1": 1,
+            "typeIndex": 0
+        },
+        {
+            "name": "Robot",
+            "hp": 2500,
+            "modelIndex": 20,
+            "aiIndex": 4,
+            "weaponIndex0": 6,
+            "weaponIndex1": 12,
+            "typeIndex": 1
+        },
+        {
+            "name": "Suit Black SG",
+            "hp": 100,
+            "modelIndex": 9,
+            "aiIndex": 1,
+            "weaponIndex0": 18,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Suit Black",
+            "hp": 100,
+            "modelIndex": 8,
+            "aiIndex": 1,
+            "weaponIndex0": 5,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Suit Gray",
+            "hp": 100,
+            "modelIndex": 17,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Police Officer",
+            "hp": 100,
+            "modelIndex": 13,
+            "aiIndex": 1,
+            "weaponIndex0": 3,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Suit Brown",
+            "hp": 100,
+            "modelIndex": 14,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Shirt Man 1",
+            "hp": 100,
+            "modelIndex": 31,
+            "aiIndex": 0,
+            "weaponIndex0": 17,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Middle East Soldier",
+            "hp": 100,
+            "modelIndex": 11,
+            "aiIndex": 1,
+            "weaponIndex0": 17,
+            "weaponIndex1": 10,
+            "typeIndex": 0
+        },
+        {
+            "name": "Woman",
+            "hp": 90,
+            "modelIndex": 34,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Blond Man",
+            "hp": 100,
+            "modelIndex": 0,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Civilian 1",
+            "hp": 100,
+            "modelIndex": 2,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Civilian 2",
+            "hp": 100,
+            "modelIndex": 4,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Shirt Man 1 SG",
+            "hp": 100,
+            "modelIndex": 32,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Blond Man SG",
+            "hp": 100,
+            "modelIndex": 1,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Civilian 1 SG",
+            "hp": 100,
+            "modelIndex": 3,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Civilian 2 SG",
+            "hp": 100,
+            "modelIndex": 5,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Soldier 1 A",
+            "hp": 115,
+            "modelIndex": 26,
+            "aiIndex": 2,
+            "weaponIndex0": 5,
+            "weaponIndex1": 9,
+            "typeIndex": 0
+        },
+        {
+            "name": "Soldier 1 B",
+            "hp": 115,
+            "modelIndex": 27,
+            "aiIndex": 2,
+            "weaponIndex0": 5,
+            "weaponIndex1": 12,
+            "typeIndex": 0
+        },
+        {
+            "name": "Soldier 2",
+            "hp": 115,
+            "modelIndex": 28,
+            "aiIndex": 2,
+            "weaponIndex0": 13,
+            "weaponIndex1": 10,
+            "typeIndex": 0
+        },
+        {
+            "name": "Zombie 1",
+            "hp": 1000,
+            "modelIndex": 35,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 2
+        },
+        {
+            "name": "Zombie 2",
+            "hp": 1000,
+            "modelIndex": 36,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 2
+        },
+        {
+            "name": "Zombie 3",
+            "hp": 1000,
+            "modelIndex": 37,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 2
+        },
+        {
+            "name": "Zombie 4",
+            "hp": 950,
+            "modelIndex": 38,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 2
+        },
+        {
+            "name": "Suit Navy",
+            "hp": 100,
+            "modelIndex": 18,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Suit Navy SG",
+            "hp": 100,
+            "modelIndex": 19,
+            "aiIndex": 1,
+            "weaponIndex0": 17,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "General",
+            "hp": 95,
+            "modelIndex": 12,
+            "aiIndex": 1,
+            "weaponIndex0": 17,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Suit Blue",
+            "hp": 100,
+            "modelIndex": 15,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Suit Blue SG",
+            "hp": 100,
+            "modelIndex": 16,
+            "aiIndex": 1,
+            "weaponIndex0": 18,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Shirt Man 2 SG",
+            "hp": 100,
+            "modelIndex": 33,
+            "aiIndex": 1,
+            "weaponIndex0": 6,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Soldier 3",
+            "hp": 105,
+            "modelIndex": 29,
+            "aiIndex": 3,
+            "weaponIndex0": 5,
+            "weaponIndex1": 20,
+            "typeIndex": 0
+        },
+        {
+            "name": "Soldier 3 SG",
+            "hp": 105,
+            "modelIndex": 30,
+            "aiIndex": 3,
+            "weaponIndex0": 21,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Gates",
+            "hp": 100,
+            "modelIndex": 6,
+            "aiIndex": 0,
+            "weaponIndex0": 0,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        },
+        {
+            "name": "Gates SG",
+            "hp": 100,
+            "modelIndex": 7,
+            "aiIndex": 4,
+            "weaponIndex0": 22,
+            "weaponIndex1": 0,
+            "typeIndex": 0
+        }
+    ]
+}

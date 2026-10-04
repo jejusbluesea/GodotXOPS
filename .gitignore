@@ -1,3 +1,17 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# C#
+bin/
+obj/
+.vs/
+.idea/
+*.csproj.user
+*.DotSettings.user
+
+# 원본 XOPS 에셋 — 저작권상 커밋 금지. Godot 임포트 차단용 .gdignore만 추적한다.
+/data/*
+!/data/.gdignore
+/addon/*
+!/addon/.gdignore

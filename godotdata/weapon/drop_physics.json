@@ -1,0 +1,11 @@
+﻿{
+    "weaponDropPhysicsData": {
+        "gravity": 33.333,
+        "terminalVelocityY": -6.0,
+        "horizontalDampingPerSec": 0.255,
+        "horizontalStopThreshold": 0.333,
+        "groundCollisionMargin": 0.01,
+        "deadlineY": -10.0,
+        "dropoffHorizontalSpeed": 5.43
+    }
+}

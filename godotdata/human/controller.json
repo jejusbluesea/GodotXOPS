@@ -1,0 +1,24 @@
+﻿{
+    "humanControllerData": {
+        "controllerStepOffset": 0.32,
+        "controllerStepClimbSpeed": 1.333333,
+        "controllerSlopeLimit": 50,
+        "controllerGroundProbeRadius": 0.05,
+        "gravityAcceleration": 21.999,
+        "fallMinSpeed": -12.667,
+        "fallMaxSpeed": -23.333,
+        "fallDamageMax": 120,
+        "fallDamageRandomMax": 6,
+        "deadlineY": -10.0,
+        "deadBodyFallAngularSpeed": 25.0,
+        "deadBodyCollision": true
+    },
+    "controllerSizeData": [
+        {
+            "height": 1.9,
+            "cameraHeight": 1.9,
+            "mapRadius": 0.28,
+            "humanRadius": 0.25
+        }
+    ]
+}

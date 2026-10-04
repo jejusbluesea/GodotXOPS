@@ -1,0 +1,121 @@
+﻿{
+    "objectData": [
+        {
+            "name": "CAN",
+            "modelIndex": 0,
+            "colliderIndex": 0,
+            "hp": 6,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 10
+        },
+        {
+            "name": "PC",
+            "modelIndex": 1,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "PC2",
+            "modelIndex": 2,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "PC3",
+            "modelIndex": 3,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "PC_W",
+            "modelIndex": 4,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "PC2_W",
+            "modelIndex": 5,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "PC3_W",
+            "modelIndex": 6,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "ISU",
+            "modelIndex": 7,
+            "colliderIndex": 2,
+            "hp": 50,
+            "soundPath": "data/sound/dan.wav",
+            "soundVolume": 1.1,
+            "jump": 6
+        },
+        {
+            "name": "DAN",
+            "modelIndex": 8,
+            "colliderIndex": 3,
+            "hp": 35,
+            "soundPath": "data/sound/dan.wav",
+            "soundVolume": 1.1,
+            "jump": 8
+        },
+        {
+            "name": "PC_SW",
+            "modelIndex": 9,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "PC_D",
+            "modelIndex": 10,
+            "colliderIndex": 1,
+            "hp": 60,
+            "soundPath": "data/sound/can.wav",
+            "soundVolume": 1.1,
+            "jump": 5
+        },
+        {
+            "name": "CONE",
+            "modelIndex": 11,
+            "colliderIndex": 4,
+            "hp": 30,
+            "soundPath": "data/sound/dan.wav",
+            "soundVolume": 1.1,
+            "jump": 7
+        },
+        {
+            "name": "ADDON-OBJECT",
+            "modelIndex": 12,
+            "colliderIndex": 5,
+            "hp": 0,
+            "soundPath": "",
+            "soundVolume": 1.1,
+            "jump": 0
+        }
+    ]
+}

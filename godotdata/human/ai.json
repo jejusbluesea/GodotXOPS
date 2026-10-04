@@ -1,0 +1,110 @@
+﻿{
+    "humanAIParameterData": {
+        "aiData": [
+            {
+                "aiming": 1,
+                "attack": 99,
+                "search": 1,
+                "limitsError": 0
+            },
+            {
+                "aiming": 1,
+                "attack": 18,
+                "search": 2,
+                "limitsError": 2
+            },
+            {
+                "aiming": 2,
+                "attack": 16,
+                "search": 3,
+                "limitsError": 0
+            },
+            {
+                "aiming": 3,
+                "attack": 14,
+                "search": 4,
+                "limitsError": -1
+            },
+            {
+                "aiming": 4,
+                "attack": 12,
+                "search": 5,
+                "limitsError": -2
+            },
+            {
+                "aiming": 5,
+                "attack": 10,
+                "search": 6,
+                "limitsError": -3
+            }
+        ],
+        "aiScopeData": [
+            {
+                "aiShotAngle": 8,
+                "aiShotAngleLong": 4,
+                "aiAddSearchDistNormal": 0,
+                "aiAddSearchDistCaution": 0
+            },
+            {
+                "aiShotAngle": 6,
+                "aiShotAngleLong": 3,
+                "aiAddSearchDistNormal": 2.5,
+                "aiAddSearchDistCaution": 4.0
+            },
+            {
+                "aiShotAngle": 4,
+                "aiShotAngleLong": 2,
+                "aiAddSearchDistNormal": 5.0,
+                "aiAddSearchDistCaution": 8.0
+            },
+            {
+                "aiShotAngle": 4,
+                "aiShotAngleLong": 2,
+                "aiAddSearchDistNormal": 5.0,
+                "aiAddSearchDistCaution": 8.0
+            }
+        ],
+        "aiSearchFovHNear": 110,
+        "aiSearchFovVNear": 60,
+        "aiSearchFovHLong": 60,
+        "aiSearchFovVLong": 40,
+        "aiSearchFovHNearCaution": 130,
+        "aiSearchFovVNearCaution": 80,
+        "aiSearchFovHLongCaution": 80,
+        "aiSearchFovVLongCaution": 50,
+        "aiSearchDistBaseNormal": 35,
+        "aiSearchDistCoeffNormal": 1.2,
+        "aiSearchDistBaseCaution": 42,
+        "aiSearchDistCoeffCaution": 1.5,
+        "aiSearchLoopScale": 4,
+        "aiSearchPoolSize": 96,
+        "aiTurnRateDeg": 0.8,
+        "aiTurnDamping": 0.8,
+        "aiTurnDeadzoneDeg": 0.2,
+        "aiTurnMaxPitchDeg": 70,
+        "aiShortAttackDist": 20,
+        "aiActionCancelDist": 62,
+        "aiCautionFrames": 160,
+        "aiZombieArmAngle": 0,
+        "aiHearGunfireDist": 12,
+        "aiHearGunfireSilencerDist": 3,
+        "aiHearGunfireAllyDist": 2,
+        "aiHearBulletDist": 2,
+        "aiHearBulletWallHitDist": 3,
+        "aiHearExplosionDist": 8,
+        "aiHearHitHumanHead": 6,
+        "aiHearHitHumanBody": 5,
+        "aiHearHitHumanLeg": 4,
+        "aiHearHitHumanZombie": 4,
+        "aiHearHitSmallObject": 2,
+        "aiHearFootstepForward": 4.0,
+        "aiHearFootstepSide": 3.5,
+        "aiHearFootstepBack": 3.0,
+        "aiArrivalDistPath": 0.5,
+        "aiStop5SecFrames": 167,
+        "aiJumpCheckDist": 0.2,
+        "aiArrivalDistTracking": 1.8,
+        "aiArrivalDistWalkTracking": 2.4,
+        "aiCombatRetreatDist": 2.0
+    }
+}

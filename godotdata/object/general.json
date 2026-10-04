@@ -1,0 +1,8 @@
+﻿{
+    "objectGeneralData": {
+        "modelScale": 0.5,
+        "bulletDamageMultiplier": 0.25,
+        "bulletPenetrationAttenuation": 0.7,
+        "addonObjectIndex": 12
+    }
+}

@@ -1,0 +1,320 @@
+﻿{
+    "objectModelData": [
+        {
+            "textures": [
+                "data/article/can.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/can.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc2.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc3.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc_w.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc2_w.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc3_w.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/isu.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/isu.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/dan.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/dan.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc_sw.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/pc_d.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/pc.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [
+                "data/article/cone.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/article/cone.x",
+                    "textureIndex": 0,
+                    "position": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "rotation": {
+                        "x": 0.0,
+                        "y": 0.0,
+                        "z": 0.0
+                    },
+                    "scale": {
+                        "x": 1.0,
+                        "y": 1.0,
+                        "z": 1.0
+                    }
+                }
+            ]
+        },
+        {
+            "textures": [],
+            "modelData": []
+        }
+    ]
+}

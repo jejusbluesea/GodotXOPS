@@ -1,0 +1,41 @@
+﻿{
+    "humanAnimationData" : {
+        "humanAnimation": [
+            {
+                "name": "Idle",
+                "index": [
+                    0
+                ],
+                "forwardSpeed": 1,
+                "strafeSpeed": 1,
+                "backwardSpeed": 1
+            },
+            {
+                "name": "Walk",
+                "index": [
+                    1,
+                    2,
+                    3,
+                    4
+                ],
+                "forwardSpeed": 0.72,
+                "strafeSpeed": 0.72,
+                "backwardSpeed": 0.72
+            },
+            {
+                "name": "Run",
+                "index": [
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10
+                ],
+                "forwardSpeed": 0.72,
+                "strafeSpeed": 1.08,
+                "backwardSpeed": 1.44
+            }
+        ]
+    }
+}

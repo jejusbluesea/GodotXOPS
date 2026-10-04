@@ -1,0 +1,122 @@
+﻿{
+    "humanTypeData": [
+        {
+            "progressRunAcceleration": 77.777,
+            "sidewaysRunAcceleration": 55.555,
+            "regressRunAcceleration": 42.222,
+            "progressWalkAcceleration": 38.888,
+            "attenuation": 23.105,
+            "jumpSpeed": 7.333,
+            "headDamageMultiplier": 2.0,
+            "bodyDamageMultiplier": 1.0,
+            "legDamageMultiplier": 0.7,
+            "maxFallDamage": 120,
+            "headRandomAddDamage": {
+                "min": 0,
+                "max": 16
+            },
+            "bodyRandomAddDamage": {
+                "min": 0,
+                "max": 8
+            },
+            "legRandomAddDamage": {
+                "min": 0,
+                "max": 6
+            },
+            "bloodEffectIndex": 4,
+            "bloodEffectThreshold": 32767,
+            "hitEffectIndex": 4,
+            "deathEffectIndex": -1,
+            "bloodAttachesToMap": true,
+            "canPickupWeapon": true,
+            "zombie": false,
+            "zombieMeleeDamageRange": {
+                "min": 0,
+                "max": 0
+            },
+            "zombieMaxMeleeRange": 2.5,
+            "autoBulletMultiplier": 3,
+            "controllerSizeIndex": 0,
+            "hitboxSizeIndex": 0
+        },
+        {
+            "progressRunAcceleration": 77.777,
+            "sidewaysRunAcceleration": 55.555,
+            "regressRunAcceleration": 42.222,
+            "progressWalkAcceleration": 38.888,
+            "attenuation": 23.105,
+            "jumpSpeed": 7.333,
+            "headDamageMultiplier": 2.0,
+            "bodyDamageMultiplier": 1.0,
+            "legDamageMultiplier": 0.7,
+            "maxFallDamage": 120,
+            "headRandomAddDamage": {
+                "min": 0,
+                "max": 16
+            },
+            "bodyRandomAddDamage": {
+                "min": 0,
+                "max": 8
+            },
+            "legRandomAddDamage": {
+                "min": 0,
+                "max": 6
+            },
+            "bloodEffectIndex": 4,
+            "bloodEffectThreshold": 32767,
+            "hitEffectIndex": 4,
+            "deathEffectIndex": 9,
+            "bloodAttachesToMap": false,
+            "canPickupWeapon": true,
+            "zombie": false,
+            "zombieMeleeDamageRange": {
+                "min": 0,
+                "max": 0
+            },
+            "zombieMaxMeleeRange": 2.5,
+            "autoBulletMultiplier": 3,
+            "controllerSizeIndex": 0,
+            "hitboxSizeIndex": 0
+        },
+        {
+            "progressRunAcceleration": 77.777,
+            "sidewaysRunAcceleration": 55.555,
+            "regressRunAcceleration": 42.222,
+            "progressWalkAcceleration": 38.888,
+            "attenuation": 23.105,
+            "jumpSpeed": 7.333,
+            "headDamageMultiplier": 2.0,
+            "bodyDamageMultiplier": 1.0,
+            "legDamageMultiplier": 0.7,
+            "maxFallDamage": 120,
+            "headRandomAddDamage": {
+                "min": 0,
+                "max": 16
+            },
+            "bodyRandomAddDamage": {
+                "min": 0,
+                "max": 8
+            },
+            "legRandomAddDamage": {
+                "min": 0,
+                "max": 6
+            },
+            "bloodEffectIndex": 4,
+            "bloodEffectThreshold": 32767,
+            "hitEffectIndex": 4,
+            "deathEffectIndex": -1,
+            "bloodAttachesToMap": true,
+            "canPickupWeapon": false,
+            "zombie": true,
+            "zombieMeleeDamageRange": {
+                "min": 15,
+                "max": 20
+            },
+            "zombieMaxMeleeRange": 2.5,
+            "zombieAttackSound": "data/sound/hit2.wav",
+            "autoBulletMultiplier": 3,
+            "controllerSizeIndex": 0,
+            "hitboxSizeIndex": 0
+        }
+    ]
+}

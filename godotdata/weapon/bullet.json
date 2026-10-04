@@ -1,0 +1,92 @@
+﻿{
+    "bulletData": [
+        {
+            "name": "BULLET",
+            "texturePath": "data/model/bullet.bmp",
+            "modelPath": "data/model/bullet.x",
+            "modelPosition": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "modelRotation": {
+                "x": 0.0,
+                "y": -180.0,
+                "z": 0.0
+            },
+            "modelScale": {
+                "x": 0.1,
+                "y": 0.1,
+                "z": 0.1
+            },
+            "bulletBoundAdjust": 1.372,
+            "useGravity": false,
+            "gravityScale": 0.0,
+            "explosionTrigger": 0,
+            "armingDelay": 0.0,
+            "explosionRadius": 0.0,
+            "humanExplosiveHeadDamageMax": 0.0,
+            "humanExplosiveLegDamageMax": 0.0,
+            "objectExplosiveDamageMax": 0.0,
+            "explosionknockbackMax": 0.0,
+            "explosionSound": "",
+            "explosionEffectIndex": -1,
+            "wallHitEffectIndex": 6,
+            "humanHitEffectIndex": 4,
+            "objectHitEffectIndex": 7,
+            "wallHitSounds": [
+                "data/sound/hit1.wav",
+                "data/sound/hit1.wav",
+                "data/sound/hit3.wav"
+            ],
+            "humanHitSounds": [
+                "data/sound/hit2.wav"
+            ],
+            "bulletPassingSounds": [
+                "data/sound/hyu.wav"
+            ],
+            "lifetime": 1.2
+        },
+        {
+            "name": "GRENADE",
+            "texturePath": "data/model/weapon/grenade.bmp",
+            "modelPath": "data/model/weapon/grenade.x",
+            "modelPosition": {
+                "x": 0.0,
+                "y": 0.0,
+                "z": 0.0
+            },
+            "modelRotation": {
+                "x": 90.0,
+                "y": 180.0,
+                "z": 0.0
+            },
+            "modelScale": {
+                "x": 0.8,
+                "y": 0.8,
+                "z": 0.8
+            },
+            "bulletBoundAdjust": 0.8,
+            "useGravity": true,
+            "gravityScale": 18.889,
+            "explosionTrigger": 1,
+            "armingDelay": 0.0,
+            "explosionRadius": 8.0,
+            "humanExplosiveHeadDamageMax": 100.0,
+            "humanExplosiveLegDamageMax": 80.0,
+            "objectExplosiveDamageMax": 80.0,
+            "explosionknockbackMax": 0.22,
+            "explosionSound": "data/sound/bang.wav",
+            "explosionEffectIndex": 8,
+            "wallHitEffectIndex": -1,
+            "humanHitEffectIndex": 4,
+            "objectHitEffectIndex": -1,
+            "wallHitSounds": [
+                "data/sound/cco.wav"
+            ],
+            "humanHitSounds": [],
+            "bulletPassingSounds": [],
+            "lifetime": 3.0
+        }
+    ]
+}

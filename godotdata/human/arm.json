@@ -1,0 +1,13 @@
+﻿{
+    "humanArmModelData": [
+        {
+            "name": "xops_arm",
+            "leftArms": [],
+            "rightArms": [
+                "data/model/arm01.x",
+                "data/model/arm02.x",
+                "data/model/arm00.x"
+            ]
+        }
+    ]
+}

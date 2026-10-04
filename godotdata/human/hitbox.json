@@ -1,0 +1,48 @@
+﻿{
+    "humanHitboxSizeData": [
+        {
+            "head": {
+                "position": {
+                    "x": 0,
+                    "y": 1.895,
+                    "z": 0
+                },
+                "rotationEuler": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "height": 0.29,
+                "radius": 0.15
+            },
+            "body": {
+                "position": {
+                    "x": 0,
+                    "y": 1.4,
+                    "z": 0
+                },
+                "rotationEuler": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "height": 0.7,
+                "radius": 0.24
+            },
+            "leg": {
+                "position": {
+                    "x": 0,
+                    "y": 0.525,
+                    "z": 0
+                },
+                "rotationEuler": {
+                    "x": 0,
+                    "y": 0,
+                    "z": 0
+                },
+                "height": 1.05,
+                "radius": 0.26
+            }
+        }
+    ]
+}

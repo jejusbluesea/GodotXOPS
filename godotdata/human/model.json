@@ -1,0 +1,1213 @@
+﻿{
+    "humanModelData": [
+        {
+            "name": "civ1",
+            "textures": [
+                "data/model/civ1.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "civ1_sg",
+            "textures": [
+                "data/model/civ1.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "civ2",
+            "textures": [
+                "data/model/civ2.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "civ2_sg",
+            "textures": [
+                "data/model/civ2.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "civ3",
+            "textures": [
+                "data/model/civ3.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "civ3_sg",
+            "textures": [
+                "data/model/civ3.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "gates",
+            "textures": [
+                "data/model/gates.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "gates_sg",
+            "textures": [
+                "data/model/gates.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "gs",
+            "textures": [
+                "data/model/gs.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "gs_sg",
+            "textures": [
+                "data/model/gs.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "hage",
+            "textures": [
+                "data/model/hage.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "islam",
+            "textures": [
+                "data/model/islam.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "islam2",
+            "textures": [
+                "data/model/islam2.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "police",
+            "textures": [
+                "data/model/police.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up2.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "riiman",
+            "textures": [
+                "data/model/riiman.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "riiman_b",
+            "textures": [
+                "data/model/riiman_b.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "riiman_b_sg",
+            "textures": [
+                "data/model/riiman_b.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "riiman_g",
+            "textures": [
+                "data/model/riiman_g.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "riiman_k",
+            "textures": [
+                "data/model/riiman_k.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "riiman_k_sg",
+            "textures": [
+                "data/model/riiman_k.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "robot",
+            "textures": [
+                "data/model/robot.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier_black",
+            "textures": [
+                "data/model/soldier_black.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up5.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier_blue",
+            "textures": [
+                "data/model/soldier_blue.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up5.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier_green",
+            "textures": [
+                "data/model/soldier_green.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier_violet",
+            "textures": [
+                "data/model/soldier_violet.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier_white",
+            "textures": [
+                "data/model/soldier_white.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier0",
+            "textures": [
+                "data/model/soldier0.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up4.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier1",
+            "textures": [
+                "data/model/soldier1.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up4.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier2",
+            "textures": [
+                "data/model/soldier2.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up4.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier3",
+            "textures": [
+                "data/model/soldier3.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "soldier3_sg",
+            "textures": [
+                "data/model/soldier3.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "syatu",
+            "textures": [
+                "data/model/syatu.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "syatu_sg",
+            "textures": [
+                "data/model/syatu.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "syatu2",
+            "textures": [
+                "data/model/syatu2.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up1.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "woman",
+            "textures": [
+                "data/model/woman.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up3.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "zombie1",
+            "textures": [
+                "data/model/zombie1.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "zombie2",
+            "textures": [
+                "data/model/zombie2.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "zombie3",
+            "textures": [
+                "data/model/zombie3.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up0.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        },
+        {
+            "name": "zombie4",
+            "textures": [
+                "data/model/zombie4.bmp"
+            ],
+            "modelData": [
+                {
+                    "modelPath": "data/model/up3.x",
+                    "position": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "rotation": {
+                        "x": 0,
+                        "y": 0,
+                        "z": 0
+                    },
+                    "scale": {
+                        "x": 1,
+                        "y": 1,
+                        "z": 1
+                    },
+                    "textureIndex": 0
+                }
+            ],
+            "armIndex": 0,
+            "armTextureIndex": 0,
+            "legIndex": 0,
+            "legTextureIndex": 0
+        }
+    ]
+}

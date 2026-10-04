@@ -1,0 +1,20 @@
+﻿{
+    "humanLegModelData": [
+        {
+            "name": "xops_leg",
+            "legs": [
+                "data/model/leg.x",
+                "data/model/walk01.x",
+                "data/model/walk02.x",
+                "data/model/walk03.x",
+                "data/model/walk04.x",
+                "data/model/run01.x",
+                "data/model/run02.x",
+                "data/model/run03.x",
+                "data/model/run04.x",
+                "data/model/run05.x",
+                "data/model/run06.x"
+            ]
+        }
+    ]
+}

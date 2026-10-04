@@ -1,0 +1,24 @@
+{
+    "skyMeshPath": "data/sky/sky.x",
+    "skyTexturePath": [
+        "",
+        "data/sky/sky1.bmp",
+        "data/sky/sky2.bmp",
+        "data/sky/sky3.bmp",
+        "data/sky/sky4.bmp",
+        "data/sky/sky5.bmp"
+    ],
+    "skyColor": [
+        { "r": 0,  "g": 0,  "b": 0,  "a": 255 },
+        { "r": 64, "g": 80, "b": 64, "a": 255 },
+        { "r": 16, "g": 16, "b": 16, "a": 255 },
+        { "r": 0,  "g": 16, "b": 32, "a": 255 },
+        { "r": 32, "g": 16, "b": 16, "a": 255 },
+        { "r": 64, "g": 32, "b": 32, "a": 255 }
+    ],
+    "nearClippingPlane": 0.1,
+    "farClippingPlane": 80.0,
+    "fog": true,
+    "fogStart": 10.0,
+    "fogEnd": 79.0
+}
