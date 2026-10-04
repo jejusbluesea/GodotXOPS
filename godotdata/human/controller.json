@@ -1,4 +1,4 @@
-﻿{
+{
     "humanControllerData": {
         "controllerStepOffset": 0.32,
         "controllerStepClimbSpeed": 1.333333,
@@ -15,7 +15,7 @@
     },
     "controllerSizeData": [
         {
-            "height": 1.9,
+            "height": 2.0,
             "cameraHeight": 1.9,
             "mapRadius": 0.28,
             "humanRadius": 0.25

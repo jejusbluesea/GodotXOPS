@@ -59,5 +59,63 @@ namespace GodotXOPS
                 -Mathf.DegToRad(unityDegrees.Y),
                 Mathf.DegToRad(unityDegrees.Z));
         }
+
+        /// <summary>
+        /// 캐릭터 yaw(UnityXOPS 규약: 도 단위, 0 = 원본 정면, 오른쪽으로 돌수록 +)가 가리키는 수평 정면 방향을 Godot 공간으로 구한다.
+        /// </summary>
+        /// <param name="yawDeg">yaw (도).</param>
+        /// <returns>길이 1 의 수평 방향.</returns>
+        public static Vector3 YawForward(float yawDeg)
+        {
+            float rad = Mathf.DegToRad(yawDeg);
+            return new Vector3(Mathf.Sin(rad), 0f, -Mathf.Cos(rad));
+        }
+
+        /// <summary>
+        /// 캐릭터 yaw 기준 수평 오른쪽 방향을 Godot 공간으로 구한다.
+        /// </summary>
+        /// <param name="yawDeg">yaw (도).</param>
+        /// <returns>길이 1 의 수평 방향.</returns>
+        public static Vector3 YawRight(float yawDeg)
+        {
+            float rad = Mathf.DegToRad(yawDeg);
+            return new Vector3(Mathf.Cos(rad), 0f, Mathf.Sin(rad));
+        }
+
+        /// <summary>
+        /// yaw 와 pitch(UnityXOPS 규약: 도 단위, 아래를 볼수록 +)가 가리키는 조준 방향을 Godot 공간으로 구한다.
+        /// </summary>
+        /// <param name="yawDeg">yaw (도).</param>
+        /// <param name="pitchDeg">pitch (도).</param>
+        /// <returns>길이 1 의 방향.</returns>
+        public static Vector3 AimDirection(float yawDeg, float pitchDeg)
+        {
+            float pitch = Mathf.DegToRad(pitchDeg);
+            return YawForward(yawDeg) * Mathf.Cos(pitch) + Vector3.Down * Mathf.Sin(pitch);
+        }
+
+        /// <summary>
+        /// 두 각도(도)의 최단 차이 (to − from) 를 -180 ~ 180 범위로 구한다.
+        /// </summary>
+        /// <param name="fromDeg">시작 각도.</param>
+        /// <param name="toDeg">끝 각도.</param>
+        /// <returns>최단 회전량 (도).</returns>
+        public static float DeltaAngle(float fromDeg, float toDeg)
+        {
+            float delta = Mathf.PosMod(toDeg - fromDeg, 360f);
+            return delta > 180f ? delta - 360f : delta;
+        }
+
+        /// <summary>
+        /// 각도(도)를 최단 경로로 보간한다.
+        /// </summary>
+        /// <param name="fromDeg">시작 각도.</param>
+        /// <param name="toDeg">끝 각도.</param>
+        /// <param name="t">보간 비율 0~1.</param>
+        /// <returns>보간된 각도 (도).</returns>
+        public static float LerpAngle(float fromDeg, float toDeg, float t)
+        {
+            return fromDeg + DeltaAngle(fromDeg, toDeg) * Mathf.Clamp(t, 0f, 1f);
+        }
     }
 }

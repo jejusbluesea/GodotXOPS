@@ -293,6 +293,9 @@ namespace GodotXOPS.Dev
             {
                 GD.Print($"문제: {failure}");
             }
+            // 한 프레임 안에 수천 개의 노드를 만들고 지운 직후 종료하면 종료 과정에서 간헐적으로 죽는다. 관리 객체를 먼저 정리해 둔다.
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
             GetTree().Quit(failures.Count == 0 ? 0 : 1);
         }
     }

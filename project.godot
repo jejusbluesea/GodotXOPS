@@ -20,6 +20,7 @@ ConfigManager="*res://src/Data/Config/ConfigManager.cs"
 DataManager="*res://src/Data/DataManager.cs"
 InputManager="*res://src/Data/Input/InputManager.cs"
 MaterialManager="*res://src/Data/Material/MaterialManager.cs"
+SimClock="*res://src/Map/SimClock.cs"
 MapLoader="*res://src/Map/MapLoader.cs"
 
 [display]

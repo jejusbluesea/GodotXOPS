@@ -62,6 +62,17 @@ dotnet build GodotXOPS.csproj
   - `--selftest` — 모든 미션을 로드해 보고 종료 (헤드리스 가능).
   - `--mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]` — 화면을 PNG로 저장하고 종료. 렌더링을 고친 뒤 결과를 직접 확인할 때 쓴다.
 
+- `res://scenes/dev/play_test.tscn` — 미션의 맵과 사람을 로드하고 플레이어를 직접 조작한다 (`--headless` 없이 실행). 인자: `--selftest`(모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 확인, 헤드리스 가능), `--mission 번호 [--addon] [--third] [--walk] --screenshot 경로.png`.
+
+## 시뮬레이션과 캐릭터
+
+- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (이동 10 → 무기 30 → 총알 40 → 인간간 충돌 100 → AI 200 → 이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
+- 게임 결과에 영향을 주는 난수는 `GameRandom.Gameplay`(틱에서만), 연출용 난수는 `GameRandom.Visual`을 쓴다.
+- `Human`(Node3D)은 데이터와 시각만 갖는다. 논리 위치·이동·충돌·사망 상태는 `human.Controller`(`HumanController`, 노드가 아닌 순수 클래스)가 갖고, 노드의 transform은 틱 사이를 보간한 시각 전용 값이다. 판정에는 `Controller.Position`을 쓴다.
+- 캐릭터 각도는 UnityXOPS 규약으로 든다: 도 단위, yaw는 오른쪽으로 돌수록 +, pitch는 아래를 볼수록 +. 방향 벡터와 노드 회전은 `Coord.YawForward` / `YawRight` / `AimDirection` / `FromUnityEuler`로 만든다.
+- 프레임 처리 순서(`ProcessPriority`): `InputManager`(최소) → `SimClock`(-200) → 일반 노드(0) → `Human` 시각 보간(50) → `PlayerController` 입력·카메라(100).
+- 이동·충돌 코드는 UnityXOPS와 원본 `object.cpp`를 함께 대조해 옮긴다. 둘이 다르면 원본을 따르고 사용자에게 알린다. 지금까지 원본대로 고친 것: 추가 충돌 플래그, NPC 접지 판정(중심 + 진행 방향 한 점), 플레이어 전용 이동 경로 레이 검사, 비정상 이동량 되돌리기, 정지 시 급경사 미끄러짐 확률 건너뛰기, 점프 입력을 같은 틱에 소비, 매몰 판정 높이(키 − 0.06), 낙하 3분할 계수 0.33.
+
 ## 맵과 렌더링
 
 - `MapLoader`(Autoload)가 블록·스카이·미션 정보를 들고 있고, 씬이 바뀌어도 유지된다. 로드 함수는 이전 것을 먼저 언로드한다.
@@ -75,7 +86,7 @@ dotnet build GodotXOPS.csproj
 
 ## Autoload 순서
 
-`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `MapLoader`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
+`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
 
 ## 설정과 입력
 

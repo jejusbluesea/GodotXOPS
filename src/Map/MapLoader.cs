@@ -20,6 +20,9 @@ namespace GodotXOPS
             m_skyRoot = new Node3D { Name = "SkyRoot" };
             AddChild(m_skyRoot);
 
+            m_humanRoot = new Node3D { Name = "HumanRoot" };
+            AddChild(m_humanRoot);
+
             // 스카이 메시가 없을 때의 배경은 검정이다(원본 기본값). 조명은 쓰지 않으므로 환경광도 끈다.
             var environment = new Environment
             {
