@@ -176,6 +176,18 @@ dotnet build GodotXOPS.csproj
 - 원본 좌표에서 외적으로 법선을 구하는 코드를 옮길 때는 피연산자 순서를 뒤집는다 (원본은 왼손, Godot은 오른손 좌표계).
 - 런타임에 만든 노드를 같은 프레임 안에 교체할 때는 `QueueFree` 대신 `RemoveChild` + `Free`를 쓴다. 트리에서 뗀 노드를 `QueueFree`만 해 두고 종료하면 종료 시 치명 오류가 난다.
 
+## 문서
+
+유저가 읽는 문서는 `README.md`(한국어, 원문), `README.en.md`, `README.ja.md`, `docs/modding.md`, `docs/development.md`다. **코드나 데이터를 고치면 같은 작업 안에서 해당 문서도 고친다.** 문서가 실제 동작과 어긋난 채로 커밋하지 않는다.
+
+- `docs/modding.md`를 고쳐야 하는 변경: `godotdata/` JSON 의 키 추가·삭제·이름 변경, 값의 뜻이나 단위 변경, 열거형 값, 파일 추가, 지원하는 파일 형식, 에드온 페이지 방식, 풀 크기 같은 제한.
+- `docs/development.md`를 고쳐야 하는 변경: 빌드·익스포트 방법, 폴더 구조, 틱 순서(`SimOrder`)와 프레임 순서, Autoload 순서, 점검 씬과 인자, 개발용 실행 인자, 원본과 다르게 하기로 한 동작, 코드 규칙, 버전 규칙.
+- `README.md`를 고쳐야 하는 변경: 기능 목록, 설치 방법, 기본 키, 최신 릴리즈 버전, 앞으로 할 것. 고치면 `README.en.md`와 `README.ja.md`도 같은 내용으로 고친다 (두 번역은 맨 위에 AI 번역임을 알린다).
+- 키의 뜻은 이름으로 추정하지 않고 그 값을 쓰는 코드를 확인해서 적는다.
+- 한국어 문서의 용어: "에드온", "오브젝트"(소물), 오브젝트의 `hp`는 "체력". 코드 주석과 이 파일·`TODO.md`는 "어드온", "소물" 그대로 쓴다.
+- 한 줄에 물결표(`~`)를 두 번 쓰지 않는다 (GitHub 이 그 사이를 취소선으로 그린다). 범위는 "0 에서 255 사이"처럼 쓴다.
+- `LICENSE`와 `godotdata/global.json`의 라이선스 문구는 같게 유지한다.
+
 ## Autoload 순서
 
 `ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader` → `BulletManager` → `WeaponManager` → `EffectManager` → `SoundManager` → `EventManager` → `Game`(`GameBridge`) → `Dev`(GDScript). `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.

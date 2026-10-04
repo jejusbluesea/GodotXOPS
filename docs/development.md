@@ -56,7 +56,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 | `src/Utility/` | 공용 도구 (`Coord` 좌표 변환, `Singleton<T>`, `GamePath` 등) |
 | `src/IO/` | 파일 로더 (이미지, 모델 `.x`, 소리, BD1, PD1, MIF) |
 | `src/Data/` | 데이터 클래스와 `DataManager`, 설정, 입력 |
-| `src/Map/` | 맵, 사람, 무기, 총알, 소물, 이펙트, 소리, AI, 이벤트 |
+| `src/Map/` | 맵, 사람, 무기, 총알, 오브젝트, 이펙트, 소리, AI, 이벤트 |
 | `src/Scene/` | 화면이 쓰는 창구 `GameBridge`(Autoload `Game`) |
 | `src/Dev/` | 점검 도구 |
 | `ui/` | GDScript. 화면 5종의 배치·연출·입력, `ui/common/`의 공용 도우미 |
@@ -80,7 +80,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 원본 조작감을 재현하려고 이동, 충돌, 총알 판정을 직접 계산합니다. `CharacterBody3D`, `RigidBody3D`, 물리 레이캐스트를 쓰지 않습니다.
 
 - 블록 충돌: `MapLoader.RaycastBlock` / `IsInsideBlock`
-- 총알: 한 틱의 경로를 0.25 m 간격 점으로 나눠 점마다 사람 → 소물 → 맵 순으로 검사 (원본 `ObjectManager::CollideBullet`)
+- 총알: 한 틱의 경로를 0.25 m 간격 점으로 나눠 점마다 사람 → 오브젝트 → 맵 순으로 검사 (원본 `ObjectManager::CollideBullet`)
 
 ### 시뮬레이션 틱
 
@@ -138,7 +138,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `config_input_check.tscn` | — | 설정 읽기·쓰기·되돌리기, 입력 조회, 키 재지정 |
 | `map_viewer.tscn` | `-- --selftest` | 모든 미션의 블록 로드와 충돌 레이 |
 | `play_test.tscn` | `-- --selftest` | 모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 |
-| `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 소물, 통계 |
+| `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 오브젝트, 통계 |
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
 | `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름 |
 

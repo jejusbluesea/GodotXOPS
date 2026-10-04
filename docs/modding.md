@@ -6,7 +6,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 - [파일 목록](#파일-목록)
 - [무기](#무기)
 - [사람](#사람)
-- [소물](#소물)
+- [오브젝트](#오브젝트)
 - [이펙트](#이펙트)
 - [미션과 스카이](#미션과-스카이)
 - [에드온 페이지](#에드온-페이지)
@@ -18,7 +18,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 - JSON 은 게임을 시작할 때 한 번 읽습니다. 고친 뒤에는 게임을 껐다 켭니다.
 - 파일에 없는 키는 기본값으로 채워집니다. 파일이 깨져 읽지 못하면 그 파일 전체가 기본값이 되므로, 고친 것이 전혀 반영되지 않으면 쉼표나 괄호를 빠뜨리지 않았는지 봅니다.
 - 키 이름은 대소문자를 구분합니다.
-- **목록에서의 순서가 곧 번호입니다** (0부터 셉니다). 다른 파일은 이 번호로 항목을 가리킵니다 (`modelIndex`, `bulletIndex`, `weaponIndex0` 등). 미션 파일(PD1)도 사람·무기·소물을 이 번호로 가리키므로, **기존 항목의 순서를 바꾸거나 중간에 끼워 넣지 말고 맨 끝에 추가하세요.**
+- **목록에서의 순서가 곧 번호입니다** (0부터 셉니다). 다른 파일은 이 번호로 항목을 가리킵니다 (`modelIndex`, `bulletIndex`, `weaponIndex0` 등). 미션 파일(PD1)도 사람·무기·오브젝트을 이 번호로 가리키므로, **기존 항목의 순서를 바꾸거나 중간에 끼워 넣지 말고 맨 끝에 추가하세요.**
 - 값을 가리키지 않을 때는 `-1`을 씁니다 (예: `scopeIndex`, `previousWeaponIndex`).
 - 파일 경로는 `GodotXOPS.exe`가 있는 폴더 기준입니다 (`data/model/weapon/mp5.x`).
 
@@ -27,17 +27,17 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | 종류 | 단위 |
 |---|---|
 | 길이, 위치 | 미터. 원본 XOPS 길이의 1/10 입니다 (원본 10 = 1 m) |
-| 시간 | 초. 게임은 초당 33.333틱으로 돌고, 초 단위 값은 가장 가까운 틱 수로 반올림해 씁니다 |
+| 시간 | 초. 게임은 초당 33.333틱으로 돌고, 초 단위 값은 가장 가까운 틱 수로 반올림해 사용합니다 |
 | 속도 | 미터/초 |
 | 각도 | 도 |
-| 색 | 파일에 따라 0~1 실수 또는 0~255 정수 (원래 들어 있는 값의 형식을 따릅니다) |
+| 색 | `sky_data.json`의 `skyColor`는 0 에서 255 사이의 정수, 그 밖(스코프 조준선, 설정의 조준선 색)은 0 에서 1 사이의 실수 |
 
 위치와 회전 값의 축 방향은 UnityXOPS 와 같습니다 (+x 오른쪽, +y 위, +z 앞).
 
 ### 쓸 수 있는 파일 형식
 
 - 모델: DirectX `.x` 파일만 됩니다.
-- 텍스처: `.bmp`, `.dds`, `.png`, `.jpg` 등 Godot 이 읽을 수 있는 이미지.
+- 텍스처: `.bmp`, `.dds`, `.tga`, `.png`, `.jpg` 등 Godot 이 읽을 수 있는 이미지.
 - 소리: `.wav`.
 
 ## 파일 목록
@@ -66,10 +66,10 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `human/hitbox.json` | 머리·몸·다리 피격 판정 |
 | `human/general.json` | 모델 배율과 높이, 팔 각도, 피격 시 조준 흐트러짐 |
 | `human/interaction.json` | 무기 줍기 범위 |
-| `object/list.json` | 소물 목록 (내구력, 부서지는 소리, 튀는 세기) |
-| `object/model.json` | 소물 모델 |
-| `object/collider.json` | 소물 판정 모양 |
-| `object/general.json` | 소물 배율, 총알 데미지 배수, 에드온 소물 번호 |
+| `object/list.json` | 오브젝트 목록 (체력, 부서지는 소리, 튀는 세기) |
+| `object/model.json` | 오브젝트 모델 |
+| `object/collider.json` | 오브젝트 판정 모양 |
+| `object/general.json` | 오브젝트 배율, 총알 데미지 배수, 에드온 오브젝트 번호 |
 
 ## 무기
 
@@ -91,7 +91,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `magazineSize` | 탄창 크기 |
 | `pelletCount` | 한 번에 나가는 탄 수 (산탄총) |
 | `burstMode` | 0 연발, 1 단발, 2 점사 |
-| `burstCount` | 점사일 때 한 번에 나가는 수 |
+| `burstCount` | `burstMode`가 2 일 때, 발사 키를 한 번 누르고 있는 동안 나가는 최대 발 수 |
 | `reloadStyle` | 0 남은 탄을 버리고 재장전, 1 남은 탄을 유지하고 재장전, 2 한 발씩 장전, 3 자동 재장전 |
 | `reloadTime` | 재장전 시간 (초) |
 | `recoil` | 쏠 때마다 늘어나는 조준 오차 |
@@ -101,8 +101,8 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `ignoreAimError` | true 면 조준 오차를 무시하고 정확히 나갑니다 |
 | `crosshair` | 조준선 표시 |
 | `scope`, `scopeIndex` | 스코프 사용 여부와 `weapon/scope.json`의 번호 |
-| `position`, `size` | HUD 의 무기 그림 위치와 크기 |
-| `soundPath`, `soundVolume` | 발사음 |
+| `position`, `size` | 손에 쥔 무기 모델의 기준 위치와 크기 |
+| `soundPath`, `soundVolume` | 발사음 경로, 발사음 볼륨 |
 | `suppressor` | 소음기. AI 가 총성을 듣는 거리가 짧아집니다 |
 | `previousWeaponIndex`, `nextWeaponIndex` | Z / X 키로 바뀌는 무기 번호 (단발 ↔ 연발처럼 다른 항목으로 바꿉니다). 없으면 -1 |
 | `switchTime` | Z / X 로 바꾸는 데 걸리는 시간 |
@@ -118,7 +118,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `muzzleFlashEffectIndex`, `muzzleFlashOffset`, `muzzleFlashSize` | 총구 화염 이펙트 번호, 위치, 크기 |
 | `gunfireSmokeEffectIndex` | 발사 연기 이펙트 번호 |
 | `shellEffectIndex`, `shellEjectOffset`, `shellEjectDirection`, `shellEjectSpeed`, `shellEjectDelay`, `shellSize` | 탄피 이펙트 번호, 나오는 위치·방향·속도·지연·크기 |
-| `leftArmIndex`, `rightArmIndex` | 팔 모델 번호 (`human/arm.json`). -1 이면 기본 |
+| `leftArmIndex`, `rightArmIndex` | 이 무기를 들었을 때의 왼팔·오른팔 모양 번호 (`human/arm.json`의 `leftArms`, `rightArms` 안에서의 순서). -1 이면 그 팔을 그리지 않습니다 |
 | `fixLeftArm`, `fixedLeftArmAngle`, `fixRightArm`, `fixedRightArmAngle` | 팔을 조준 방향과 무관하게 고정할지와 그 각도 |
 
 모델 조각을 여러 개 넣으면 `.x` 파일 여러 개를 조립해 무기 하나로 만들 수 있습니다.
@@ -130,7 +130,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `modelPath`, `texturePath`, `modelPosition`, `modelRotation`, `modelScale` | 탄환 모델 |
 | `bulletBoundAdjust` | 탄환 모델이 총구에서 이 거리만큼 멀어진 뒤부터 보입니다 (판정과 무관한 연출) |
 | `useGravity`, `gravityScale` | 중력을 받는 탄 (수류탄) |
-| `explosionTrigger` | 폭발 조건. 아래 값을 더해서 씁니다: 1 수명이 다함, 2 맵에 맞음, 4 사람에 맞음, 8 소물에 맞음. 0 이면 폭발하지 않습니다 |
+| `explosionTrigger` | 폭발 조건. 아래 값을 더해서 씁니다: 1 탄환 사라짐, 2 맵에 충돌, 4 사람에 충돌, 8 오브젝트에 충돌. 0 이면 폭발하지 않습니다 |
 | `armingDelay` | 발사 뒤 이 시간이 지나야 폭발할 수 있습니다 |
 | `explosionRadius` | 폭발 반경 (m) |
 | `humanExplosiveHeadDamageMax`, `humanExplosiveLegDamageMax`, `objectExplosiveDamageMax` | 폭발 중심에서의 최대 데미지 |
@@ -140,7 +140,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `wallHitSounds`, `humanHitSounds`, `bulletPassingSounds` | 착탄음, 피격음, 스쳐 지나가는 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다 |
 | `lifetime` | 탄환이 사라질 때까지의 시간 (초) |
 
-예: 맞으면 터지는 로켓은 `explosionTrigger`를 15(1+2+4+8)로, 시한 수류탄은 1 로 둡니다.
+예: 로켓은 `explosionTrigger`를 15(1+2+4+8)로, 수류탄은 1 로 둡니다.
 
 ### `weapon/general.json`
 
@@ -202,18 +202,38 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 ### `human/model.json` — 모습
 
-`textures`와 `modelData`는 무기 모델과 같은 형식입니다. `armIndex`·`legIndex`는 팔·다리 모델 번호, `armTextureIndex`·`legTextureIndex`는 그 모델에 입힐 텍스처 번호(이 항목의 `textures` 안에서)입니다.
+`textures`와 `modelData`는 무기 모델과 같은 형식입니다. `armIndex`·`legIndex`는 팔·다리 모델 번호(`human/arm.json`, `human/leg.json`), `armTextureIndex`·`legTextureIndex`는 그 모델에 입힐 텍스처 번호(이 항목의 `textures` 안에서)입니다.
 
-## 소물
+### `human/arm.json` — 팔 모델
 
-`object/list.json`의 `objectData` 항목 하나가 소물 하나입니다.
+`humanArmModelData` 항목 하나가 팔 모델 한 벌입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `name` | 이름 (구분용) |
+| `leftArms`, `rightArms` | 왼팔·오른팔 모양의 `.x` 경로 목록. 무기 모델의 `leftArmIndex`·`rightArmIndex`가 이 목록 안의 순서를 가리킵니다 |
+
+### `human/leg.json` — 다리 모델
+
+`humanLegModelData` 항목 하나가 다리 모델 한 벌입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `name` | 이름 (구분용) |
+| `legs` | 다리 동작 한 장면씩의 `.x` 경로 목록. `human/animation.json`의 `index`가 이 목록 안의 순서를 가리킵니다 |
+
+`human/animation.json`의 `humanAnimation`은 서 있기·걷기·달리기 동작입니다. `index`는 그 동작에서 차례로 보여 줄 다리 모양 번호, `forwardSpeed`·`strafeSpeed`·`backwardSpeed`는 방향별 재생 속도입니다.
+
+## 오브젝트
+
+`object/list.json`의 `objectData` 항목 하나가 오브젝트 하나입니다.
 
 | 키 | 뜻 |
 |---|---|
 | `name` | 이름 |
 | `modelIndex` | `object/model.json`의 번호 |
 | `colliderIndex` | `object/collider.json`의 번호 |
-| `hp` | 내구력 |
+| `hp` | 체력 |
 | `soundPath`, `soundVolume` | 부서질 때의 소리 |
 | `jump` | 부서질 때 튀어 오르는 세기 |
 
@@ -225,16 +245,16 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | 1 | 상자 | `x`, `y`, `z` = 전체 크기 |
 | 2 | 캡슐 | `x` = 반지름, `y` = 높이, `z` = 방향 (0 X축, 1 Y축, 2 Z축) |
 
-`object/general.json`의 `addonObjectIndex`는 에드온 미션(.mif)이 직접 지정하는 소물이 들어가는 자리입니다. 이 번호의 항목은 미션을 로드할 때마다 덮어쓰이므로 다른 용도로 쓰지 마세요.
+`object/general.json`의 `addonObjectIndex`는 에드온 미션(.mif)이 직접 지정하는 오브젝트이 들어가는 자리입니다. 이 번호의 항목은 미션을 로드할 때마다 덮어쓰이므로 다른 용도로 쓰지 마세요.
 
 ## 이펙트
+
+**완전히 모딩 가능하게 구현된 부분이 아닙니다. 수정하지 마세요.**
 
 `effect_parameter_data.json`에 있습니다.
 
 - `effectGeneralData.texturePaths` — 이펙트가 쓰는 텍스처 목록.
 - `effectData` — 이펙트 프리셋 목록. 무기 모델·탄환·사람 종류의 `...EffectIndex`가 이 목록의 번호를 가리킵니다. 프리셋 하나는 `emitters`(한 번에 내는 입자 묶음) 여러 개로 이루어집니다.
-
-이펙트는 화면 연출일 뿐이어서 게임 결과에는 영향을 주지 않습니다.
 
 ## 미션과 스카이
 
@@ -244,7 +264,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 - `openingData` — 오프닝에 쓰는 맵.
 - `demoData` — 메뉴 배경으로 도는 맵 목록.
 
-미션을 목록에 추가하려면 `officialMissions` 끝에 항목을 더하면 됩니다. BD1 / PD1 / MIF 파일 자체는 원본 XOPS 용 편집 도구로 만듭니다.
+미션을 목록에 추가하려면 `officialMissions` 끝에 항목을 더하면 됩니다. BD1 / PD1 / MIF 파일은 맵 에디터를 이용해 수정합니다.
 
 ### `sky_data.json`
 
@@ -282,7 +302,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 원본 파일 형식에서 오는 제한입니다.
 
 - 맵(BD1) 하나가 쓸 수 있는 텍스처는 10개입니다.
-- 미션 파일(PD1)의 포인트 값은 0~255 범위입니다. 사람·무기·소물 번호도 이 범위 안에서만 가리킬 수 있습니다.
+- 미션 파일(PD1)의 포인트 값은 0~255 범위입니다. 사람·무기·오브젝트 번호도 이 범위 안에서만 가리킬 수 있습니다.
 - 동시에 존재할 수 있는 수: 떨어진 무기 200개, 탄환 160개, 이펙트 256개. 넘으면 새로 생기지 않습니다.
 - 이벤트는 세 줄, 메시지는 미션당 16개입니다.
 - 이미지·모델·소리는 한 번 읽으면 게임을 끌 때까지 기억합니다. 실행 중에 파일을 바꿨다면 게임을 다시 켭니다.
