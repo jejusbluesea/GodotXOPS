@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="GodotXOPS"
+run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.7", "C#", "Mobile")
 config/icon="res://icon.svg"
 
@@ -27,6 +28,8 @@ WeaponManager="*res://src/Map/Weapon/WeaponManager.cs"
 EffectManager="*res://src/Map/Effect/EffectManager.cs"
 SoundManager="*res://src/Map/Sound/SoundManager.cs"
 EventManager="*res://src/Map/Event/EventManager.cs"
+Game="*res://src/Scene/GameBridge.cs"
+Dev="*res://ui/common/xops_dev.gd"
 
 [display]
 

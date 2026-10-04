@@ -74,6 +74,8 @@ namespace GodotXOPS
         // 사망 회전: 각속도(deg/s), 각도(deg, + 앞으로 엎어짐 / − 뒤로 자빠짐), 방향(+1/−1).
         private float m_deadAddRy;
         private float m_deadPitchAngle;
+        // 직전 틱의 사망 회전 각도. 화면에는 직전 틱과 현재 틱 사이를 보간해 보여 준다.
+        private float m_prevDeadPitchAngle;
         private float m_deadDirection;
 
         public Vector3 Position => m_position;
@@ -185,6 +187,7 @@ namespace GodotXOPS
         public void SimTick()
         {
             m_prevPosition = m_position;
+            m_prevDeadPitchAngle = m_deadPitchAngle;
 
             // 완전히 고정된 시체는 더 계산하지 않는다 (원본 deadstate == 5 조기 반환).
             if (m_human.DeadState == HumanDeadState.Done) return;
@@ -232,7 +235,9 @@ namespace GodotXOPS
         {
             m_human.Position = VisualPosition;
             // 몸통 yaw × 사망 pitch 합성. 살아있을 때는 사망 pitch 가 0 이다.
-            m_human.Rotation = Coord.FromUnityEuler(new Vector3(m_deadPitchAngle, m_rotationX, 0f));
+            // 쓰러지는 각도는 틱마다 바뀌므로 위치처럼 틱 사이를 보간한다. 그러지 않으면 높은 프레임에서 33Hz 로 끊겨 보인다.
+            float deadPitch = Mathf.Lerp(m_prevDeadPitchAngle, m_deadPitchAngle, SimClock.InterpolationAlpha);
+            m_human.Rotation = Coord.FromUnityEuler(new Vector3(deadPitch, m_rotationX, 0f));
 
             if (m_human.Alive)
             {

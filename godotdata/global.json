@@ -1,6 +1,6 @@
 {
     "productName" : "GodotXOPS",
-    "companyName" : "dlwowlsgod",
+    "companyName" : "jaytwogames",
     "licenseType" : "MIT License",
     "licenseName" : "Copyright (c) 2026",
     "licenseLines" : [
@@ -22,7 +22,7 @@
         "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE",
         "SOFTWARE."
     ],
-    "versionMajor" : "0",
-    "versionMinor" : "1",
+    "versionMajor" : "1",
+    "versionMinor" : "0",
     "versionPatch" : "0"
 }

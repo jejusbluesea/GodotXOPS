@@ -61,6 +61,9 @@ namespace GodotXOPS
         // 스코프를 쓰지 않을 때의 시야각 (설정값).
         private float m_baseFov;
 
+        // 지금 씬에서 조작을 맡은 컨트롤러. 없으면 null.
+        public static PlayerController Current { get; private set; }
+
         public Camera3D Camera => m_camera;
         public ViewMode ViewMode => m_viewMode;
         public float Yaw => m_yaw;
@@ -76,6 +79,16 @@ namespace GodotXOPS
             MapLoader.ApplyCameraSettings(m_camera);
             m_baseFov = m_camera.Fov;
             m_camera.MakeCurrent();
+        }
+
+        public override void _EnterTree()
+        {
+            Current = this;
+        }
+
+        public override void _ExitTree()
+        {
+            if (Current == this) Current = null;
         }
 
         public override void _Process(double delta)
@@ -179,6 +192,10 @@ namespace GodotXOPS
             var frameInput = new HumanInput { moveFlag = moveFlag, yaw = m_yaw, pitch = m_pitch, weapon = weapon };
             m_controller.SetInput(in frameInput);
             m_player.QueueWeaponInput(weapon);
+
+            // 사람 노드의 회전과 팔 각도는 이 노드보다 먼저(Human 의 시각 갱신에서) 정해져서, 그대로 두면 이번 프레임의 마우스 입력이 다음 프레임에야 팔에 반영된다.
+            // 카메라는 바로 돌기 때문에 1인칭에서 팔이 시선을 한 박자 늦게 따라오는 것처럼 보인다. 새 조준각으로 한 번 더 맞춘다.
+            m_controller.ApplyVisual();
         }
 
         /// <summary>
