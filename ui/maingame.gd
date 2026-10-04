@@ -250,7 +250,9 @@ func _build_normal() -> void:
 
 func _build_weapon_view() -> void:
 	var size: int = WEAPON_VIEW["size"]
-	var texture: Texture2D = Game.CreateWeaponView(size)
+	# 무기 그림은 층의 배율(UIScale)만큼 크게 렌더링한다. 표시 크기 그대로 렌더링하면 확대될 때 계단이 진다.
+	var render_size := ceili(size * maxf(1.0, ConfigManager.GetFloat("General", "UIScale", 1.0)))
+	var texture: Texture2D = Game.CreateWeaponView(render_size)
 	_weapon_view = XopsUI.image(_layer(WEAPON_ORDER, false), XopsUI.BOTTOM_RIGHT, texture, 0, 0, size, size)
 	Game.SetWeaponViewMain(WEAPON_VIEW["main_position"], WEAPON_VIEW["main_scale"], 0.0)
 	Game.SetWeaponViewSub(WEAPON_VIEW["sub_position"], WEAPON_VIEW["sub_scale"], WEAPON_VIEW["sub_yaw"])

@@ -143,9 +143,11 @@ dotnet build GodotXOPS.csproj
 - `Game`이 하는 일: 화면 전환(`ChangeScene`), 맵 로드(`LoadOpening`, `LoadDemo`, `LoadMission`, `BeginMission`, `RestartMission`, `ReloadMission`, `UnloadMap`, `UnloadMission`), 장면 카메라, 벽 블라인드 판정, 미션 목록·브리핑·통계 조회, HUD 가 읽는 플레이어 값, 3D 무기 표시(`HudWeaponView`), 밝기·감마 사각형.
 - 오프닝과 메뉴 배경은 `AIController.DrivePlayer = true`로 플레이어까지 AI 가 움직이고 이벤트는 돌지 않는다. 메인게임이 들어올 때 `Game.BeginMission()`이 되돌린다.
 - 시점 전환(F1)과 스코프 입력은 `PlayerController`가 처리한다. HUD 는 상태를 읽어 그리기만 한다.
+- OS 글꼴 글상자(`XopsUI.label`: 브리핑 본문, 이벤트 메시지, 크레딧)는 자기가 속한 층의 글꼴(`XopsLayer.os_font()`)을 쓴다. 층이 배율만큼 `oversampling`을 맞춰 두므로 확대돼도 흐려지지 않는다. 공용 `XopsUI.os_font()`를 글상자에 직접 넣으면 높은 해상도에서 흐려진다.
+- 글꼴은 OS 언어로 고른다 (한국어 맑은 고딕, 일본어 Yu Gothic, 그 밖 Segoe UI. 없는 글자는 시스템의 다른 글꼴로 넘어간다). 텍스트 파일은 BOM → 유효한 UTF-8 → OS 언어의 옛 코드 페이지(한국어 CP949, 일본어 Shift-JIS, 그 밖 1252) 순으로 읽는다 (`EncodingHelper`). UnityXOPS 와 같은 방식이다.
 - 크기가 없는 노드에 직접 그리는 요소(`XopsText`)는 그릴 범위를 `RenderingServer.canvas_item_set_custom_rect`로 알려 줘야 한다. 그러지 않으면 기준점이 화면 밖일 때 화면 안에 걸친 부분까지 통째로 그려지지 않는다 (HUD 의 STATE 상자 아랫줄이 그렇게 사라졌었다).
 - `PlayerController`는 입력을 넣은 직후 `Controller.ApplyVisual()`을 한 번 더 부른다. 사람 노드의 회전·팔 각도가 `PlayerController`보다 먼저 갱신되므로, 다시 맞추지 않으면 1인칭 팔이 카메라보다 한 프레임 늦게 돈다.
-- 3D 무기 표시는 자기만의 3D 공간을 가진 뷰포트다. 무기 모델이 맵과 같은 안개 셰이더를 쓰므로 공간 전체를 1/100로 줄여 카메라 바로 앞에 둔다.
+- 3D 무기 표시는 자기만의 3D 공간을 가진 뷰포트다. 무기 모델이 맵과 같은 안개 셰이더를 쓰므로 공간 전체를 1/100로 줄여 카메라 바로 앞에 둔다. 뷰포트는 표시 크기 × UIScale 로 렌더링한다 (표시 크기 그대로면 확대될 때 계단이 진다).
 - 메뉴의 OPTION(설정 화면)은 `ui/mainmenu_option.gd`(`MenuOption`)가 만든다. 구성과 수치는 UnityXOPS 0.4의 `mainmenu.lua`다. 탭은 General / Input / Graphic / Sound. 값은 바꾸는 즉시 `ConfigManager`에 들어가 화면에 반영되고(밝기·감마, 음량, 키 바인딩), SAVE 가 파일에 쓰고 `ApplyGraphic`을 부른다. UIScale 은 SAVE 때 적용한다 (바로 적용하면 누르고 있던 화살표가 움직인다. 사용자 결정). BACK 과 ESC 는 `RevertToSaved`로 되돌린다. playerName 은 쓰는 곳이 없어 화면에 넣지 않았다 (사용자 결정).
 - 화면의 클릭은 `InputManager.WasClickPressed` / `WasClickReleased` / `IsClickPressed`(마우스 왼쪽 버튼 고정)로 읽는다. `"fire"` 액션으로 읽으면 발사 키를 바꿨을 때 메뉴를 누를 수 없게 된다.
 

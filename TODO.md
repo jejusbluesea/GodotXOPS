@@ -160,12 +160,22 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
   - UIScale 은 SAVE 를 눌러야 적용된다 (사용자 요청. 바로 적용하면 누르고 있던 화살표가 손 밑에서 움직인다).
   - 확인하지 못한 것: 해상도·전체화면을 바꾸고 SAVE 했을 때의 화면, UIScale 을 1 보다 크게 했을 때의 배치(640×480 에서는 상한이 1 이다), RESET.
 - **소물 방향이 180° 반대였던 것.** 원본은 사람만 방향에 π 를 더해 그리는데 (object.cpp:2158) 소물에도 사람 기준 yaw 를 그대로 쓰고 있었다 (UnityXOPS 도 같다). `look − 180`으로 고쳤다. RUINS_DE(37번)의 책상에서 모니터와 의자가 서로 마주 보는 것을 스크린샷으로 확인했다.
+- **HUD 의 무기 그림이 UIScale 을 키우면 계단이 지던 것.** 뷰포트를 표시 크기 × UIScale 로 렌더링하게 했다. 1920×1080, UIScale 2.2 스크린샷으로 확인.
+- **아이콘**을 `xops.png`로 바꿨다 (`icon.svg` 삭제). 익스포트한 실행 파일에도 들어간다 (프리셋의 `application/modify_resources`).
 - **F8**(조작 대상 교체)이 창을 닫는 것은 에디터에서 실행할 때만이다 (사용자 확인).
+- **OS 글꼴 글자가 높은 해상도에서 흐리던 것.** 글자를 글꼴 크기대로 그려 놓고 층의 배율로 늘리고 있었다. 층마다 배율만큼 `oversampling`을 준 글꼴을 쓰게 했다 (`XopsLayer.os_font()`). 1920×1080 브리핑 본문을 전후 스크린샷으로 확인했다.
+
+- **익스포트 빌드** (Windows). `export_presets.cfg`의 "Windows Desktop" 프리셋으로 `build/windows/`에 뽑는다 (`build/`는 커밋하지 않는다):
+  `Godot콘솔.exe --headless --path . --export-release "Windows Desktop" build/windows/GodotXOPS.exe`
+  - 결과물: `GodotXOPS.exe`, `GodotXOPS.pck`, `data_GodotXOPS_windows_x86_64/`(.NET 런타임과 어셈블리. 게임 데이터 `data/`와 다른 폴더다).
+  - 실행 파일 옆에 `data/`, `addon/`, `godotdata/`, `addon.json`을 놓아야 한다 (`GamePath.Root` = 실행 파일 폴더).
+  - 확인한 것: 빌드에서 메뉴와 메인게임(미션 3)이 뜨고 데이터를 읽는다 (스크린샷), 결과 화면 헤드리스 실행 종료 코드 0. 개발용 인자(`--scene`, `--ui-shot` 등)는 빌드에서도 동작한다.
+  - 확인하지 못한 것: 빌드를 직접 플레이하는 것(소리, 전체화면, 설정 저장), 다른 PC 에서의 실행.
 
 할 일:
 
-1. **익스포트 빌드.** Godot 4.7.2 .NET 익스포트 템플릿이 설치돼 있지 않아 (`%APPDATA%/Godot/export_templates` 가 비어 있다) 하지 못했다. 템플릿을 받은 뒤: `export_presets.cfg`(Windows Desktop) 만들기, 빌드가 뜨는지, 실행 파일 옆의 `data/`·`addon/`·`godotdata/`·`addon.json` 을 읽는지(`GamePath.Root`), F8 문제.
-2. 사용자가 창에서 확인: OPTION 화면 전체(위의 확인하지 못한 것), darkScreen 미션의 어둡기, 브리핑·결과 타이틀의 진하기.
+1. 사용자가 창에서 확인: OPTION 화면(해상도·전체화면 SAVE, UIScale, RESET), darkScreen 미션의 어둡기, 브리핑·결과 타이틀의 진하기, 소물 방향, 익스포트 빌드 플레이.
+2. 1.0.0 릴리즈: 배포 묶음에 무엇을 넣을지 (`godotdata/`와 `addon.json`은 넣고, `data/`·`addon/`은 저작권상 사용자가 직접 넣는다), 개발용 점검 씬을 빌드에서 뺄지.
 
 10단계에서 뺀 것 ("확인이 덜 된 것"에 남긴다): 미션 59개 통과 자동 점검, 스카이 방향·떨어진 무기 방향의 원본 대조, 이펙트 화면 확인, TGA·RLE BMP 로더.
 
@@ -173,6 +183,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 
 - **포팅 뒤 현대화의 순서.** 일시정지 메뉴, 체크포인트, 저해상도 렌더를 확대할 때의 화질, 모딩.
 - **어드온 페이지를 자동으로 잡기.** 지금은 프로젝트 루트 `addon.json`의 `addonPath`를 직접 적어야 페이지가 늘어난다 (UnityXOPS 방식, 유지하기로 함). `addon/` 아래 하위 폴더를 자동으로 페이지로 잡을지.
+- **다른 언어의 텍스트 읽기.** 지금은 UTF-8 이 아니면 OS 언어의 코드 페이지로 읽는다 (UnityXOPS 와 같다). 한국어 OS 에서 Shift-JIS 로 저장된 일본어 어드온은 깨진다. 내용으로 인코딩을 추정하거나 설정에서 고르게 할지.
 - **화면 수치를 외부 데이터로 뺄지.** 지금은 화면별 GDScript 맨 위 상수 표에 있다.
 - **발소리 WAV.** 넣을 자리(`WorldSound.EmitFootstep`)는 있다.
 - **아군 시체를 보고 경계하는 조건**(`CheckCorpse`)과 **AI 가 실제로 스코프를 켜는 동작.**

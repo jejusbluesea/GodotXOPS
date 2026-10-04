@@ -10,6 +10,9 @@ const BASE_HEIGHT := 480.0
 var scaled := false
 var ui_scale := 1.0
 
+# 이 층의 글상자가 쓰는 OS 글꼴. 처음 쓸 때 만든다.
+var _os_font: SystemFont
+
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -30,3 +33,14 @@ func refresh() -> void:
 	position = Vector2.ZERO
 	scale = Vector2(factor, factor)
 	size = view / factor
+	if _os_font != null and not is_equal_approx(_os_font.oversampling, factor):
+		_os_font.oversampling = factor
+
+
+## 이 층의 글상자가 쓸 OS 글꼴. 층의 배율만큼 크게 그려 두고 줄여 쓰므로, 층이 확대돼도 글자가 흐려지지 않는다.
+## (글자는 글꼴 크기대로 그린 그림을 층의 배율로 늘려 보여 주는 것이라, 그대로 두면 4K 에서 16픽셀짜리 글자를 4.5배로 늘린 것이 된다.)
+func os_font() -> Font:
+	if _os_font == null:
+		_os_font = XopsUI.os_font().duplicate()
+		_os_font.oversampling = maxf(scale.x, 0.01)
+	return _os_font

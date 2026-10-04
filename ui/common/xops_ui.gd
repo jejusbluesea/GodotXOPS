@@ -147,14 +147,23 @@ static func label(parent: Control, value: String, font_size: int, color: Color) 
 	var node := Label.new()
 	node.text = value
 	node.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	node.add_theme_font_override("font", os_font())
+	node.add_theme_font_override("font", _layer_font(parent))
 	node.add_theme_font_size_override("font_size", font_size)
 	node.add_theme_color_override("font_color", color)
 	parent.add_child(node)
 	return node
 
 
-## 본문용 OS 글꼴. 한국어는 맑은 고딕, 일본어는 Yu Gothic, 그 밖에는 Segoe UI 를 먼저 찾는다.
+## 요소가 속한 층의 OS 글꼴을 찾는다. 층 밖이면 공용 글꼴.
+static func _layer_font(node: Node) -> Font:
+	while node != null:
+		if node is XopsLayer:
+			return (node as XopsLayer).os_font()
+		node = node.get_parent()
+	return os_font()
+
+
+## 본문용 OS 글꼴 (글자 크기를 잴 때와 층 글꼴의 원본으로 쓴다). 한국어는 맑은 고딕, 일본어는 Yu Gothic, 그 밖에는 Segoe UI 를 먼저 찾는다.
 static func os_font() -> Font:
 	if _os_font == null:
 		var font := SystemFont.new()
