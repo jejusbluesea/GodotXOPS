@@ -25,6 +25,18 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// OpenXOPS 원본 공간의 방향 벡터(광원 방향 등)를 Godot 공간으로 바꾼다. 축척은 적용하지 않는다.
+        /// </summary>
+        /// <param name="x">원본 X.</param>
+        /// <param name="y">원본 Y.</param>
+        /// <param name="z">원본 Z.</param>
+        /// <returns>Godot 공간의 방향 벡터.</returns>
+        public static Vector3 DirectionFromXops(float x, float y, float z)
+        {
+            return new Vector3(-x, y, z);
+        }
+
+        /// <summary>
         /// UnityXOPS 공간의 위치·방향·오프셋(godotdata JSON 값, 모델 정점)을 Godot 좌표로 바꾼다. 축척은 건드리지 않는다.
         /// </summary>
         /// <param name="unity">UnityXOPS 공간의 벡터.</param>

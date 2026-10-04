@@ -58,9 +58,24 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/config_input_check.tscn` — 설정 읽기/쓰기/되돌리기와 입력 조회를 가짜 입력 이벤트로 확인한다. 설정 파일은 저장하지 않는다.
 
+- `res://scenes/dev/map_viewer.tscn` — 미션을 골라 블록·스카이를 띄우고 자유 카메라로 확인한다 (`--headless` 없이 실행). 인자는 `--` 뒤에 준다:
+  - `--selftest` — 모든 미션을 로드해 보고 종료 (헤드리스 가능).
+  - `--mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]` — 화면을 PNG로 저장하고 종료. 렌더링을 고친 뒤 결과를 직접 확인할 때 쓴다.
+
+## 맵과 렌더링
+
+- `MapLoader`(Autoload)가 블록·스카이·미션 정보를 들고 있고, 씬이 바뀌어도 유지된다. 로드 함수는 이전 것을 먼저 언로드한다.
+- 블록 충돌은 `MapLoader.RaycastBlock` / `IsInsideBlock`으로 직접 계산한다 (엔진 물리 미사용). 블록 앞면만 맞는다.
+- 추가 충돌(Additional Collision, `MapLoader.AdjustCollision`): 캐릭터-맵 충돌에서 중심축 0.9 m / 1.3 m 높이의 추가 검사 2점은 **이 플래그가 켜진 미션에서만** 돈다 (원본 `human::CollisionMap`의 `AddCollisionFlag`). UnityXOPS `HumanController`는 플래그를 무시하고 항상 검사하는데, 이는 잘못 옮긴 것이므로 따라 하지 않는다.
+- 머티리얼은 `MaterialManager`의 `Create*Material`로 만든다. `alpha_clip_blend` 셰이더는 원본처럼 sRGB 값 그대로 곱하고 섞은 뒤 마지막에만 선형으로 바꾼다. 텍스처 유니폼에 `source_color`를 붙이지 않는다.
+- 안개는 Godot 환경 안개가 아니라 전역 셰이더 변수(`xops_fog_color`, `xops_fog_range`)로 셰이더가 직접 계산한다 (원본의 선형 안개 재현).
+- 깊이 테스트를 끈 머티리얼(스카이)은 반투명 패스로 들어가므로 `RenderPriority`로 그리는 순서를 정한다.
+- 원본 좌표에서 외적으로 법선을 구하는 코드를 옮길 때는 피연산자 순서를 뒤집는다 (원본은 왼손, Godot은 오른손 좌표계).
+- 런타임에 만든 노드를 같은 프레임 안에 교체할 때는 `QueueFree` 대신 `RemoveChild` + `Free`를 쓴다. 트리에서 뗀 노드를 `QueueFree`만 해 두고 종료하면 종료 시 치명 오류가 난다.
+
 ## Autoload 순서
 
-`ConfigManager` → `DataManager` → `InputManager`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
+`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `MapLoader`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
 
 ## 설정과 입력
 

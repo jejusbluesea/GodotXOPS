@@ -19,6 +19,8 @@ config/icon="res://icon.svg"
 ConfigManager="*res://src/Data/Config/ConfigManager.cs"
 DataManager="*res://src/Data/DataManager.cs"
 InputManager="*res://src/Data/Input/InputManager.cs"
+MaterialManager="*res://src/Data/Material/MaterialManager.cs"
+MapLoader="*res://src/Map/MapLoader.cs"
 
 [display]
 
@@ -37,3 +39,14 @@ project/assembly_name="GodotXOPS"
 
 rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+
+[shader_globals]
+
+xops_fog_color={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}
+xops_fog_range={
+"type": "vec2",
+"value": Vector2(0, 1)
+}
