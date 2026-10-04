@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **세션을 시작하면 프로젝트 루트의 `TODO.md`를 먼저 읽는다.** 진행 상황, 다음 작업, 아직 옮기지 않은 것이 적혀 있다. 작업을 끝내면 그 파일을 갱신한다.
+
 ## Project Overview
 
 **GodotXOPS** — Godot 4.7.2 (.NET) 프로젝트. 일본 인디 FPS XOPS(2000년)의 오픈소스 구현 OpenXOPS를, 그 Unity 포팅본인 UnityXOPS를 참고해 Godot으로 옮긴다.
@@ -113,4 +115,22 @@ dotnet build GodotXOPS.csproj
   - 그 외 위치에는 이해하기 어려운 부분에만.
 - `partial class`로 관심사별 파일 분리. Godot 노드 클래스는 `partial`이 필수다.
 - 에디터 전용 로그는 `Debugger`를 쓴다 (`[Conditional("TOOLS")]`로 익스포트 빌드에서 제거됨).
-- Godot 4.7 기준 deprecated API 사용 금지.
+- Godot 4.7 기준 deprecated API 사용 금지. 빌드 경고 0개를 유지한다.
+- 주석 형식: 클래스와 함수는 `/// <summary>`, 인자는 `/// <param>`, 반환 값은 `/// <returns>`. 한 줄짜리 프로퍼티·필드 설명은 `//` 한 줄.
+- 주석에는 "무엇이고 왜 그런지"를 쓴다. 원본에서 온 값이나 로직에는 출처를 적는다 (예: `원본 object.cpp:1607-1644`, `HUMAN_MAPCOLLISION_CLIMBHEIGHT`). UnityXOPS에서 옮겼다는 사실 자체는 적지 않는다.
+- 중괄호는 항상 새 줄에 연다. 한 줄 `if`는 조기 반환·`continue` 같은 짧은 가드에만 쓴다.
+- 데이터 클래스(`src/Data/`)의 public 필드는 JSON 키와 같은 camelCase다. 그 밖의 public 멤버는 PascalCase.
+- 숫자 상수는 이름 붙은 `k_` 상수로 빼고 단위(미터, 초, 도)와 원본 값을 주석에 적는다. 원본 길이 단위는 ×0.1 해서 미터로 쓴다.
+- 파일 하나에 주 클래스 하나. 폴더 구조는 UnityXOPS `Runtime/`을 따른다 (`src/Map/Human/`, `src/Map/Weapon/` 등).
+- 노드일 필요가 없는 것은 순수 C# 클래스로 둔다 (`HumanController`, `HumanCollision` 참조). 매니저만 `Singleton<T>` + Autoload.
+- Godot이 만드는 `.cs.uid` 파일은 커밋한다.
+
+## 작업 방식
+
+- **구현 전에 설계를 먼저 논의한다.** 선택지가 있으면 권고안과 함께 제시하고 사용자의 결정을 받는다.
+- **커밋과 푸시는 사용자가 요청할 때만 한다.** `main`에 직접 커밋하고, 메시지는 한국어로 쓴다.
+- **조작감에 직결되는 코드(이동, 충돌, 무기, 총알, AI)는 UnityXOPS 코드와 원본 C++를 함께 대조한다.** 둘이 다르면 원본을 따르고, 무엇이 달랐는지 사용자에게 표로 알린다. 원본 분석에는 `openxops-analyzer` 에이전트를 쓸 수 있다 (사용자가 에이전트 사용을 요청한 경우).
+- **구현한 것은 점검 씬으로 직접 검증한다.** 새 시스템에는 `src/Dev/`에 점검 씬을 추가하거나 기존 씬에 `--selftest`를 확장한다. 화면에 보이는 것은 `--screenshot`으로 PNG를 저장해 직접 확인하고, 그 뒤 창을 띄워 사용자가 확인하게 한다.
+- **확인하지 못한 것은 확인하지 못했다고 보고한다.** 조작감처럼 직접 판단할 수 없는 것은 사용자에게 확인을 요청한다.
+- 작업을 마칠 때마다 기존 점검 씬 전부를 다시 돌려 통과를 확인한다 (`TODO.md`의 목록 참조).
+- PowerShell로 파일을 고칠 때는 UTF-8(BOM 없음)로 읽고 쓴다. `Get-Content`는 `-Encoding UTF8` 없이 쓰면 한글이 깨져 보인다.
