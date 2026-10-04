@@ -1,5 +1,5 @@
 {
-    "productName" : "UnityXOPS",
+    "productName" : "GodotXOPS",
     "companyName" : "dlwowlsgod",
     "licenseType" : "MIT License",
     "licenseName" : "Copyright (c) 2026",
@@ -23,6 +23,6 @@
         "SOFTWARE."
     ],
     "versionMajor" : "0",
-    "versionMinor" : "3",
-    "versionPatch" : "00a"
+    "versionMinor" : "1",
+    "versionPatch" : "0"
 }

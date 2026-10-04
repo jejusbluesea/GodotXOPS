@@ -21,7 +21,7 @@
 
 ## 폴더
 
-- `src/` — C#. `Utility/`(공용), `IO/`(파일 로더), `Dev/`(점검 도구). 이후 `Data/`, `Map/` 등이 UnityXOPS `Runtime/` 구조를 따라 추가된다.
+- `src/` — C#. `Utility/`(공용), `IO/`(파일 로더), `Data/`(데이터 클래스와 `DataManager`), `Dev/`(점검 도구). 이후 `Map/` 등이 UnityXOPS `Runtime/` 구조를 따라 추가된다.
 - `scenes/` — `.tscn`. 화면은 씬 파일 단위로 나눈다.
 - `ui/` — GDScript UI.
 - `shaders/` — `.gdshader`.
@@ -50,6 +50,17 @@ dotnet build GodotXOPS.csproj
 ```
 
 두 번째 명령은 `data/`와 `addon/`의 모든 이미지·사운드·모델을 로더로 읽어 보는 점검이다. 실패가 있으면 종료 코드 1.
+
+같은 방식으로 실행하는 점검·도구 씬:
+
+- `res://scenes/dev/data_check.tscn` — `godotdata/` JSON을 로드된 값과 키 단위로 대조한다. 데이터 클래스에 없는 키나 값 불일치가 있으면 종료 코드 1. 데이터 클래스나 JSON을 고친 뒤에 돌린다.
+- `res://scenes/dev/asset_viewer.tscn` — 에셋을 눈으로 확인하는 뷰어 (`--headless` 없이 실행).
+
+## 데이터 JSON
+
+- 데이터 클래스의 public 필드 이름이 곧 JSON 키다 (camelCase, UnityXOPS와 동일). 이름을 바꾸면 파일과 어긋난다.
+- 읽기는 `JsonData.Overwrite`만 쓴다. 파일에 있는 최상위 키만 덮어쓰고, 파일이 없거나 깨져도 기본값으로 진행한다.
+- 컨테이너의 리스트·중첩 객체 필드는 이니셜라이저로 초기화해 소비자가 null을 만나지 않게 한다.
 
 ## Code Conventions (C#)
 
