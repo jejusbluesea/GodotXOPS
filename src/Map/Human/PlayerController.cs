@@ -12,7 +12,7 @@ namespace GodotXOPS
     }
 
     /// <summary>
-    /// 플레이어 조작과 카메라. MapLoader.Player 가 가리키는 Human 에 입력을 넣고, 1인칭/3인칭/사망 카메라를 배치한다.
+    /// 플레이어 조작과 카메라. MapLoader.Player 가 가리키는 Human 에 이동·조준·무기 입력을 넣고, 1인칭/3인칭/사망 카메라를 배치한다.
     /// 메인게임 씬에 하나 둔다. 시점 각도는 UnityXOPS 규약(도, yaw 오른쪽 +, pitch 아래 +)으로 들고 Coord 로 변환한다.
     /// </summary>
     public partial class PlayerController : Node3D
@@ -56,6 +56,10 @@ namespace GodotXOPS
         private float m_deathCamYaw;
         private float m_deathCamPitch;
         private bool m_deathCamInitialized;
+        // 조작권을 얻은 뒤 발사 버튼을 한 번 떼야 발사를 받는다. 이전 화면을 닫은 클릭이 첫 발사로 새는 것을 막는다.
+        private bool m_fireReady;
+        // 스코프를 쓰지 않을 때의 시야각 (설정값).
+        private float m_baseFov;
 
         public Camera3D Camera => m_camera;
         public ViewMode ViewMode => m_viewMode;
@@ -70,6 +74,7 @@ namespace GodotXOPS
             m_camera = new Camera3D { Name = "PlayerCamera", TopLevel = true };
             AddChild(m_camera);
             MapLoader.ApplyCameraSettings(m_camera);
+            m_baseFov = m_camera.Fov;
             m_camera.MakeCurrent();
         }
 
@@ -94,6 +99,16 @@ namespace GodotXOPS
             {
                 // F1 — 1인칭 ↔ 3인칭 (원본 gamemain.cpp:2293-2304).
                 if (input.WasKeyPressed(Key.F1)) ToggleViewMode();
+
+                // 치트 F6 — F6 을 누른 채 Enter 로 현재 무기의 예비 탄을 장탄수만큼 추가 (원본 gamemain.cpp:2336-2341).
+                if (input.IsKeyPressed(Key.F6) && input.WasKeyPressed(Key.Enter)) m_player.CheatAddMagazine();
+
+                // 치트 F7 — F7 을 누른 채 ←/→ 로 현재 무기를 다음/이전 종류로 교체 (원본 gamemain.cpp:2344-2363). ← 가 번호 증가.
+                if (input.IsKeyPressed(Key.F7))
+                {
+                    if (input.WasKeyPressed(Key.Left)) m_player.CheatCycleWeapon(1);
+                    else if (input.WasKeyPressed(Key.Right)) m_player.CheatCycleWeapon(-1);
+                }
 
                 ReadInput(input, dt);
             }
@@ -152,8 +167,39 @@ namespace GodotXOPS
             if (input.IsPressed(InputManager.Walk)) moveFlag |= HumanMoveFlag.Walk;
             if (input.WasPressed(InputManager.Jump)) moveFlag |= HumanMoveFlag.Jump;
 
-            var frameInput = new HumanInput { moveFlag = moveFlag, yaw = m_yaw, pitch = m_pitch };
+            HumanWeaponAction weapon = ReadWeaponInput(input);
+
+            var frameInput = new HumanInput { moveFlag = moveFlag, yaw = m_yaw, pitch = m_pitch, weapon = weapon };
             m_controller.SetInput(in frameInput);
+            m_player.QueueWeaponInput(weapon);
+        }
+
+        /// <summary>
+        /// 무기 입력을 읽는다. 실행은 다음 틱에 Human 이 한다 (원본 gamemain.cpp:2224-2288).
+        /// 발사는 단발 무기면 누른 순간만, 그 밖에는 누르고 있는 동안 계속 받는다.
+        /// </summary>
+        /// <param name="input">입력 매니저.</param>
+        /// <returns>이번 프레임의 무기 입력 플래그.</returns>
+        private HumanWeaponAction ReadWeaponInput(InputManager input)
+        {
+            HumanWeaponAction weapon = HumanWeaponAction.None;
+
+            if (!input.IsPressed(InputManager.Fire)) m_fireReady = true;
+            if (m_fireReady)
+            {
+                bool semiAuto = m_player.CurrentWeapon.Data.burstMode == WeaponBurstMode.SemiAuto;
+                if (semiAuto ? input.WasPressed(InputManager.Fire) : input.IsPressed(InputManager.Fire)) weapon |= HumanWeaponAction.Fire;
+            }
+
+            if (input.WasPressed(InputManager.Reload)) weapon |= HumanWeaponAction.Reload;
+            if (input.WasPressed(InputManager.First)) weapon |= HumanWeaponAction.SelectFirst;
+            if (input.WasPressed(InputManager.Second)) weapon |= HumanWeaponAction.SelectSecond;
+            if (input.WasPressed(InputManager.Previous)) weapon |= HumanWeaponAction.SwitchPrevious;
+            if (input.WasPressed(InputManager.Next)) weapon |= HumanWeaponAction.SwitchNext;
+            if (input.WasPressed(InputManager.Drop)) weapon |= HumanWeaponAction.Drop;
+            if (input.WasPressed(InputManager.Zoom)) weapon |= HumanWeaponAction.Scope;
+
+            return weapon;
         }
 
         /// <summary>
@@ -167,6 +213,10 @@ namespace GodotXOPS
                 ApplyDeathCamera(dt);
                 return;
             }
+
+            // 스코프 시야각은 1인칭에서만 적용한다 (원본 gamemain.cpp:2935).
+            ScopeData scope = m_viewMode == ViewMode.FirstPerson ? m_player.ActiveScope : null;
+            m_camera.Fov = scope != null && scope.fovDegrees > 0f ? scope.fovDegrees : m_baseFov;
 
             if (m_viewMode == ViewMode.FirstPerson)
             {
@@ -189,6 +239,7 @@ namespace GodotXOPS
                 m_deathCamYaw = m_yaw;
                 m_deathCamPitch = m_pitch;
                 m_deathCamInitialized = true;
+                m_camera.Fov = m_baseFov;
                 // 사망 카메라는 바깥에서 보는 시점이므로 1인칭이었어도 몸통/다리를 보이게 한다.
                 m_player.HumanVisual.SetBodyVisible(true);
             }
@@ -258,6 +309,7 @@ namespace GodotXOPS
             // 옛 플레이어는 바깥에서 보이는 대상이 되므로 1인칭 때 숨겼던 몸통/다리를 다시 보이게 하고 상승 치트를 푼다.
             m_player.HumanVisual.SetBodyVisible(true);
             m_controller.SetCheatRise(false);
+            m_player.ClearPendingWeaponInput();
 
             MapLoader.SetPlayer(MapLoader.GetHuman(next));
             return true;
@@ -289,6 +341,7 @@ namespace GodotXOPS
                 m_viewYawOffset = 0f;
                 m_viewPitchOffset = m_viewMode == ViewMode.ThirdPerson ? k_thirdPersonInitialPitch : 0f;
                 m_deathCamInitialized = false;
+                m_fireReady = false;
 
                 var initial = new HumanInput { moveFlag = HumanMoveFlag.None, yaw = m_yaw, pitch = m_pitch };
                 m_controller.SetInput(in initial);

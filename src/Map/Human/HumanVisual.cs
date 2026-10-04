@@ -19,6 +19,11 @@ namespace GodotXOPS
         // 원본: 다리 방향 = 이전 방향 × 0.85 + 목표 × 0.15 (프레임당).
         private const float k_legTurnBlend = 0.15f;
 
+        // 팔 반동 복원 (원본 HumanMotionControl::ProcessObject, object.cpp:3400-3419). 단위는 도.
+        private const float k_armReactionDecay = 0.5f; // 발사 반동: 틱마다 절반
+        private const float k_armReactionSnap = 0.01f; // 이보다 작으면 0 으로
+        private const float k_armSlowStep = 2f; // 무기 전환·줍기: 틱마다 2° 씩 복원
+
         private Human m_human;
 
         private Node3D m_bodyRoot;
@@ -46,6 +51,10 @@ namespace GodotXOPS
         private float m_legRotationX;
         private bool m_legRotationInitialized;
         private float m_armPitchDeg;
+        // 팔 반동 각도 (도, 위 +). 틱에서 갱신하고 화면에는 직전 틱 값과 보간해 반영한다. 원본 reaction_y / slowarm.
+        private float m_armReactionDeg;
+        private float m_armReactionPrevDeg;
+        private bool m_armSlow;
 
         public Node3D DynamicWeaponAttachRoot => m_dynamicWeaponAttachRoot;
         public Node3D FixedWeaponAttachRoot => m_fixedWeaponAttachRoot;
@@ -140,9 +149,10 @@ namespace GodotXOPS
         {
             if (model != null && model.fixRightArm)
             {
-                // 부착 루트는 원래 Y 180° 회전을 갖는다. 그 위에 고정 각도를 합성한다.
-                m_fixedWeaponAttachRoot.Basis = Basis.FromEuler(Coord.FromUnityEuler(new Vector3(model.fixedRightArmAngle, 0f, 0f)))
+                // 부착 루트는 원래 Y 180° 회전을 갖는다. 그 위에 고정 각도를 합성한다. 회전만 바꿔 부착 루트의 스케일은 유지한다.
+                Basis rotation = Basis.FromEuler(Coord.FromUnityEuler(new Vector3(model.fixedRightArmAngle, 0f, 0f)))
                     * Basis.FromEuler(new Vector3(0f, Mathf.Pi, 0f));
+                m_fixedWeaponAttachRoot.Quaternion = rotation.GetRotationQuaternion();
             }
 
             if (m_humanArmModelData == null)
@@ -174,15 +184,81 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 시선 pitch(상하 조준각)를 DynamicArm 의 회전으로 반영한다.
+        /// 두 무기 부착 루트의 월드 스케일을 무기 스케일로 맞춘다. 부모(팔 루트)의 팔 스케일을 상쇄해 무기가 원본 크기로 보이게 한다.
+        /// </summary>
+        /// <param name="weaponScale">WeaponGeneralData.weaponScale (원본 길이 단위 → 미터).</param>
+        public void ApplyWeaponAttachScale(float weaponScale)
+        {
+            float armScale = DataManager.Instance.HumanParameterData.humanGeneralData.humanArmScale;
+            Vector3 scale = Vector3.One * (armScale > 0f ? weaponScale / armScale : weaponScale);
+            m_dynamicWeaponAttachRoot.Scale = scale;
+            m_fixedWeaponAttachRoot.Scale = scale;
+        }
+
+        /// <summary>
+        /// 시선 pitch(상하 조준각)와 팔 반동을 DynamicArm 의 회전으로 반영한다. 매 렌더 프레임 호출된다.
         /// 원본 OpenXOPS: armmodel_rotation_y = armrotation_y + reaction_y (object.cpp:3450-3455).
         /// </summary>
         /// <param name="pitchDeg">pitch (도, 아래를 볼수록 +).</param>
         public void SetArmPitch(float pitchDeg)
         {
             m_armPitchDeg = pitchDeg;
+            float reaction = Mathf.Lerp(m_armReactionPrevDeg, m_armReactionDeg, SimClock.InterpolationAlpha);
             // 이 노드가 Y 180° 회전돼 있어 자식의 X축 회전은 월드에서 방향이 뒤집힌다. 그래서 pitch 부호를 반대로 넣는다.
-            m_dynamicArmRoot.Rotation = Coord.FromUnityEuler(new Vector3(-m_armPitchDeg, 0f, 0f));
+            m_dynamicArmRoot.Rotation = Coord.FromUnityEuler(new Vector3(-m_armPitchDeg + reaction, 0f, 0f));
+        }
+
+        /// <summary>
+        /// 발사 반동 — 팔을 순간적으로 들어 올린 뒤 틱마다 절반씩 되돌린다. 원본 HumanMotionControl::ShotWeapon (object.cpp:3341-3362).
+        /// </summary>
+        /// <param name="angleDeg">들어 올릴 각도 (도, 위 +). 원본은 0.5° × 무기 반동값, 수류탄은 20°.</param>
+        public void BeginArmShotReaction(float angleDeg)
+        {
+            m_armReactionDeg = angleDeg;
+            m_armReactionPrevDeg = angleDeg;
+            m_armSlow = false;
+        }
+
+        /// <summary>
+        /// 무기 전환·줍기 — 팔을 내린 각도에서 시작해 틱마다 2° 씩 천천히 되돌린다. 원본 ChangeHaveWeapon / PickupWeapon (object.cpp:3311-3329).
+        /// </summary>
+        /// <param name="angleDeg">시작 각도 (도, 아래는 음수). 원본 −20°.</param>
+        public void BeginArmSlowReaction(float angleDeg)
+        {
+            m_armReactionDeg = angleDeg;
+            m_armReactionPrevDeg = angleDeg;
+            m_armSlow = true;
+        }
+
+        /// <summary>
+        /// 매 틱 HumanController 가 호출한다. 팔 반동을 되돌리고, 재장전·무기 종류 전환 중이면 팔을 내린 각도로 잡아 둔다.
+        /// 원본 HumanMotionControl::ProcessObject (object.cpp:3400-3429).
+        /// </summary>
+        /// <param name="held">재장전 또는 무기 종류 전환 중이면 true.</param>
+        public void TickArmReaction(bool held)
+        {
+            m_armReactionPrevDeg = m_armReactionDeg;
+
+            if (!m_armSlow)
+            {
+                if (Mathf.Abs(m_armReactionDeg) > k_armReactionSnap) m_armReactionDeg *= k_armReactionDecay;
+                else m_armReactionDeg = 0f;
+            }
+            else
+            {
+                if (Mathf.Abs(m_armReactionDeg) < k_armSlowStep)
+                {
+                    m_armReactionDeg = 0f;
+                    m_armSlow = false;
+                }
+                if (m_armReactionDeg > 0f) m_armReactionDeg -= k_armSlowStep;
+                if (m_armReactionDeg < 0f) m_armReactionDeg += k_armSlowStep;
+            }
+
+            if (held)
+            {
+                m_armReactionDeg = DataManager.Instance.HumanParameterData.humanGeneralData.armAngleReloading;
+            }
         }
 
         /// <summary>

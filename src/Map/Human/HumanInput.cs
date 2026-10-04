@@ -19,7 +19,7 @@ namespace GodotXOPS
 
     /// <summary>
     /// 이번 틱 무기 액션 의도. 직접 호출 대신 플래그로 표현해 Human 이 한 곳에서 소비한다.
-    /// 소비 순서는 원본 입력 처리 순서(슬롯선택 → 버림 → 무기ID전환 → 재장전 → 발사)를 따른다.
+    /// 소비 순서는 원본 입력 처리 순서(발사 → 재장전 → 슬롯 선택 → 무기 종류 전환 → 버리기 → 스코프)를 따른다.
     /// </summary>
     [Flags]
     public enum HumanWeaponAction
@@ -32,6 +32,7 @@ namespace GodotXOPS
         SwitchNext = 1 << 4,
         Reload = 1 << 5,
         Fire = 1 << 6,
+        Scope = 1 << 7,
     }
 
     /// <summary>

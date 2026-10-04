@@ -64,16 +64,29 @@ dotnet build GodotXOPS.csproj
   - `--selftest` — 모든 미션을 로드해 보고 종료 (헤드리스 가능).
   - `--mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]` — 화면을 PNG로 저장하고 종료. 렌더링을 고친 뒤 결과를 직접 확인할 때 쓴다.
 
-- `res://scenes/dev/play_test.tscn` — 미션의 맵과 사람을 로드하고 플레이어를 직접 조작한다 (`--headless` 없이 실행). 인자: `--selftest`(모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 확인, 헤드리스 가능), `--mission 번호 [--addon] [--third] [--walk] --screenshot 경로.png`.
+- `res://scenes/dev/play_test.tscn` — 미션의 맵과 사람을 로드하고 플레이어를 직접 조작한다 (`--headless` 없이 실행). 인자: `--selftest`(모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 확인, 헤드리스 가능), `--mission 번호 [--addon] [--third] [--walk] [--fire] [--weapon 번호] [--hitbox] [--look yaw,pitch] --screenshot 경로.png`.
+
+- `res://scenes/dev/weapon_check.tscn` — 무기·총알·히트박스를 수치로 확인한다 (헤드리스). 사람들을 블록이 없는 공중으로 옮겨 놓고 무기 틱과 총알 틱만 직접 돌린다. 무기, 총알, 피격 코드를 고친 뒤에 돌린다.
 
 ## 시뮬레이션과 캐릭터
 
-- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (이동 10 → 무기 30 → 총알 40 → 인간간 충돌 100 → AI 200 → 이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
+- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (사람 10 → 떨어진 무기 30 → 총알 40 → 인간간 충돌 100 → AI 200 → 이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
+- 사람 틱(10) 안의 순서는 원본 한 프레임과 같다: 무기 입력 소비(발사 등) → 무기 카운터 감소·조준 오차 갱신(`Human.TickWeapon`) → 이동·충돌 → 사망 상태 → 다리·팔 동작. 총알은 이동 전 위치에서 나간다.
+- 시간 카운터(발사 간격, 재장전, 전환, 탄환 수명)는 정수 틱으로 센다. 데이터의 초 단위 값은 `RoundToInt(초 × SimClock.FrameRate)`로 바꾼다. 실수 초를 틱마다 빼면 잔차 때문에 원본보다 한 틱 늦어진다.
 - 게임 결과에 영향을 주는 난수는 `GameRandom.Gameplay`(틱에서만), 연출용 난수는 `GameRandom.Visual`을 쓴다.
 - `Human`(Node3D)은 데이터와 시각만 갖는다. 논리 위치·이동·충돌·사망 상태는 `human.Controller`(`HumanController`, 노드가 아닌 순수 클래스)가 갖고, 노드의 transform은 틱 사이를 보간한 시각 전용 값이다. 판정에는 `Controller.Position`을 쓴다.
 - 캐릭터 각도는 UnityXOPS 규약으로 든다: 도 단위, yaw는 오른쪽으로 돌수록 +, pitch는 아래를 볼수록 +. 방향 벡터와 노드 회전은 `Coord.YawForward` / `YawRight` / `AimDirection` / `FromUnityEuler`로 만든다.
 - 프레임 처리 순서(`ProcessPriority`): `InputManager`(최소) → `SimClock`(-200) → 일반 노드(0) → `Human` 시각 보간(50) → `PlayerController` 입력·카메라(100).
 - 이동·충돌 코드는 UnityXOPS와 원본 `object.cpp`를 함께 대조해 옮긴다. 둘이 다르면 원본을 따르고 사용자에게 알린다. 지금까지 원본대로 고친 것: 추가 충돌 플래그, NPC 접지 판정(중심 + 진행 방향 한 점), 플레이어 전용 이동 경로 레이 검사, 비정상 이동량 되돌리기, 정지 시 급경사 미끄러짐 확률 건너뛰기, 점프 입력을 같은 틱에 소비, 매몰 판정 높이(키 − 0.06), 낙하 3분할 계수 0.33.
+
+## 무기와 총알
+
+- `Weapon`(순수 클래스)은 종류와 탄약만 갖는다. 모델은 `WeaponVisual`, 발사 간격·재장전·전환 카운터와 조준 오차는 `Human`(`HumanWeapon.cs`, `HumanAim.cs`)이 갖는다. 슬롯은 항상 2개이고 빈 슬롯은 맨손 무기(`IsNone`)다.
+- 무기 동작은 데이터 필드로만 가른다. 코드에 무기 번호를 직접 쓰지 않는다 (`weaponGeneralData`의 `noneWeaponIndex`, `grenadeWeaponIndex`만 참조). 유저가 JSON 수정만으로 새 무기를 만들 수 있어야 한다.
+- 총알 판정은 원본 `ObjectManager::CollideBullet` 방식이다: 한 틱 경로를 0.25 m 간격 점으로 나눠 점마다 사람(`HumanHitbox.Contains`, 수직 원기둥) → 소물 → 맵(`MapLoader.IsInsideBlock`) 순으로 검사한다. 선분-도형 교차로 바꾸지 않는다 (스치는 탄의 명중률과 벽 관통 결과가 달라진다).
+- `BulletManager`(Autoload)가 탄환 풀 160개와 모델 노드를 갖는다. 탄환 모델은 보간된 위치가 총구에서 `bulletBoundAdjust`만큼 멀어진 뒤부터 보인다 (높은 프레임에서 사수의 머리를 뚫고 보이는 것을 막는 UnityXOPS의 연출, 판정과 무관).
+- 무기·총알에서 원본대로 고친 것: 점 샘플링 판정, 피격 데미지의 부위별 난수 가산, 조준 오차·산탄 확산의 정수 난수, 연속 발사 수 제한(단발), 입력 처리 순서(발사 → 재장전 → 슬롯 → 종류 전환 → 스코프), 수류탄 이동 순서(이동 → 감쇠·중력)와 반사 시 위치 유지, 초기 예비 탄(장탄수 × (배수 − 1)).
+- 원본이 아니라 UnityXOPS가 고친 동작을 따르는 것 (사용자 결정): 피격 시 조준 흐트러짐은 더 큰 쪽 유지(원본은 대입), 가득 찬 탄창은 재장전 불가(원본은 허용), 폭풍은 항상 멀어지는 쪽(원본 식은 폭발이 위에 있으면 끌어당김), 반동 오차는 항상 누적(원본은 조준선이 보일 때만).
 
 ## 맵과 렌더링
 
@@ -88,7 +101,7 @@ dotnet build GodotXOPS.csproj
 
 ## Autoload 순서
 
-`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
+`ConfigManager` → `DataManager` → `InputManager` → `MaterialManager` → `SimClock` → `MapLoader` → `BulletManager`. `InputManager`는 `ConfigManager`의 바인딩을 읽으므로 뒤에 와야 한다. 매니저를 추가할 때 의존 순서대로 `project.godot`의 `[autoload]`에 넣는다.
 
 ## 설정과 입력
 
@@ -126,6 +139,8 @@ dotnet build GodotXOPS.csproj
 - Godot이 만드는 `.cs.uid` 파일은 커밋한다.
 
 ## 작업 방식
+
+- **UnityXOPS가 JSON으로 빼 둔 값은 "원본 동작을 유지하면서 유저가 고칠 수 있게 한 것"이다.** 원본은 값이 코드에 박혀 있어 수정할 수 있는 것이 너무 적었다. JSON 필드가 있으면 그 값이 기준이고, 원본 상수로 하드코딩하거나 "원본과 다르다"며 JSON을 고치지 않는다. 모더용으로 열어 둔 필드(히트박스 회전, 좌우 팔 분기 등)도 원본에 없다는 이유로 무시하지 않는다. 원본과 대조해 사용자에게 올릴 것은 데이터와 무관한 계산 방식의 차이뿐이다.
 
 - **구현 전에 설계를 먼저 논의한다.** 선택지가 있으면 권고안과 함께 제시하고 사용자의 결정을 받는다.
 - **커밋과 푸시는 사용자가 요청할 때만 한다.** `main`에 직접 커밋하고, 메시지는 한국어로 쓴다.

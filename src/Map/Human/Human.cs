@@ -19,6 +19,7 @@ namespace GodotXOPS
         private HumanTypeData m_humanTypeData;
         private HumanController m_controller;
         private HumanVisual m_humanVisual;
+        private HumanHitboxSizeData m_hitboxSize;
         private RawPointData m_humanParam;
         private RawPointData m_humanDataParam;
         private int m_identifier;
@@ -38,6 +39,8 @@ namespace GodotXOPS
         public HumanTypeData HumanTypeData => m_humanTypeData;
         public HumanController Controller => m_controller;
         public HumanVisual HumanVisual => m_humanVisual;
+        // 이 사람 체형의 총알 판정 원기둥 (머리·상반신·다리). 데이터가 없으면 null.
+        public HumanHitboxSizeData HitboxSize => m_hitboxSize;
         public RawPointData HumanParam => m_humanParam;
         public RawPointData HumanDataParam => m_humanDataParam;
         public int Identifier => m_identifier;
@@ -80,11 +83,16 @@ namespace GodotXOPS
             m_humanVisual = new HumanVisual { Name = "Visual" };
             AddChild(m_humanVisual);
             m_humanVisual.CreateHumanVisual(this, m_humanData);
-            m_humanVisual.ApplyArmModel(NoneWeaponModel(), false);
+
+            var hitboxSizes = parameter.humanHitboxSizeData;
+            int hitboxIndex = m_humanTypeData != null ? m_humanTypeData.hitboxSizeIndex : 0;
+            m_hitboxSize = hitboxSizes.Count > 0 ? hitboxSizes[Mathf.Clamp(hitboxIndex, 0, hitboxSizes.Count - 1)] : null;
 
             m_hp = m_humanData != null ? m_humanData.hp : 0f;
             m_team = humanDataParam.param2;
             m_deadState = m_hp > 0f ? HumanDeadState.Alive : HumanDeadState.Done;
+
+            EquipInitialWeapons();
 
             SimClock.Register(m_controller);
             m_controller.ApplyVisual();
@@ -98,20 +106,6 @@ namespace GodotXOPS
         public override void _ExitTree()
         {
             SimClock.Unregister(m_controller);
-        }
-
-        /// <summary>
-        /// 맨손(무기 없음)의 무기 모델 데이터를 찾는다. 무기 장착을 옮기기 전까지 팔 자세를 정하는 데 쓴다.
-        /// </summary>
-        /// <returns>맨손 무기 모델 데이터. 데이터가 없으면 null.</returns>
-        private static WeaponModelData NoneWeaponModel()
-        {
-            WeaponParameterData weapon = DataManager.Instance.WeaponParameterData;
-            int noneIndex = weapon.weaponGeneralData.noneWeaponIndex;
-            if (noneIndex < 0 || noneIndex >= weapon.weaponData.Count) return null;
-
-            int modelIndex = weapon.weaponData[noneIndex].modelIndex;
-            return modelIndex >= 0 && modelIndex < weapon.weaponModelData.Count ? weapon.weaponModelData[modelIndex] : null;
         }
 
         /// <summary>
@@ -129,7 +123,11 @@ namespace GodotXOPS
         /// <param name="value">새 사망 상태.</param>
         public void SetDeadState(HumanDeadState value)
         {
+            bool aliveChanged = (m_deadState == HumanDeadState.Alive) != (value == HumanDeadState.Alive);
             m_deadState = value;
+
+            // 생사가 바뀌면 팔을 다시 붙인다. 죽으면 조준 방향을 따르던 맨손 팔이 고정 자세로 돌아간다.
+            if (aliveChanged && m_weapons[0] != null) ApplyActiveWeaponVisual();
         }
 
         /// <summary>
@@ -143,6 +141,62 @@ namespace GodotXOPS
 
             m_hp -= damage;
             if (m_hp < 0f) m_hp = 0f;
+        }
+
+        /// <summary>
+        /// 총알에 맞은 데미지와 조준 흐트러짐을 적용한다. 원본 human::HitBulletHead / HitBulletUp / HitBulletLeg (object.cpp:1032-1061):
+        /// 데미지 = (int)(위력 × 부위 배율) + 부위별 난수. 배율과 난수 범위는 사람 종류 데이터에서 온다.
+        /// </summary>
+        /// <param name="part">맞은 부위.</param>
+        /// <param name="attacks">총알의 현재 위력.</param>
+        public void HitBullet(HumanHitPart part, int attacks)
+        {
+            HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
+            float multiplier = 1f;
+            IntRange randomAdd = default;
+            int reaction;
+
+            switch (part)
+            {
+                case HumanHitPart.Head:
+                    reaction = general.headHitReaction;
+                    if (m_humanTypeData != null)
+                    {
+                        multiplier = m_humanTypeData.headDamageMultiplier;
+                        randomAdd = m_humanTypeData.headRandomAddDamage;
+                    }
+                    break;
+                case HumanHitPart.Body:
+                    reaction = general.bodyHitReaction;
+                    if (m_humanTypeData != null)
+                    {
+                        multiplier = m_humanTypeData.bodyDamageMultiplier;
+                        randomAdd = m_humanTypeData.bodyRandomAddDamage;
+                    }
+                    break;
+                default:
+                    reaction = general.legHitReaction;
+                    if (m_humanTypeData != null)
+                    {
+                        multiplier = m_humanTypeData.legDamageMultiplier;
+                        randomAdd = m_humanTypeData.legRandomAddDamage;
+                    }
+                    break;
+            }
+
+            int damage = (int)(attacks * multiplier) + GameRandom.Gameplay.Range(randomAdd.min, randomAdd.max);
+            ApplyDamage(damage);
+            SetHitReaction(reaction);
+        }
+
+        /// <summary>
+        /// 폭발 데미지와 조준 흐트러짐을 적용한다. 원본 human::HitGrenadeExplosion (object.cpp:1074-1080).
+        /// </summary>
+        /// <param name="damage">데미지.</param>
+        public void HitGrenadeExplosion(int damage)
+        {
+            ApplyDamage(damage);
+            SetHitReaction(DataManager.Instance.HumanParameterData.humanGeneralData.grenadeHitReaction);
         }
 
         /// <summary>

@@ -185,6 +185,9 @@ namespace GodotXOPS
             // 완전히 고정된 시체는 더 계산하지 않는다 (원본 deadstate == 5 조기 반환).
             if (m_human.DeadState == HumanDeadState.Done) return;
 
+            // 무기 입력과 카운터는 이동보다 먼저 처리한다 (원본: 입력 → human::ProcessObject 앞부분). 총알은 이동 전 위치에서 나간다.
+            m_human.TickWeapon();
+
             // 사망 시 입력 플래그를 버린다. 틱 자체는 계속 돌려야 중력/지면/추락 한계가 시체에 적용된다.
             if (!m_human.Alive)
             {
@@ -196,6 +199,7 @@ namespace GodotXOPS
 
             // 원본 human::ProcessObject 말미의 MotionCtrl->ProcessObject 대응 — 이번 틱 입력으로 다리 애니메이션/회전 갱신.
             m_human.HumanVisual?.TickLeg(SimClock.FrameTime, m_moveFlagLt, m_rotationX, m_human.Alive);
+            m_human.HumanVisual?.TickArmReaction(m_human.ArmHeld);
         }
 
         /// <summary>
@@ -525,6 +529,7 @@ namespace GodotXOPS
         private void EnterDeadState(ref Vector3 pos)
         {
             m_human.SetDeadState(HumanDeadState.Falling);
+            m_human.OnDeath();
 
             // 원본 object.cpp:1213-1222 — 마지막 피격 방향과 본인 yaw 차이로 앞/뒤 분기.
             // 차이가 90° 미만(등 뒤에서 맞음)이면 앞으로 엎어지고, 그 외에는 뒤로 자빠진다.

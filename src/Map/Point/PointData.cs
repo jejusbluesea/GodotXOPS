@@ -144,6 +144,7 @@ namespace GodotXOPS
             MapLoader loader = Instance;
 
             SimClock.Unregister(loader.m_humanCollision);
+            if (BulletManager.Loaded) BulletManager.Instance.Clear();
 
             loader.m_player = null;
             loader.m_humans.Clear();
