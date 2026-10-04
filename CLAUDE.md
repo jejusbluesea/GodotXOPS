@@ -7,7 +7,7 @@
 **GodotXOPS** — Godot 4.7.2 (.NET) 프로젝트. 일본 인디 FPS XOPS(2000년)의 오픈소스 구현 OpenXOPS를, 그 Unity 포팅본인 UnityXOPS를 참고해 Godot으로 옮긴다.
 
 - 참고 원본: `C:\Users\twoj2\Desktop\Project\UnityXOPS` (브랜치 `QoL-road-to-multiplay(0.4)`), C++ 원본은 그 안의 `OpenXOPS/`
-- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다.
+- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 릴리즈를 앞두고 있다 (`TODO.md`).
 
 ## 확정된 설계
 
@@ -83,6 +83,19 @@ dotnet build GodotXOPS.csproj
 - `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다.
 
 `play_test.tscn` 은 AI 와 이벤트를 켠 채로 돈다. `--noai` 로 끄고 시작하고, 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), F9+↑/↓(복제), Insert(플레이어 무적), Home(디버그 텍스트 켜기/끄기)을 쓴다. `--invincible`, `--notext` 로 켜고 끈 채 시작할 수 있다. AI 가 꺼져 있어야 하는 점검 도구는 `AIController.Enabled = false` 로 둔다 (`WeaponCheck` 참조).
+
+## 익스포트 빌드
+
+```bash
+"C:/Users/twoj2/Desktop/Game Engine/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe" --headless --path . --export-release "Windows Desktop" build/windows/GodotXOPS.exe
+```
+
+- 프리셋은 `export_presets.cfg`의 "Windows Desktop" 이다. `build/`는 커밋하지 않는다 (`.gitignore`, `.gdignore`).
+- 결과물: `GodotXOPS.exe`, `GodotXOPS.pck`, `data_GodotXOPS_windows_x86_64/`(.NET 런타임과 어셈블리. 게임 데이터 `data/`와 다른 폴더다).
+- 실행 파일 옆에 `data/`, `addon/`, `godotdata/`, `addon.json`이 있어야 한다 (`GamePath.Root`가 익스포트 빌드에서는 실행 파일 폴더다).
+- 익스포트 뒤 Godot 프로세스가 한동안 종료되지 않을 때가 있으므로 백그라운드로 돌린다.
+- 개발용 인자("--" 뒤)는 빌드에서도 동작한다. 뽑은 뒤 `GodotXOPS.exe --headless -- --scene mainmenu --ui-quit 2`의 종료 코드로 뜨는지 본다.
+- 아이콘은 `xops.png`(`config/icon`)이고 실행 파일에도 들어간다. 부트 스플래시는 로고 없이 검은 배경이다 (끄는 설정은 없다).
 
 ## 시뮬레이션과 캐릭터
 
