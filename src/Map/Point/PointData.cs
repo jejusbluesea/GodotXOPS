@@ -211,7 +211,8 @@ namespace GodotXOPS
 
                 var smallObject = new SmallObject { Name = $"Object_{loader.m_smallObjects.Count}" };
                 loader.m_objectRoot.AddChild(smallObject);
-                smallObject.CreateObject(raw.param1, raw.param3, raw.position, raw.look);
+                // look 은 사람 기준 yaw 다 (원본 방향 + 180°). 원본은 사람만 방향에 π 를 더해 그리고 (object.cpp:2158) 소물은 그대로 그리므로 (object.cpp:2765) 도로 뺀다.
+                smallObject.CreateObject(raw.param1, raw.param3, raw.position, raw.look - 180f);
                 if (raw.param2 != 0) smallObject.SnapToGround();
                 loader.m_smallObjects.Add(smallObject);
             }

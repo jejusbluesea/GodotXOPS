@@ -58,6 +58,8 @@ namespace GodotXOPS
         private readonly HashSet<Key> m_pressedKeys = new HashSet<Key>();
         private string m_pendingPressedPath = string.Empty;
         private string m_pressedPath = string.Empty;
+        private bool m_clickHeld;
+        private bool m_clickHeldBefore;
 
         public override void _Ready()
         {
@@ -101,6 +103,9 @@ namespace GodotXOPS
 
             m_pressedPath = m_pendingPressedPath;
             m_pendingPressedPath = string.Empty;
+
+            m_clickHeldBefore = m_clickHeld;
+            m_clickHeld = Input.IsMouseButtonPressed(MouseButton.Left);
         }
 
         public override void _ExitTree()
@@ -199,6 +204,47 @@ namespace GodotXOPS
         public bool WasKeyPressed(Key key)
         {
             return m_pressedKeys.Contains(key);
+        }
+
+        /// <summary>
+        /// 바인딩과 무관하게 마우스 왼쪽 버튼이 지금 눌려 있는지 반환한다. 메뉴 클릭처럼 발사 키를 바꿔도 그대로여야 하는 조작에 쓴다.
+        /// </summary>
+        /// <returns>눌려 있으면 true.</returns>
+        public bool IsClickPressed()
+        {
+            return m_clickHeld;
+        }
+
+        /// <summary>
+        /// 바인딩과 무관하게 마우스 왼쪽 버튼이 이번 프레임에 눌렸는지 반환한다.
+        /// </summary>
+        /// <returns>이번 프레임에 눌렸으면 true.</returns>
+        public bool WasClickPressed()
+        {
+            return m_clickHeld && !m_clickHeldBefore;
+        }
+
+        /// <summary>
+        /// 바인딩과 무관하게 마우스 왼쪽 버튼이 이번 프레임에 떼어졌는지 반환한다.
+        /// </summary>
+        /// <returns>이번 프레임에 떼어졌으면 true.</returns>
+        public bool WasClickReleased()
+        {
+            return !m_clickHeld && m_clickHeldBefore;
+        }
+
+        /// <summary>
+        /// 단일 버튼 액션에 지금 묶여 있는 바인딩 경로(인덱스 0)를 반환한다. 설정 화면이 현재 키를 보여 줄 때 쓴다.
+        /// </summary>
+        /// <param name="action">액션 이름 (대소문자 무시).</param>
+        /// <returns>바인딩 경로. 없는 액션이거나 바인딩이 없으면 빈 문자열.</returns>
+        public string GetActionBinding(string action)
+        {
+            if (!m_actions.TryGetValue(action, out ActionEntry entry) || entry.definition.bindings.Length == 0)
+            {
+                return string.Empty;
+            }
+            return entry.definition.bindings[0] ?? string.Empty;
         }
 
         /// <summary>

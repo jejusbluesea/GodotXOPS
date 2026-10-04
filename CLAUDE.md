@@ -39,6 +39,7 @@
 - UnityXOPS → Godot: `(x, y, -z)` (`Coord.FromUnity`). `godotdata` JSON의 위치·오프셋과 `.x` 정점이 여기에 해당한다.
 - UnityXOPS 오일러 각(도) → Godot: `(-x, -y, z)` 라디안, YXZ 순서 (`Coord.FromUnityEuler`)
 - 삼각형 와인딩과 UV는 뒤집지 않는다.
+- PD1 포인트의 `look`은 사람 기준 yaw 다 (원본 방향 + 180°). 원본은 사람만 방향에 π 를 더해 그리므로, 소물처럼 원본 방향 그대로 그리는 것에는 `look − 180`을 쓴다 (UnityXOPS 는 소물에도 `look`을 그대로 써서 반대로 놓인다).
 - `godotdata` JSON 값은 UnityXOPS 공간 그대로 둔다. 로드해서 쓰는 지점에서 변환한다.
 
 ## 빌드와 실행
@@ -77,7 +78,8 @@ dotnet build GodotXOPS.csproj
 - `--window 너비x높이` — 설정 파일의 전체화면 대신 그 크기의 창으로 띄운다.
 - `--scene 이름 [--mission 번호 [--addon] [--page 번호]]` — 그 화면에서 시작한다 (`mainmenu`, `briefing`, `maingame`, `result`).
 - `--ui-shot 경로.png [--ui-time 초]` — 화면을 PNG 로 저장하고 종료한다.
-- `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon`, 메인게임은 `simple` / `off` 상태로 시작한다.
+- `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` 상태로 시작한다.
+- `--ui-click "목록"` — 가짜 입력을 차례로 넣는다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번). 좌표는 창 픽셀이고 실제 커서를 옮긴다. 버튼을 눌러 본 결과를 `--ui-shot`으로 볼 때 쓴다 (`--window 640x480`과 함께).
 - `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다.
 
 `play_test.tscn` 은 AI 와 이벤트를 켠 채로 돈다. `--noai` 로 끄고 시작하고, 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), F9+↑/↓(복제), Insert(플레이어 무적), Home(디버그 텍스트 켜기/끄기)을 쓴다. `--invincible`, `--notext` 로 켜고 끈 채 시작할 수 있다. AI 가 꺼져 있어야 하는 점검 도구는 `AIController.Enabled = false` 로 둔다 (`WeaponCheck` 참조).
@@ -121,8 +123,9 @@ dotnet build GodotXOPS.csproj
   - 좀비는 적의 이동을 앞질러 겨누지 않는다 (원본 `AItrackability` 는 데이터에 없다).
   - 맨손인 사람의 팔은 전투(좀비 공격, 항복) 중에만 조준 방향을 따른다.
   - AI 는 무기 관리 때 스코프를 해제하지 않는다.
+  - 전투 중 수류탄을 든 AI 가 확률로 다른 무기로 바꾸는 분기(ai.cpp:1059-1089)는 넣지 않는다. 수류탄을 다 던진 뒤에 바꾼다.
   - 경로·이벤트 포인트는 종류별로 찾는다 (아래).
-- 원본대로 둔 것: 적의 이동을 앞질러 겨누기와 수류탄 높이 보정, 원거리 발견의 1/4 확정, 경계가 끝나면 시작한 자리로 돌아가기, 원거리 교전 중 근거리 적 재탐색, 수류탄·단발/연발 전환, 점프 판정, 좀비 공격은 겨눈 적 한 명만. 원본의 "끼었을 때 좌우로 돌기"는 조건이 늘 거짓이라 실행되지 않는 코드여서 옮기지 않았다.
+- 원본대로 둔 것: 적의 이동을 앞질러 겨누기와 수류탄 높이 보정, 원거리 발견의 1/4 확정, 경계가 끝나면 시작한 자리로 돌아가기, 원거리 교전 중 근거리 적 재탐색, 경로의 수류탄 투척, 단발/연발 전환, 점프 판정, 좀비 공격은 겨눈 적 한 명만. 원본의 "끼었을 때 좌우로 돌기"는 조건이 늘 거짓이라 실행되지 않는 코드여서 옮기지 않았다.
 - 시야와 사선은 블록만 가린다 (`MapLoader.RaycastBlock`). 사람과 소물은 가리지 않는다.
 - 경로와 이벤트의 다음 포인트는 **종류별로** 찾는다 (`MapLoader.GetPathPoint`, `GetEventPoint`). 원본 `SearchPointdata`는 종류와 무관하게 같은 번호의 첫 포인트를 찾아서 번호가 겹치면 줄이 끊기는데, 원본의 버그로 보고 따르지 않는다 (사용자 결정).
 - 소리 신호(`Human.NotifyThreatHeard`)는 `AIController`가 매 틱 비운다. 원본보다 한 틱 빨리 듣는다 (원본은 이중 버퍼라 다음 프레임에 듣는다).
@@ -132,7 +135,7 @@ dotnet build GodotXOPS.csproj
 ## 화면 (씬 UI)
 
 - 화면은 `scenes/`의 씬 6개다: `boot` → `opening` → `mainmenu` → `briefing` → `maingame` → `result`. 각 씬은 루트 노드와 `ui/`의 GDScript 하나만 갖고, 화면 요소는 스크립트가 `_ready`에서 코드로 만든다. `maingame`만 `PlayerController`(C#) 노드를 자식으로 둔다.
-- **수치는 화면별 GDScript 맨 위 상수 표에 모은다** (위치, 글자 크기, 색, 시간). 값의 출처는 UnityXOPS 0.4의 `unitydata/scene/*.lua`다. 나중에 외부 데이터로 뺄 때 그 표만 옮기면 된다.
+- **수치는 화면별 GDScript 맨 위 상수 표에 모은다** (위치, 글자 크기, 색, 시간). 값의 출처는 UnityXOPS 0.4의 `unitydata/scene/*.lua`다. 다만 Lua 의 반투명 값은 Unity 가 선형 색 공간에서 섞은 것이라, 아주 옅은 값은 그대로 쓰면 보이지 않는다 (브리핑·결과 배경의 타이틀은 Lua 0.012 → 0.1). 나중에 외부 데이터로 뺄 때 그 표만 옮기면 된다.
 - 공용 도우미는 `ui/common/`: `XopsUI`(요소 만들기·배치), `XopsText`(`char.dds` 스프라이트 글자), `XopsLayer`(층과 배율), `XopsLines`(스코프 조준선), `xops_dev.gd`(Autoload `Dev`, 개발용 인자).
 - **배치 좌표는 UnityXOPS 화면 좌표 그대로다**: 기준점(화면이나 부모 안의 한 점)에서의 오프셋, +x 오른쪽, +y **위쪽**. `XopsUI`가 Godot 좌표로 바꾼다. 화면 스크립트에서 y 부호를 직접 뒤집지 않는다.
 - **층의 배율은 두 가지다** (`XopsUI.layer(parent, order, scaled)`): `scaled = true`는 화면 높이를 480으로 보고 확대하고, `false`는 픽셀 1:1에 설정의 `UIScale`을 곱한다. 어느 요소가 어느 쪽인지는 Lua 를 따른다 (HUD·메뉴는 픽셀, 스코프·중앙 문구·암전은 확대).
@@ -143,7 +146,8 @@ dotnet build GodotXOPS.csproj
 - 크기가 없는 노드에 직접 그리는 요소(`XopsText`)는 그릴 범위를 `RenderingServer.canvas_item_set_custom_rect`로 알려 줘야 한다. 그러지 않으면 기준점이 화면 밖일 때 화면 안에 걸친 부분까지 통째로 그려지지 않는다 (HUD 의 STATE 상자 아랫줄이 그렇게 사라졌었다).
 - `PlayerController`는 입력을 넣은 직후 `Controller.ApplyVisual()`을 한 번 더 부른다. 사람 노드의 회전·팔 각도가 `PlayerController`보다 먼저 갱신되므로, 다시 맞추지 않으면 1인칭 팔이 카메라보다 한 프레임 늦게 돈다.
 - 3D 무기 표시는 자기만의 3D 공간을 가진 뷰포트다. 무기 모델이 맵과 같은 안개 셰이더를 쓰므로 공간 전체를 1/100로 줄여 카메라 바로 앞에 둔다.
-- 메뉴에 OPTION(설정 화면)은 없다. 포팅 뒤 현대화 단계에서 넣는다 (사용자 결정). UnityXOPS 0.4의 `mainmenu.lua`에 구현이 있다.
+- 메뉴의 OPTION(설정 화면)은 `ui/mainmenu_option.gd`(`MenuOption`)가 만든다. 구성과 수치는 UnityXOPS 0.4의 `mainmenu.lua`다. 탭은 General / Input / Graphic / Sound. 값은 바꾸는 즉시 `ConfigManager`에 들어가 화면에 반영되고(밝기·감마, 음량, 키 바인딩), SAVE 가 파일에 쓰고 `ApplyGraphic`을 부른다. UIScale 은 SAVE 때 적용한다 (바로 적용하면 누르고 있던 화살표가 움직인다. 사용자 결정). BACK 과 ESC 는 `RevertToSaved`로 되돌린다. playerName 은 쓰는 곳이 없어 화면에 넣지 않았다 (사용자 결정).
+- 화면의 클릭은 `InputManager.WasClickPressed` / `WasClickReleased` / `IsClickPressed`(마우스 왼쪽 버튼 고정)로 읽는다. `"fire"` 액션으로 읽으면 발사 키를 바꿨을 때 메뉴를 누를 수 없게 된다.
 
 ## 맵과 렌더링
 
@@ -152,6 +156,7 @@ dotnet build GodotXOPS.csproj
 - 추가 충돌(Additional Collision, `MapLoader.AdjustCollision`): 캐릭터-맵 충돌에서 중심축 0.9 m / 1.3 m 높이의 추가 검사 2점은 **이 플래그가 켜진 미션에서만** 돈다 (원본 `human::CollisionMap`의 `AddCollisionFlag`). UnityXOPS `HumanController`는 플래그를 무시하고 항상 검사하는데, 이는 잘못 옮긴 것이므로 따라 하지 않는다.
 - 머티리얼은 `MaterialManager`의 `Create*Material`로 만든다. `alpha_clip_blend` 셰이더는 원본처럼 sRGB 값 그대로 곱하고 섞은 뒤 마지막에만 선형으로 바꾼다. 텍스처 유니폼에 `source_color`를 붙이지 않는다.
 - 안개는 Godot 환경 안개가 아니라 전역 셰이더 변수(`xops_fog_color`, `xops_fog_range`)로 셰이더가 직접 계산한다 (원본의 선형 안개 재현).
+- 어두운 화면(`MapLoader.DarkScreen`) 미션은 블록 면 명도를 낮추고(가산값 0.5 → 0.3), 스카이와 모델(사람·무기·소물·탄환)에 전역 셰이더 변수 `xops_model_brightness` = 0.8 을 곱한다 (원본 `RenderModel`의 darkflag). 0.8 은 코드 상수다 (사용자 결정). 블록은 머티리얼 유니폼 `dark_apply` = 0 으로, HUD 의 무기 표시는 인스턴스 유니폼 `dark_exempt` = 1 로 빠진다.
 - 깊이 테스트를 끈 머티리얼(스카이)은 반투명 패스로 들어가므로 `RenderPriority`로 그리는 순서를 정한다.
 - 원본 좌표에서 외적으로 법선을 구하는 코드를 옮길 때는 피연산자 순서를 뒤집는다 (원본은 왼손, Godot은 오른손 좌표계).
 - 런타임에 만든 노드를 같은 프레임 안에 교체할 때는 `QueueFree` 대신 `RemoveChild` + `Free`를 쓴다. 트리에서 뗀 노드를 `QueueFree`만 해 두고 종료하면 종료 시 치명 오류가 난다.
@@ -164,7 +169,7 @@ dotnet build GodotXOPS.csproj
 
 - `godotdata/config.json`은 `ConfigManager`가 읽고 쓴다. 파일이 없으면 코드 기본값(`ConfigManagerDefault.cs`)으로 새로 만든다. 새 설정은 기본값 목록에 추가하면 기존 파일에도 자동으로 병합된다.
 - `ConfigManager.ApplyGraphic`이 부팅 때 창 모드와 렌더 해상도를 적용한다(기본: 전체화면, 640×480 렌더, 화면비가 다르면 검은 띠). 도구 씬은 `_Ready`에서 창 설정을 되돌린다(`AssetViewer` 참조).
-- 입력은 `InputManager`를 거쳐 읽는다: `IsPressed` / `WasPressed` / `WasReleased`(버튼), `ReadVector`(move, look), `IsKeyPressed` / `WasKeyPressed`(치트 키 등 바인딩 밖의 키). Godot `Input`을 직접 부르지 않는다.
+- 입력은 `InputManager`를 거쳐 읽는다: `IsPressed` / `WasPressed` / `WasReleased`(버튼), `ReadVector`(move, look), `IsKeyPressed` / `WasKeyPressed`(치트 키 등 바인딩 밖의 키), `IsClickPressed` / `WasClickPressed` / `WasClickReleased`(화면 클릭). Godot `Input`을 직접 부르지 않는다.
 - `ReadVector`는 X 오른쪽 +, Y 위쪽(전진) + 다. look은 마우스 이동량(픽셀)이다.
 - 바인딩 경로는 `<Keyboard>/w`, `<Mouse>/leftButton` 형식이고 `InputPath`가 Godot 이벤트로 변환한다. 키보드는 물리 키 위치 기준이다.
 

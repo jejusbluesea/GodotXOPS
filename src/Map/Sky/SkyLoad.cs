@@ -8,10 +8,15 @@ namespace GodotXOPS
     {
         private static readonly StringName s_fogColorGlobal = "xops_fog_color";
         private static readonly StringName s_fogRangeGlobal = "xops_fog_range";
+        private static readonly StringName s_modelBrightnessGlobal = "xops_model_brightness";
+
+        // 어두운 화면 미션에서 스카이와 모델(사람·무기·소물·탄환)에 곱하는 밝기 (원본 D3DGraphics::RenderModel 의 darkflag).
+        private const float k_darkModelBrightness = 0.8f;
 
         /// <summary>
         /// 스카이 메시와 텍스처를 로드해 스카이 노드를 생성한다. 이전 스카이는 먼저 제거한다.
         /// 스카이는 셰이더가 카메라 위치에 붙여 그리므로 노드 위치와 무관하게 항상 배경으로 보인다.
+        /// 어두운 화면 미션이면 스카이와 모델의 밝기도 여기서 낮춘다 (미션 정보를 먼저 로드해야 한다).
         /// </summary>
         /// <param name="textureIndex">SkyData 텍스처 경로 목록의 인덱스. 0 이거나 범위 밖이면 텍스처 없이 검정.</param>
         public static void LoadSkyData(int textureIndex)
@@ -54,6 +59,7 @@ namespace GodotXOPS
             Instance.m_skyRoot.AddChild(sky);
 
             ApplySkyFog(textureIndex);
+            RenderingServer.GlobalShaderParameterSet(s_modelBrightnessGlobal, Instance.m_darkScreen ? k_darkModelBrightness : 1f);
         }
 
         /// <summary>
@@ -69,6 +75,7 @@ namespace GodotXOPS
             }
 
             ClearFog();
+            RenderingServer.GlobalShaderParameterSet(s_modelBrightnessGlobal, 1f);
         }
 
         /// <summary>

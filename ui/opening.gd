@@ -110,7 +110,7 @@ func _process(delta: float) -> void:
 		var fade: Array = TEXTS[i]["fade"]
 		_texts[i].set_alpha(_fade_alpha(_time, fade[0], fade[1], fade[2], fade[3]))
 
-	if _time > END_TIME or InputManager.WasPressed("escape") or InputManager.WasPressed("fire"):
+	if _time > END_TIME or InputManager.WasPressed("escape") or InputManager.WasClickPressed():
 		_finish()
 
 

@@ -38,6 +38,10 @@ namespace GodotXOPS.Dev
 
             Expect("리바인드 성공", input.SetActionBinding(InputManager.Jump, "<Keyboard>/k"), true);
             Expect("잘못된 경로 리바인드 거부", input.SetActionBinding(InputManager.Jump, "<Keyboard>/nope"), false);
+            Expect("리바인드 뒤 현재 바인딩 조회", input.GetActionBinding(InputManager.Jump), "<Keyboard>/k");
+            Expect("없는 액션의 바인딩 조회", input.GetActionBinding("nope"), string.Empty);
+            Expect("fov 범위 최솟값", config.GetMin(ConfigManager.SectionGraphic, "fov"), 60f);
+            Expect("fov 범위 최댓값", config.GetMax(ConfigManager.SectionGraphic, "fov"), 90f);
 
             config.RevertToSaved();
             Expect("BACK: fov 복원", config.GetInt(ConfigManager.SectionGraphic, "fov"), 65);

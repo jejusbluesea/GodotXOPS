@@ -1,6 +1,7 @@
 extends Node
 ## 메인메뉴. 데모 맵을 배경으로 미션 목록(공식 / 어드온)을 보여 주고, 고르면 브리핑으로 넘어간다.
-## 왼쪽 아래에 CREDIT 과 EXIT 버튼이 있고, ESC 는 종료 확인을 띄운다.
+## 왼쪽 아래에 OPTION, CREDIT, EXIT 버튼이 있고, ESC 는 종료 확인을 띄운다. OPTION 화면은 MenuOption 이 만든다.
+## 클릭은 발사 키 바인딩과 무관하게 마우스 왼쪽 버튼이다.
 ## 버튼은 누른 자리에서 뗐을 때만 동작한다 (누른 채 벗어나면 취소).
 
 const BRIEFING_SCENE := "briefing"
@@ -71,7 +72,8 @@ const PAGE_ARROW_HIT := 60
 
 # ----- 왼쪽 아래 버튼 -----
 const MENU_ROW_HEIGHT := 25
-const MENU_ITEMS := ["< CREDIT >", "<  EXIT  >"]
+const MENU_ITEMS := ["< OPTION >", "< CREDIT >", "<  EXIT  >"]
+const MENU_SCREENS := ["option", "credit", "exit"]
 const MENU_BG := {"x": 5, "y": 14, "w": 170, "color": Color(0, 0, 0, 0.5)}
 const BACK_TEXT := "< BACK >"
 const BACK_BG := {"x": 5, "y": 14, "w": 136, "color": Color(0, 0, 0, 0.5)}
@@ -125,6 +127,7 @@ var _back_bg: ColorRect
 var _credit_panel: ColorRect
 var _credit_label: Label
 var _exit_panel: ColorRect
+var _option: MenuOption
 
 # 버튼 하나 = {"shadow": XopsText, "main": XopsText, "x": 기준 x, "y": 기준 y}.
 var _up_slot: Dictionary
@@ -164,7 +167,9 @@ func _ready() -> void:
 
 	_build_scroll(_layer(ui, SCROLL_ORDER))
 	_build_mission_list(_layer(ui, MISSION_ORDER))
-	_build_menu(_layer(ui, MENU_ORDER))
+	var menu_layer := _layer(ui, MENU_ORDER)
+	_build_menu(menu_layer)
+	_option = MenuOption.new(self, menu_layer)
 
 	_pointer_layer = XopsUI.layer(ui, POINTER_ORDER, true)
 	_pointer_h = XopsUI.panel_stretch(_pointer_layer, XopsUI.Stretch.TOP, 0, 0, 0, 1, POINTER_COLOR)
@@ -176,8 +181,12 @@ func _ready() -> void:
 	_refresh_items()
 	_update_scroll_thumb()
 	_update_switch_text()
-	_set_screen(Dev.value("--ui-state", "main") if Dev.value("--ui-state", "") in ["credit", "exit"] else "main")
-	if Dev.value("--ui-state", "") == "addon" and _addon_exists:
+	var state: String = Dev.value("--ui-state", "")
+	if state.begins_with("option-"):
+		_option.select_tab(state.trim_prefix("option-").capitalize())
+		state = "option"
+	_set_screen(state if state in ["credit", "exit", "option"] else "main")
+	if state == "addon" and _addon_exists:
 		_switch_tab(true)
 
 
@@ -196,9 +205,9 @@ func _process(delta: float) -> void:
 	_pointer_v.position.x = mouse.x
 
 	var allowed := _time >= CLICK_ALLOW_TIME
-	var pressed: bool = allowed and InputManager.WasPressed("fire")
-	var clicked: bool = allowed and InputManager.WasReleased("fire")
-	var held: bool = InputManager.IsPressed("fire")
+	var pressed: bool = allowed and InputManager.WasClickPressed()
+	var clicked: bool = allowed and InputManager.WasClickReleased()
+	var held: bool = InputManager.IsClickPressed()
 	var escape: bool = allowed and InputManager.WasPressed("escape")
 	if pressed:
 		_press_capture = null
@@ -210,7 +219,9 @@ func _process(delta: float) -> void:
 			_update_exit(pressed, clicked, held, escape)
 		_:
 			if _button(_back_slot, pressed, clicked, held) or escape:
-				_set_screen("main")
+				_back_to_main()
+			elif _screen == "option":
+				_option.update(delta, pressed, clicked, held)
 
 
 # ============================================================
@@ -409,12 +420,28 @@ func _set_screen(screen: String) -> void:
 	_track.visible = main
 	_switch_bg.visible = main and _addon_exists
 	_menu_bg.visible = main
-	_back_bg.visible = screen == "credit"
+	_back_bg.visible = screen == "credit" or screen == "option"
+	_option.set_visible(screen == "option")
 	_credit_panel.visible = screen == "credit"
 	_exit_panel.visible = screen == "exit"
 	_set_page_bar_visible(main and _is_addon and _multiple_pages())
 	if screen == "credit":
 		_fit_credit_text.call_deferred()
+
+
+## OPTION 이나 CREDIT 에서 미션 목록으로 돌아간다. OPTION 이었으면 저장하지 않은 변경을 되돌린다.
+func _back_to_main() -> void:
+	if _screen == "option":
+		ConfigManager.RevertToSaved()
+		_apply_ui_scale()
+	_set_screen("main")
+
+
+## 설정의 UIScale 을 메뉴의 층들에 다시 적용한다 (OPTION 에서 SAVE 할 때와 BACK 으로 되돌릴 때).
+func _apply_ui_scale() -> void:
+	var ui_scale: float = ConfigManager.GetFloat("General", "UIScale", 1.0)
+	for layer in _layers:
+		layer.ui_scale = ui_scale
 
 
 ## 크레딧 글자 크기를 창 안에 들어가는 가장 큰 값으로 맞춘다.
@@ -522,7 +549,7 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 
 	for i in _menu_slots.size():
 		if _button(_menu_slots[i], pressed, clicked, held):
-			_set_screen("credit" if i == 0 else "exit")
+			_set_screen(MENU_SCREENS[i])
 			return
 
 	for i in ITEM_COUNT:

@@ -69,6 +69,7 @@ namespace GodotXOPS.Dev
             CheckCaution();
             CheckLeadAim();
             CheckWeaponControl();
+            CheckGrenade();
             CheckZombie();
             CheckPath();
             CheckEvents();
@@ -488,6 +489,45 @@ namespace GodotXOPS.Dev
             dropper.SetWeapon(dropper.SelectWeapon, weaponIndex, 0, 0);
             dropper.Brain.Tick(false);
             Expect(dropper.CurrentWeapon.IsNone && WeaponManager.Instance.CountActive() == dropped + 1, "탄이 하나도 없는 무기를 버리지 않음");
+        }
+
+        /// <summary>
+        /// 수류탄: 수류탄을 든 채 전투에 들어가면 던지고, 수류탄이 남아 있는 동안에는 다른 슬롯의 총으로 바꾸지 않는다.
+        /// </summary>
+        private void CheckGrenade()
+        {
+            BeginPoints();
+            AddHuman(m_armedHuman, 1, 1, Arena(0f, 0f), 0f, 255);
+            AddHuman(m_armedHuman, 0, 2, Arena(0f, -10f), 180f, 255);
+            if (!LoadPoints())
+            {
+                Expect(false, "수류탄 점검용 포인트 로드 실패");
+                return;
+            }
+
+            Human thrower = MapLoader.SearchHuman(1);
+            int grenadeIndex = DataManager.Instance.WeaponParameterData.weaponGeneralData.grenadeWeaponIndex;
+            int grenadeSlot = thrower.SelectWeapon;
+            int gunSlot = (grenadeSlot + 1) % Human.WeaponSlotCount;
+            thrower.SetWeapon(gunSlot, thrower.CurrentWeapon.WeaponIndex);
+            thrower.SetWeapon(grenadeSlot, grenadeIndex);
+
+            Weapon grenade = thrower.GetWeapon(grenadeSlot);
+            int start = grenade.Magazine + grenade.Reserve;
+            bool swapped = false;
+            for (int tick = 0; tick < 600; tick++)
+            {
+                TickAI(thrower);
+                Weapon held = thrower.GetWeapon(grenadeSlot);
+                if (held.WeaponIndex != grenadeIndex || held.Magazine + held.Reserve == 0) break;
+                if (thrower.SelectWeapon != grenadeSlot) swapped = true;
+            }
+
+            Weapon after = thrower.GetWeapon(grenadeSlot);
+            int left = after.WeaponIndex == grenadeIndex ? after.Magazine + after.Reserve : 0;
+            Expect(start > 0 && left < start, $"수류탄을 든 채 전투에 들어갔는데 던지지 않음 ({start} → {left}, 상태 {thrower.Brain.Mode})");
+            Expect(!swapped, "수류탄이 남아 있는데 다른 무기로 바꿈");
+            GD.Print($"수류탄: {start}개 중 {start - left}개 던짐, 중간 전환 {(swapped ? "있음" : "없음")}");
         }
 
         /// <summary>

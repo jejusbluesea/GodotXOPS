@@ -59,3 +59,7 @@ xops_fog_range={
 "type": "vec2",
 "value": Vector2(0, 1)
 }
+xops_model_brightness={
+"type": "float",
+"value": 1.0
+}

@@ -15,6 +15,8 @@ namespace GodotXOPS
         private const float k_cameraNear = 0.001f;
         private const float k_cameraFar = 10f;
 
+        private static readonly StringName s_darkExempt = "dark_exempt";
+
         private Node3D m_root;
         private Node3D m_mainSlot;
         private Node3D m_subSlot;
@@ -126,6 +128,12 @@ namespace GodotXOPS
             model = new Node3D { Name = "Model", Scale = Vector3.One * weapon.Data.size };
             slot.AddChild(model);
             WeaponVisual.BuildModelParts(model, weapon.ModelData);
+
+            // 원본은 HUD 의 무기를 어두운 화면 미션에서도 어둡게 그리지 않는다 (gamemain.cpp:3272).
+            foreach (Node child in model.GetChildren())
+            {
+                if (child is GeometryInstance3D part) part.SetInstanceShaderParameter(s_darkExempt, 1f);
+            }
         }
     }
 }

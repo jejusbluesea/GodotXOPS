@@ -3,7 +3,15 @@
 shader_type spatial;
 render_mode unshaded, cull_back, depth_draw_never, depth_test_disabled, fog_disabled, skip_vertex_transform;
 
-uniform sampler2D main_texture : source_color, hint_default_black, filter_linear, repeat_enable;
+// source_color 를 붙이지 않는다 — 밝기를 원본처럼 sRGB 값에 곱한 뒤 마지막에만 선형으로 바꾼다.
+uniform sampler2D main_texture : hint_default_black, filter_linear, repeat_enable;
+
+// 어두운 화면 미션에서 0.8, 그 밖에는 1.
+global uniform float xops_model_brightness;
+
+vec3 srgb_to_linear(vec3 c) {
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+}
 
 void vertex() {
 	// 원본 XOPS 기준으로 Y축 180도 회전 보정 (X, Z 반전).
@@ -17,5 +25,5 @@ void vertex() {
 }
 
 void fragment() {
-	ALBEDO = texture(main_texture, UV).rgb;
+	ALBEDO = srgb_to_linear(texture(main_texture, UV).rgb * xops_model_brightness);
 }

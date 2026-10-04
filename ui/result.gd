@@ -15,7 +15,9 @@ const CONTENT_ORDER := 1
 # ----- 배경 -----
 const BACKDROP_COLOR := Color(0, 0, 0, 1)
 const TITLE_PATH := "data/title.dds"
-const TITLE_ALPHA := 0.012
+# Lua 값은 0.012 인데 UnityXOPS 는 선형 색 공간에서 섞어 화면에서는 약 0.1 밝기로 보인다. 여기서는 sRGB 값으로 섞으므로 보이는 밝기를 적는다.
+# 원본도 0.4 로 깔고 0.75 검정을 덮어 0.1 이다 (scene.cpp:200-201).
+const TITLE_ALPHA := 0.1
 
 # ----- RESULT 제목: 화면 위 가운데 기준. 진하기가 from → to 로 duration 초마다 되풀이된다 -----
 const HEADING := {
@@ -81,7 +83,7 @@ func _process(delta: float) -> void:
 		else:
 			Game.UnloadMission()
 			Game.ChangeScene(MENU_SCENE)
-	elif InputManager.WasPressed("escape") or InputManager.WasPressed("fire"):
+	elif InputManager.WasPressed("escape") or InputManager.WasClickPressed():
 		_finished = true
 		Game.UnloadMission()
 		Game.ChangeScene(MENU_SCENE)

@@ -3,9 +3,6 @@ namespace GodotXOPS
     // AIBrain 의 무기 운용(들기, 재장전, 교체, 버리기, 단발·연발 전환) 담당 partial.
     public partial class AIBrain
     {
-        // 전투 중 수류탄을 든 채로 다른 무기로 바꿀 확률의 분모: 근거리 / 원거리 (원본 ai.cpp:1074-1087).
-        private const int k_grenadeSwapChanceShort = 100;
-        private const int k_grenadeSwapChanceLong = 66;
         // 탄창이 비었을 때 대응을 시작할 확률의 분모: 평상시 / 경계 / 전투 (원본 ai.cpp:1096-1098).
         private const int k_emptyReactChanceNormal = 1;
         private const int k_emptyReactChanceCaution = 10;
@@ -26,7 +23,8 @@ namespace GodotXOPS
 
         /// <summary>
         /// 무기를 관리한다. 매 틱 부른다. 원본 AIcontrol::ControlWeapon (ai.cpp:1033-1170).
-        /// 전투 중 수류탄을 들고 있으면 확률로 다른 무기로 바꾼다. 탄창이 비면 상태별 확률로 재장전하거나 다른 슬롯으로 바꾸고, 남은 탄이 없으면 버린다.
+        /// 탄창이 비면 상태별 확률로 재장전하거나 다른 슬롯으로 바꾸고, 남은 탄이 없으면 버린다.
+        /// 원본은 전투 중 수류탄을 들고 있으면 확률로 다른 무기로 바꾸는데 (ai.cpp:1059-1089), 던지기 전에 바꿔 버려 부자연스러워서 넣지 않는다.
         /// 단발·연발을 바꿀 수 있는 무기는 근거리에서 연발, 원거리에서 단발로 맞춘다. 케이스(임무 물품)는 건드리지 않는다.
         /// 원본은 여기서 매번 스코프를 해제하지만, AI 가 스코프를 쓸 수 있게 해제하지 않는다.
         /// </summary>
@@ -39,16 +37,6 @@ namespace GodotXOPS
             if (parameter.weaponGeneralData.caseWeaponIndex.Contains(current.WeaponIndex)) return;
 
             int other = (m_self.SelectWeapon + 1) % Human.WeaponSlotCount;
-
-            if (m_mode == AIBattleMode.Action && current.WeaponIndex == parameter.weaponGeneralData.grenadeWeaponIndex)
-            {
-                int chance = m_longAttack ? k_grenadeSwapChanceLong : k_grenadeSwapChanceShort;
-                if (GetRand(chance) == 0 && TotalBullets(m_self.GetWeapon(other)) > 0)
-                {
-                    m_self.SetSelectWeapon(other);
-                    return;
-                }
-            }
 
             if (current.Magazine == 0)
             {

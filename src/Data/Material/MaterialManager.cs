@@ -18,6 +18,7 @@ namespace GodotXOPS
         private const int k_effectRenderPriority = 1;
 
         private static readonly StringName s_mainTexture = "main_texture";
+        private static readonly StringName s_darkApply = "dark_apply";
 
         private Shader m_alphaClipBlend;
         private Shader m_skyMesh;
@@ -41,13 +42,15 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 소물·사람·무기용 머티리얼을 만든다.
+        /// 소물·사람·무기용 머티리얼을 만든다. 어두운 화면 미션에서 모델 밝기(xops_model_brightness)를 받는다.
         /// </summary>
         /// <param name="texture">입힐 텍스처. null 이면 흰색.</param>
         /// <returns>새 머티리얼.</returns>
         public ShaderMaterial CreateMainMaterial(Texture2D texture)
         {
-            return Create(m_alphaClipBlend, texture, k_mainRenderPriority);
+            ShaderMaterial material = Create(m_alphaClipBlend, texture, k_mainRenderPriority);
+            material.SetShaderParameter(s_darkApply, 1f);
+            return material;
         }
 
         /// <summary>

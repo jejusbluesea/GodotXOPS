@@ -355,6 +355,30 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 설정의 허용 범위 최솟값을 반환한다. 설정 화면이 화살표를 끌 자리를 정할 때 쓴다.
+        /// </summary>
+        /// <param name="section">섹션 이름.</param>
+        /// <param name="name">설정 이름.</param>
+        /// <returns>최솟값. 설정이 없으면 0.</returns>
+        public float GetMin(string section, string name)
+        {
+            ConfigSetting setting = FindSetting(section, name);
+            return setting != null ? setting.min : 0f;
+        }
+
+        /// <summary>
+        /// 설정의 허용 범위 최댓값을 반환한다.
+        /// </summary>
+        /// <param name="section">섹션 이름.</param>
+        /// <param name="name">설정 이름.</param>
+        /// <returns>최댓값. 설정이 없으면 0.</returns>
+        public float GetMax(string section, string name)
+        {
+            ConfigSetting setting = FindSetting(section, name);
+            return setting != null ? setting.max : 0f;
+        }
+
+        /// <summary>
         /// 정수 값을 설정한다. min이 max보다 작으면 클램프한다. 설정이 없으면 무시된다(Save로 파일에 반영).
         /// </summary>
         /// <param name="section">섹션 이름.</param>
