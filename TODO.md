@@ -169,10 +169,18 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 - GitHub 릴리즈: https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.0.0 — 태그 `v1.0.0`(커밋 `9d667ed`), 첨부 `GodotXOPS_1.0.0.7z`(약 51MB). 릴리즈 노트는 영어로 기능 다섯 줄이다.
 - **배포 묶음** (사용자가 직접 만들었다. `build/1.0/`): 최상위 폴더 `GodotXOPS/` 안에 `GodotXOPS.exe`, `GodotXOPS.pck`, `data_GodotXOPS_windows_x86_64/`, `godotdata/`, `addon.json`, `readme_kr.txt` / `readme_en.txt` / `readme_jp.txt`. 원본 에셋 `data/`·`addon/`은 넣지 않는다 (받는 사람이 원본 XOPS 에서 가져온다).
 - `GodotXOPS_1.0.0ForCafe.7z`는 `data/`가 들어 있는 사용자의 개인 배포용이다. **GitHub 에 올리지 않는다.**
-- readme 세 개는 `build/windows/`에만 있고 저장소에는 없다. 빌드를 다시 뽑아도 남아 있지만, 폴더를 새로 만들면 다시 넣어야 한다. 저장소에 README 는 없다.
+- readme 세 개는 `build/windows/`에만 있고 저장소에는 없다. 빌드를 다시 뽑아도 남아 있지만, 폴더를 새로 만들면 다시 넣어야 한다.
 - 개발용 점검 씬과 개발용 인자는 빌드에 그대로 들어 있다 (빼지 않았다).
 - **버전 규칙** (사용자 결정): 버그 수정은 패치(1.0.x), 기능 추가(무기 부착물, 방어구, 날씨 같은 것)는 마이너(1.x.0). 유저가 고친 `godotdata` JSON 이나 어드온이 그대로 돌지 않게 되는 변경이면 메이저로 본다 (이 기준은 내가 제안했고 사용자가 따로 확정하지는 않았다).
 - **버전을 올릴 때 바꿀 곳**: `godotdata/global.json`(메뉴와 크레딧에 표시)과 `export_presets.cfg`의 `file_version` / `product_version`. 그 뒤 빌드를 다시 뽑고(`CLAUDE.md`의 "익스포트 빌드"), 압축과 릴리즈 게시는 사용자가 요청할 때 한다.
+
+## 문서 (2026-10-05, 아직 커밋하지 않았다)
+
+- `README.md`(한국어, 원문), `README.en.md`, `README.ja.md`. 맨 위에 언어 선택 줄이 있고 지금 보는 언어는 링크 없이 굵게 쓴다. 영어·일본어판은 맨 위에 AI 번역임을 알린다. 한국어 README 를 고치면 두 번역도 함께 고친다.
+- `docs/modding.md`(`godotdata/` JSON, 에드온 페이지, 알려진 제한), `docs/development.md`(소스에서 빌드, 구조, 점검 도구, 개발용 인자, 원본과 다르게 한 동작, 코드 규칙, 버전 규칙). 문서는 이 둘로만 나눈다 (사용자 결정). 한국어만 있다.
+- 유저가 읽는 문서에서는 "에드온"으로 쓴다 (사용자 결정. 코드 주석과 `CLAUDE.md`·이 파일은 "어드온" 그대로다).
+- `LICENSE`는 `godotdata/global.json`의 라이선스 문구와 같다 (MIT, `Copyright (c) 2026 jaytwogames`). 한쪽을 고치면 다른 쪽도 고친다. README 세 개의 라이선스 줄에서 연결한다. 일본어 README 의 파일 이름은 `README.ja.md`다 (`ja`가 일본어의 언어 코드다. `jp`는 국가 코드).
+- 확인하지 못한 것: OpenXOPS 주소(`https://openxops.net/`), UnityXOPS 링크(로컬 remote 인 `dlwowlsgod/UnityXOPS`를 썼다), GitHub 에서 렌더링된 모습.
 
 ## 다음 작업
 
