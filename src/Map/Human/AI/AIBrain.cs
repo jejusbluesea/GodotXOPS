@@ -126,7 +126,24 @@ namespace GodotXOPS
             ControlWeapon();
 
             // 맨손 팔은 전투 동작(좀비 공격, 항복) 중에만 조준 방향을 따른다. 그 밖에는 데이터의 고정 자세다.
-            m_self.SetUnarmedArmDynamic(m_mode == AIBattleMode.Action && m_self.CurrentWeapon.IsNone);
+            // 전투가 끝난 뒤에는 팔이 고정 자세까지 내려올 때까지 조준 방향을 계속 따르게 해서, 고정 자세로 한 틱 만에 튀지 않게 한다.
+            bool unarmed = m_self.CurrentWeapon.IsNone;
+            bool lowering = unarmed && m_self.UnarmedArmDynamic && m_controller.Pitch < UnarmedRestPitch() - k_unarmedRestTolerance;
+            m_self.SetUnarmedArmDynamic(unarmed && (m_mode == AIBattleMode.Action || lowering));
+        }
+
+        /// <summary>
+        /// 맨손 팔이 고정 자세일 때와 같은 모양이 되는 시선 pitch 를 구한다. 맨손의 팔은 평상시에 계속 내려가므로(ArmAngle) 이 각에 닿으면 고정 자세로 바꿔도 튀지 않는다.
+        /// </summary>
+        /// <returns>pitch (도, 아래 +). 맨손 모델의 팔이 고정이 아니면 음의 무한대(내릴 것이 없다).</returns>
+        private float UnarmedRestPitch()
+        {
+            WeaponModelData model = m_self.CurrentWeapon.ModelData;
+            if (model == null || (!model.fixRightArm && !model.fixLeftArm)) return float.NegativeInfinity;
+
+            // 데이터는 팔 기준(아래가 음수)이라 시선 pitch(아래가 양수)로 부호를 뒤집는다. AI 가 내릴 수 있는 한계를 넘지 않게 한다.
+            float fixedAngle = model.fixRightArm ? model.fixedRightArmAngle : model.fixedLeftArmAngle;
+            return Mathf.Min(-fixedAngle, AIData.aiTurnMaxPitchDeg);
         }
 
         /// <summary>

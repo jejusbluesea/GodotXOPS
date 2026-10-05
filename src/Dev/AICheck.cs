@@ -569,6 +569,37 @@ namespace GodotXOPS.Dev
             Expect(victim.HP == hpAfterFirst || !zombie.CurrentWeapon.IsNone, "좀비가 주기보다 빨리 다시 때림");
             TickUntil(zombie, 40, () => victim.HP < hpAfterFirst);
             Expect(victim.HP < hpAfterFirst, "좀비가 한 주기 뒤에 다시 때리지 않음");
+
+            // 적이 죽어 전투가 끝나면 팔은 고정 자세로 튀지 않고 그 각도까지 내려온 뒤에 고정된다.
+            if (!zombie.CurrentWeapon.IsNone) return;
+
+            WeaponModelData model = zombie.CurrentWeapon.ModelData;
+            float restPitch = Mathf.Min(-model.fixedRightArmAngle, DataManager.Instance.HumanParameterData.humanAIParameterData.aiTurnMaxPitchDeg);
+            float raisedPitch = zombie.Controller.Pitch;
+            victim.ApplyDamage(victim.HP + 1f);
+
+            int toLeave = TickUntil(zombie, 60, () => zombie.Brain.Mode != AIBattleMode.Action);
+            Expect(toLeave > 0, "적이 죽었는데 좀비의 전투가 끝나지 않음");
+            Expect(zombie.UnarmedArmDynamic, $"전투가 끝난 틱에 맨손 팔이 고정 자세로 튐 (pitch {zombie.Controller.Pitch:0.0}, 고정 자세 {restPitch:0.0})");
+
+            float maxStep = 0f;
+            float previous = zombie.Controller.Pitch;
+            int toFixed = -1;
+            for (int tick = 1; tick <= 300; tick++)
+            {
+                TickAI(zombie);
+                maxStep = Mathf.Max(maxStep, Mathf.Abs(zombie.Controller.Pitch - previous));
+                previous = zombie.Controller.Pitch;
+                if (!zombie.UnarmedArmDynamic)
+                {
+                    toFixed = tick;
+                    break;
+                }
+            }
+            Expect(toFixed > 1, $"맨손 팔이 내려오는 동안 조준 방향을 따르지 않음 ({toFixed}틱)");
+            Expect(Mathf.Abs(zombie.Controller.Pitch - restPitch) < 1f, $"맨손 팔이 고정 자세에 닿기 전에 고정됨 (pitch {zombie.Controller.Pitch:0.0}, 고정 자세 {restPitch:0.0})");
+            Expect(maxStep < 10f, $"맨손 팔이 내려오면서 한 틱에 {maxStep:0.0}° 움직임");
+            GD.Print($"좀비: 전투 뒤 팔 {raisedPitch:0.0}° → {zombie.Controller.Pitch:0.0}° 내리는 데 {toFixed}틱, 한 틱 최대 {maxStep:0.0}°");
         }
 
         /// <summary>

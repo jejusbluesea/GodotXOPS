@@ -20,6 +20,8 @@ namespace GodotXOPS
         // 경계 중 팔을 수평으로 맞출 때의 허용 오차, 평상시 팔 각도의 허용 폭 (도). 원본 ai.cpp:1278-1292 (±1°, −32° ~ −28°).
         private const float k_armCautionTolerance = 1f;
         private const float k_armRestTolerance = 2f;
+        // 전투가 끝난 맨손 팔이 고정 자세까지 내려왔다고 보는 허용 오차 (도). 원본에 없는 값이다.
+        private const float k_unarmedRestTolerance = 0.5f;
         // 원거리에서 적을 봤을 때 확정할 확률의 분모 (원본 ai.cpp:1355).
         private const int k_longSearchChance = 4;
         // 원거리 교전 중 가까운 적을 다시 찾는 횟수와 시야각 (원본 ai.cpp:1366-1381 — 3회, 100° × 52°).
