@@ -8,7 +8,7 @@ A port of the Japanese indie FPS **XOPS** (X operations, 2000) to the Godot engi
 
 - Engine: Godot 4.7.2 (.NET)
 - Platform: Windows
-- Latest release: [1.0.0](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.0.0)
+- Latest release: [1.0.1](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.0.1)
 
 The goal is to reproduce the feel of the original. Movement, collision, and bullet hit detection do not use the engine's physics; the original calculations were ported directly, and the game runs at the same 33.33 ticks per second as the original.
 
@@ -95,7 +95,7 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0. Next are bug fixes (1.0.1) and extended file formats that go beyond the limits of the original formats (1.1.0). The plan for each version is in the [roadmap](ROADMAP.md) (written in Korean).
+The port was completed with 1.0.0, and 1.0.1 added the debug console and a bug fix. Next are extended file formats that go beyond the limits of the original formats (1.1.0). The plan for each version is in the [roadmap](ROADMAP.md) (written in Korean).
 
 ## License and notices
 

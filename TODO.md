@@ -4,7 +4,7 @@
 
 ## 현재 상태 (2026-10-05)
 
-브랜치 `main`. 10단계까지 커밋·푸시했다. 버전은 1.0.0, 제작자 표기는 jaytwogames 다 (`godotdata/global.json`). 저장소: https://github.com/jejusbluesea/GodotXOPS
+브랜치 `main`. 10단계까지 커밋·푸시했다. 버전은 1.0.1 (릴리즈됨), 제작자 표기는 jaytwogames 다 (`godotdata/global.json`). 저장소: https://github.com/jejusbluesea/GodotXOPS
 
 맵을 로드해 플레이어로 걸어 다니며 무기를 쏘고, 버리고, 줍고, 사람과 소물을 맞힐 수 있다. 이펙트와 효과음이 나온다. AI 가 경로를 돌고, 보고 듣고, 싸운다. 미션 이벤트와 클리어·실패 판정이 돈다. 오프닝 → 메뉴 → 브리핑 → 메인게임(HUD) → 결과 화면이 이어진다. 메뉴에 OPTION(설정 화면)이 있고 Windows 익스포트 빌드가 뜬다. **포팅 작업은 끝났고 1.0.0 을 릴리즈했다** (2026-10-05, https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.0.0). 다음은 현대화 단계이고, 그 사이에 나오는 버그는 패치 버전으로 고친다.
 
@@ -21,7 +21,7 @@
 | 9. 씬 UI (오프닝, 메뉴, 브리핑, HUD, 결과) | 완료 (사용자가 창에서 확인) | `ui/`, `scenes/`, `src/Scene/`, `shaders/screen_color_adjust.gdshader`, `src/Dev/UICheck.cs` |
 | 10. 마무리 (부자연스러운 부분 수정, OPTION, 빌드) | 완료 (사용자 최종 확인 남음) | `ui/mainmenu_option.gd`, `export_presets.cfg`, `xops.png` |
 | 릴리즈 1.0.0 | 완료 (2026-10-05, 태그 `v1.0.0`) | `build/1.0/` (커밋하지 않는다) |
-| 1.0.1 (버그 수정) | 예정 (`ROADMAP.md`) | — |
+| 릴리즈 1.0.1 (팔 동작 수정, 디버그 콘솔) | 완료 (2026-10-05, 태그 `v1.0.1`) | `build/1.0.1/` (커밋하지 않는다) |
 | 1.1.0 확장 파일 형식 | **설계 중** (아래 "1.1.0 설계") | — |
 
 ## 점검 씬 (작업을 마칠 때마다 전부 통과해야 한다)
@@ -187,9 +187,11 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 
 ## 다음 작업
 
-버전별 계획은 `ROADMAP.md`에 있다 (2026-10-05 사용자가 정했다. 아직 커밋하지 않았다: `ROADMAP.md`, README 세 개의 "앞으로 할 것", `CLAUDE.md`, 이 파일).
+버전별 계획은 `ROADMAP.md`에 있다 (2026-10-05 사용자가 정했다).
 
-1. **1.0.1**: 팔을 내리는 동작이 한 틱 만에 고정 각도(−70)로 돌아가던 것을 고쳤다 (2026-10-05, 커밋 전. 사용자의 창 확인이 남았다).
+**1.0.1 은 릴리즈했다** (2026-10-05, https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.0.1, 태그 `v1.0.1` = 커밋 `8ed7d2b`, 첨부 `GodotXOPS_1.0.1.7z` 약 51MB). 태그·압축·게시는 사용자가 직접 했다. 릴리즈 노트는 영어다 (Features 와 Changelog). 다음 작업은 아래 2번(1.1.0)이다. 1번은 1.0.1 에서 한 일의 기록이다.
+
+1. **1.0.1**: 팔을 내리는 동작이 한 틱 만에 고정 각도(−70)로 돌아가던 것을 고쳤다 (2026-10-05, 커밋 `51566f6`).
    - 원인: 전투가 끝나는 틱에 맨손 팔을 "조준을 따르는 팔"(DynamicArm)에서 "고정 각도 팔"(FixedArm)로 바로 바꿨다. 들 때는 pitch 가 이미 고정 각도와 같은 70° 근처여서 튀지 않았다.
    - 수정: `AIBrain.Tick` 끝에서, 전투가 끝나도 pitch 가 고정 자세의 각도(`fixedRightArmAngle`의 부호를 뒤집은 값, `aiTurnMaxPitchDeg` 이하)에 닿을 때까지 조준을 따르게 둔다. 맨손은 평상시와 경계에서 팔을 계속 내리므로(`ArmAngle`) AI 회전 속도로 내려온다. 점검에서 0° → 70° 에 25틱, 한 틱 최대 3.9°.
    - 판정에는 영향이 없다 (팔을 어느 노드에 붙이느냐만 바뀐다).
@@ -197,8 +199,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
    - **디버그 콘솔을 1.0.1 에 넣었다** (사용자 요청, 2026-10-05). `config.json`의 `General` / `AllowConsole`(기본 false)로 허용하고 메인게임에서 F11 로 연다. 처음에는 실행 인자 `--allowconsole`이었다가 사용자가 설정으로 바꿨다. OPTION 화면에는 없고 유저가 파일을 직접 고친다. RESET 은 이 값을 건드리지 않는다. 화면 확인용으로 개발 인자 `--ui-state console`을 남겼다. 글자는 OS 글꼴 (사용자 결정). 입력과 출력은 영어만 (사용자 결정. 한글 입력 상태에서는 키 이름에서 영문자를 얻는다). 명령 27개: help, ver, clear, exit, info, human, result, event, nodamage, treat, teleport, player, weapon, kill, flight, bot, nofight, caution, stop, comp, fail, estop, f12, collider, fog, sky, ss. 사용자 요청으로 뒤에 더한 것: `collider human|weapon|object`(사람 판정 초록, 무기 줍기 범위 빨강, 소물 형상 파랑. 줍기 범위는 실제 판정대로 원기둥으로, 떨어진 무기마다 그린다), `weapon 번호 [탄 수]`(탄 수가 없으면 `autoBulletMultiplier`), `teleport x y z`(`info`와 같은 Godot 좌표), `flight`(시선 방향 비행, 점프 무시, 블록·사람 충돌 없음, 속도는 달리기 수렴 속도이고 걷기 키로 느려진다. 속도는 내가 정했고 사용자 확인은 받지 않았다). 파일은 `src/Scene/DebugConsole.cs`, `GameBridgeConsole.cs`, `ui/common/xops_console.gd`. 함께 추가한 것: `InputManager.InputBlocked`, `EventManager.ForceEnd` / `LinesPaused` / `LineCursor`, `Human.RestoreHP`, `PlayerController.SwitchPlayer`, `--ui-click`의 `text:` 항목.
    - 콘솔에서 미룬 것: `revive`(사망 상태머신과 사망 카메라를 되돌려야 해서 이동 코드에 손이 간다), `dark`(블록 면 명도가 메시에 구워져 있어 블록을 다시 만들어야 한다), 그리고 새로 만들 것이 있는 원본 명령들: `speed`, `ailevel`, `view`, `center`, `map`, `model`, `aiinfo`, `tag`, `radar`, `inmap`, `newobj`, `break`, `delhuman`, `delweapon`, `delobj`, `ff`, `skip`, `window`, 파일 정보(`config`, `mif`, `bd1`, `pd1`, `resinfo`). 이 목록은 여기에만 둔다. `docs/development.md`의 콘솔 절은 지금 있는 기능만 소개하고 원본과 비교하는 말("원본에 없는 명령", "아직 없는 것")은 쓰지 않는다 (사용자 결정).
    - 콘솔을 스크린샷으로 확인한 것 (640×480): 열기, help, info, human, kill, 틀린 명령, Esc 로 닫아도 메뉴로 나가지 않음, f12 재시작, ss 저장(콘솔이 빠진 화면), 인자 없이는 F11 무시. 확인하지 못한 것: 높은 해상도에서의 글자 크기, 실제 한국어 입력기가 켜진 상태에서의 글자 입력(글자 코드 없이 키 이름만 온 경우는 가짜 입력으로 확인했다), 사람이 직접 칠 때의 느낌.
-   - 콘솔을 넣은 뒤 `build/1.0.1/`을 다시 뽑아야 한다.
-   - 남은 것: 커밋, 태그 `v1.0.1`, 압축, GitHub 릴리즈 게시, README 세 개의 "최신 릴리즈"와 `ROADMAP.md`의 상태를 릴리즈됨으로. 전부 사용자가 요청할 때 한다.
+   - 콘솔까지 커밋 `8ed7d2b`로 들어갔고, 사용자가 창에서 써 보고 확인했다. 점검 수치(미션 59개, 모델 53개, `ui_check` 97항목)는 로컬에 `addon/`이 있을 때의 값이다. `addon/`이 비어 있으면 58개, 52개, 96항목이 나온다.
 2. **1.1.0 "Voyage of Extended Filesystem Part 1"**: 확장 블록·포인트·미션 데이터, 함께 들어갈 기능 일부, 이펙트 JSON 의 완전한 외부 데이터화. 설계 중이고 아래 "1.1.0 설계"에 정한 것과 남은 것이 있다. **구현은 사용자가 시작하라고 할 때 한다.**
 3. **릴리즈 뒤에 나오는 버그 수정.** 사용자가 빌드에서 직접 확인하지 못했을 수 있는 것 (내가 화면으로 확인하지 못했거나 직접 판단할 수 없는 것):
    - OPTION: 해상도·전체화면을 바꾸고 SAVE 했을 때의 화면, UIScale 이 1 보다 클 때의 배치, RESET.
