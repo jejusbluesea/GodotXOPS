@@ -44,7 +44,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 | 파일 | 내용 |
 |---|---|
-| `config.json` | 게임 설정과 키 바인딩. 메뉴의 OPTION 에서 SAVE 하면 덮어씁니다 |
+| `config.json` | 게임 설정과 키 바인딩. 메뉴의 OPTION 에서 SAVE 하면 덮어씁니다. `General`의 `AllowConsole`은 OPTION 에 없는 설정이고, `"true"`로 바꾸면 메인게임에서 F11 로 디버그 콘솔이 열립니다 ([개발 문서](development.md#디버그-콘솔)) |
 | `global.json` | 제품 이름, 버전, 크레딧에 나오는 라이선스 문구 |
 | `mission_data.json` | 오프닝·메뉴 배경 맵, 공식 미션 목록 |
 | `sky_data.json` | 스카이 텍스처, 배경색, 안개, 시야 거리 |

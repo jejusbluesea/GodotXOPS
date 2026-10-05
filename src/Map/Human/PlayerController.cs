@@ -327,12 +327,22 @@ namespace GodotXOPS
             int index = MapLoader.PlayerIndex;
             if (count == 0 || index < 0) return false;
 
-            int next = ((index + direction) % count + count) % count;
-            if (next == index) return false;
+            return SwitchPlayer(((index + direction) % count + count) % count);
+        }
 
-            // 옛 플레이어는 바깥에서 보이는 대상이 되므로 1인칭 때 숨겼던 몸통/다리를 다시 보이게 하고 상승 치트를 푼다.
+        /// <summary>
+        /// 조작 대상을 Humans 목록의 지정한 사람으로 바꾼다 (치트 F8, 디버그 콘솔의 player).
+        /// </summary>
+        /// <param name="next">새 조작 대상의 목록 인덱스.</param>
+        /// <returns>실제로 교체됐으면 true. 범위 밖이거나 지금 대상과 같으면 false.</returns>
+        public bool SwitchPlayer(int next)
+        {
+            if (m_player == null || next < 0 || next >= MapLoader.HumanCount || next == MapLoader.PlayerIndex) return false;
+
+            // 옛 플레이어는 바깥에서 보이는 대상이 되므로 1인칭 때 숨겼던 몸통/다리를 다시 보이게 하고 상승 치트와 비행 모드를 푼다.
             m_player.HumanVisual.SetBodyVisible(true);
             m_controller.SetCheatRise(false);
+            m_controller.SetFlight(false);
             m_player.ClearPendingWeaponInput();
 
             MapLoader.SetPlayer(MapLoader.GetHuman(next));

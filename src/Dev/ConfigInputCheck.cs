@@ -50,10 +50,16 @@ namespace GodotXOPS.Dev
 
             config.SetBool(ConfigManager.SectionInput, ConfigManager.KeyInvertY, true);
             input.SetActionBinding(InputManager.Reload, "<Mouse>/rightButton");
+            // AllowConsole 은 옵션 화면에 없는 설정이라 RESET 이 건드리지 않는다. 파일에 저장된 값이 무엇이든 그 반대로 바꿔 놓고 본다.
+            bool savedAllowConsole = config.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowConsole);
+            Expect("AllowConsole 설정 존재", config.FindSetting(ConfigManager.SectionGeneral, ConfigManager.KeyAllowConsole) != null, true);
+            config.SetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowConsole, !savedAllowConsole);
             config.ResetToDefaults();
             Expect("RESET: invertY", config.InvertY, false);
             Expect("RESET: 바인딩", FindBinding(InputManager.Reload), "<Keyboard>/r");
+            Expect("RESET: AllowConsole 유지", config.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowConsole), !savedAllowConsole);
             config.RevertToSaved();
+            Expect("BACK: AllowConsole 복원", config.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowConsole), savedAllowConsole);
 
             config.SetInt(ConfigManager.SectionGraphic, ConfigManager.KeyResolution, 13);
             Expect("1920x1080 의 UIScale 상한", config.MaxUIScale(), 2.2f);

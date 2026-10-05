@@ -22,6 +22,7 @@ namespace GodotXOPS.Dev
             CheckBackgroundMaps(game);
             CheckMissionFlow(game);
             CheckPlayerValues(game);
+            CheckConsole(game);
 
             game.UnloadMission();
             GD.Print($"UI 창구 점검 {m_checks}항목 — 문제 {m_problems.Count}건");
@@ -195,6 +196,231 @@ namespace GodotXOPS.Dev
             Expect(game.PlayerHP() == 0f && !game.PlayerAlive() && !game.ShowsCrosshair(), "죽은 플레이어의 체력·생존·조준선 값이 맞지 않음");
 
             AIController.Enabled = true;
+        }
+
+        /// <summary>
+        /// 비행 모드: 입력이 없으면 공중에 그대로 떠 있고, 전진하면 시선 방향(위아래 포함)으로 블록을 뚫고 나아가며, 점프는 무시되고, 사람에게 밀리지 않고, 끄면 다시 떨어진다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        /// <param name="player">플레이어.</param>
+        /// <param name="other">겹쳐 세워 볼 다른 사람.</param>
+        private void CheckFlight(GameBridge game, Human player, Human other)
+        {
+            bool aiWasEnabled = AIController.Enabled;
+            AIController.Enabled = false;
+            HumanController controller = player.Controller;
+
+            // 블록이 없는 높은 공중에서 시작한다.
+            var start = new Vector3(0f, 300f, 0f);
+            controller.Teleport(start);
+            Expect(game.ConsoleExecute("flight") == "Flight on" && controller.Flight, "flight 로 비행 모드가 켜지지 않음");
+
+            for (int i = 0; i < 10; i++) SimClock.Step();
+            Expect(controller.Position == start, $"비행 중 입력이 없는데 움직임 ({controller.Position})");
+            // 날고 있는 동안은 공중에 뜬 상태가 아니다: 공중 조준 오차 가산이 붙지 않는다.
+            int airbornePenalty = DataManager.Instance.WeaponParameterData.weaponAccuracyData.airborneAccuracyPenalty;
+            Expect(controller.Grounded && (airbornePenalty <= 0 || player.GunsightErrorRange < airbornePenalty), $"비행 중인데 공중 상태로 판정됨 (조준 오차 {player.GunsightErrorRange})");
+
+            // 30° 내려다보며 전진 + 점프: 시선 방향으로만 움직인다.
+            const float yaw = 40f;
+            const float pitch = 30f;
+            for (int i = 0; i < 10; i++)
+            {
+                var input = new HumanInput { moveFlag = HumanMoveFlag.Forward | HumanMoveFlag.Jump, yaw = yaw, pitch = pitch };
+                controller.SetInput(in input);
+                SimClock.Step();
+            }
+            Vector3 moved = controller.Position - start;
+            Expect(moved.Length() > 0.5f && moved.Normalized().Dot(Coord.AimDirection(yaw, pitch)) > 0.999f,
+                $"비행 중 전진이 시선 방향이 아님 (이동 {moved})");
+            Expect(player.HP == player.HumanData.hp, "비행 중 데미지를 입음");
+
+            // 다른 사람과 겹쳐 있어도 밀리지 않는다.
+            Vector3 overlap = controller.Position;
+            other.Controller.Teleport(overlap);
+            for (int i = 0; i < 5; i++) SimClock.Step();
+            Expect(controller.Position == overlap, "비행 중인데 사람에게 밀림");
+
+            // 블록 안으로 들어가도 밀려나지 않는다. 맵의 블록 하나의 한가운데로 옮겨 놓고 틱을 돌린다.
+            if (MapLoader.BlockColliders.Count > 0)
+            {
+                Block block = MapLoader.BlockColliders[0];
+                Vector3 inside = (block.boundsMin + block.boundsMax) * 0.5f;
+                controller.Teleport(inside);
+                for (int i = 0; i < 5; i++) SimClock.Step();
+                Expect(controller.Position == inside, "비행 중인데 블록에 밀려남");
+            }
+
+            // 끄면 평소 이동으로 돌아와 떨어진다.
+            controller.Teleport(start);
+            Expect(game.ConsoleExecute("flight") == "Flight off" && !controller.Flight, "flight 를 다시 쳐도 꺼지지 않음");
+            Expect(!controller.Grounded, "공중에서 비행을 껐는데 바로 공중 상태가 되지 않음");
+            bool airborneWhileFalling = true;
+            for (int i = 0; i < 10; i++)
+            {
+                SimClock.Step();
+                if (controller.Grounded) airborneWhileFalling = false;
+            }
+            Expect(controller.Position.Y < start.Y - 0.1f, "비행을 껐는데 떨어지지 않음");
+            Expect(airborneWhileFalling && (airbornePenalty <= 0 || player.GunsightErrorRange >= airbornePenalty), $"비행을 끄고 떨어지는 동안 공중 상태가 아님 (조준 오차 {player.GunsightErrorRange})");
+
+            // 이어지는 점검을 위해 플레이어를 살려 두고 원래 자리 근처로 되돌린다.
+            controller.Teleport(other.Controller.Position + new Vector3(50f, 0f, 0f));
+            other.Controller.Teleport(other.Controller.Position + new Vector3(-50f, 0f, 0f));
+            player.RestoreHP();
+            AIController.Enabled = aiWasEnabled;
+        }
+
+        /// <summary>
+        /// 디버그 콘솔: 명령이 게임 상태를 바꾸고, 틀린 입력은 상태를 바꾸지 않고, 화면에 맡기는 일이 한 번만 나오고, 입력 차단이 조회를 막는다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        private void CheckConsole(GameBridge game)
+        {
+            if (!game.LoadMission(2, false, 0))
+            {
+                Expect(false, "콘솔 점검용 미션 2 로드 실패");
+                return;
+            }
+            game.BeginMission();
+
+            Human player = MapLoader.Player;
+            int other = MapLoader.PlayerIndex == 0 ? 1 : 0;
+            Human target = MapLoader.GetHuman(other);
+
+            string help = game.ConsoleExecute("help");
+            Expect(help.Contains("nodamage") && help.Contains("teleport") && help.Contains("ss"), "help 에 명령 이름이 나오지 않음");
+            Expect(game.ConsoleExecute("help kill").Contains("kill <id>"), "help 명령 이 사용법을 보여 주지 않음");
+            Expect(game.ConsoleExecute("ver").Contains(game.Version()), "ver 에 버전이 없음");
+            Expect(game.ConsoleExecute("  ") == string.Empty && game.ConsoleExecute("nosuchcommand").Contains("Unknown command"), "빈 줄이나 없는 명령의 처리가 다름");
+
+            game.ConsoleExecute("NoDamage");
+            Expect(player.Invincible, "nodamage 로 플레이어가 무적이 되지 않음 (대소문자 무시 포함)");
+            game.ConsoleExecute("nodamage");
+            game.ConsoleExecute($"nodamage {other}");
+            Expect(!player.Invincible && target.Invincible, "nodamage 번호 가 그 사람에게 적용되지 않음");
+            game.ConsoleExecute($"kill {other}");
+            Expect(target.HP > 0f, "무적인 사람이 kill 로 죽음");
+            game.ConsoleExecute($"nodamage {other}");
+
+            player.ApplyDamage(10f);
+            game.ConsoleExecute("treat");
+            Expect(player.HP == player.HumanData.hp, "treat 로 HP 가 돌아오지 않음");
+
+            game.ConsoleExecute($"teleport {other}");
+            Expect(player.Controller.Position == target.Controller.Position, "teleport 로 플레이어가 옮겨지지 않음");
+
+            int none = DataManager.Instance.WeaponParameterData.weaponGeneralData.noneWeaponIndex;
+            int weaponIndex = none == 1 ? 2 : 1;
+            game.ConsoleExecute($"weapon {weaponIndex}");
+            Expect(player.CurrentWeapon.WeaponIndex == weaponIndex, "weapon 으로 무기가 바뀌지 않음");
+            game.ConsoleExecute("weapon 99999");
+            game.ConsoleExecute("weapon abc");
+            Expect(player.CurrentWeapon.WeaponIndex == weaponIndex, "틀린 번호로 무기가 바뀜");
+
+            // 탄 수를 주면 장탄수만큼 장전하고 나머지가 예비 탄이다. 주지 않으면 사람 종류의 초기 탄약 배수다.
+            int magazineSize = DataManager.Instance.WeaponParameterData.weaponData[weaponIndex].magazineSize;
+            int multiplier = player.HumanTypeData != null ? player.HumanTypeData.autoBulletMultiplier : Weapon.DefaultAutoBulletMultiplier;
+            Expect(player.CurrentWeapon.Magazine == magazineSize && player.CurrentWeapon.Reserve == magazineSize * Mathf.Max(0, multiplier - 1),
+                $"weapon 번호 의 기본 탄약이 초기 탄약 배수와 다름 ({player.CurrentWeapon.Magazine}/{player.CurrentWeapon.Reserve})");
+            game.ConsoleExecute($"weapon {weaponIndex} {magazineSize + 7}");
+            Expect(player.CurrentWeapon.Magazine == magazineSize && player.CurrentWeapon.Reserve == 7, "weapon 번호 탄수 가 장전 탄과 예비 탄으로 나뉘지 않음");
+            game.ConsoleExecute($"weapon {weaponIndex} 1");
+            Expect(player.CurrentWeapon.Magazine == 1 && player.CurrentWeapon.Reserve == 0, "장탄수보다 적은 탄 수가 그대로 장전되지 않음");
+            game.ConsoleExecute($"weapon {weaponIndex} -5");
+            Expect(player.CurrentWeapon.Magazine == 1, "틀린 탄 수로 무기가 바뀜");
+
+            // 좌표로 옮기기: info 와 같은 좌표다. 인자 수가 맞지 않거나 수가 아니면 옮기지 않는다.
+            game.ConsoleExecute("teleport 12.5 -3 40.25");
+            Expect(player.Controller.Position == new Vector3(12.5f, -3f, 40.25f), $"teleport x y z 로 옮겨지지 않음 ({player.Controller.Position})");
+            game.ConsoleExecute("teleport 1 2");
+            game.ConsoleExecute("teleport a b c");
+            game.ConsoleExecute("teleport 1 2 nan");
+            Expect(player.Controller.Position == new Vector3(12.5f, -3f, 40.25f), "틀린 좌표로 플레이어가 옮겨짐");
+
+            CheckFlight(game, player, target);
+
+            // 판정 표시: 종류별로 켜고 끄고, 켠 채로 한 프레임을 그려도 문제가 없다.
+            ColliderView view = game.ColliderView;
+            game.ConsoleExecute("collider human");
+            game.ConsoleExecute("collider weapon");
+            game.ConsoleExecute("collider object");
+            Expect(view.ShowHuman && view.ShowWeapon && view.ShowObject, "collider 로 표시가 켜지지 않음");
+            player.DropCurrentWeapon();
+            view._Process(0.0);
+            Expect(view.Mesh.GetSurfaceCount() == 1, "판정 표시를 켰는데 그려진 선이 없음");
+            game.ConsoleExecute("collider human");
+            Expect(!view.ShowHuman && view.ShowWeapon && game.ConsoleExecute("collider box").Contains("Usage"), "collider 를 다시 쳐도 꺼지지 않거나 틀린 종류의 안내가 없음");
+            game.ConsoleExecute("collider weapon");
+            game.ConsoleExecute("collider object");
+            view._Process(0.0);
+            Expect(view.Mesh.GetSurfaceCount() == 0, "판정 표시를 전부 껐는데 선이 남아 있음");
+
+            game.ConsoleExecute($"kill {other}");
+            Expect(target.HP == 0f, "kill 로 HP 가 0 이 되지 않음");
+            Expect(game.ConsoleExecute("kill 99999").Contains("No such human") && game.ConsoleExecute("kill").Contains("id is required"), "틀린 사람 번호의 안내가 없음");
+
+            game.ConsoleExecute("stop");
+            Expect(!AIController.Enabled, "stop 으로 AI 가 멈추지 않음");
+            game.ConsoleExecute("stop");
+            game.ConsoleExecute("bot");
+            Expect(AIController.Enabled && AIController.DrivePlayer, "stop 을 다시 쳐도 AI 가 재개되지 않거나 bot 이 켜지지 않음");
+            game.ConsoleExecute("bot");
+            game.ConsoleExecute("nofight");
+            Expect(MapLoader.GetHuman(MapLoader.HumanCount - 1).Brain.NoFight, "nofight 가 적용되지 않음");
+            game.ConsoleExecute("nofight");
+            Expect(!MapLoader.GetHuman(MapLoader.HumanCount - 1).Brain.NoFight, "nofight 를 다시 쳐도 풀리지 않음");
+
+            game.ConsoleExecute("estop");
+            Expect(EventManager.Instance.LinesPaused && game.ConsoleExecute("event").Contains("stopped"), "estop 으로 이벤트가 멈추지 않음");
+            game.ConsoleExecute("info");
+            Expect(game.ConsoleInfoVisible() && game.ConsoleInfoText().Contains(MapLoader.Instance.MissionFullname), "info 로 디버그 텍스트가 켜지지 않음");
+            game.ConsoleExecute("info");
+            Expect(game.ConsoleExecute("human").Contains($"Humans {MapLoader.HumanCount},") && game.ConsoleExecute("result").Contains("Shots"), "human 이나 result 의 내용이 없음");
+
+            game.ConsoleExecute("fog");
+            game.ConsoleExecute("sky 1");
+            Expect(game.ConsoleExecute("sky 99999").Contains("sky index"), "틀린 하늘 번호의 안내가 없음");
+
+            // 콘솔의 글자는 영어만 쓴다. 명령마다 설명을 보고, 몇 가지는 결과와 틀린 입력의 안내까지 본다.
+            bool ascii = true;
+            string printed = game.ConsoleInfoText() + game.ConsoleExecute("nosuch") + game.ConsoleExecute("kill") + game.ConsoleExecute("weapon") + game.ConsoleExecute("sky");
+            foreach (string name in game.ConsoleExecute("help").Split(new[] { ' ', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                printed += game.ConsoleExecute($"help {name}");
+            }
+            foreach (string name in new[] { "ver", "human", "result", "event" })
+            {
+                printed += game.ConsoleExecute(name);
+            }
+            foreach (char character in printed)
+            {
+                if (character > 126) ascii = false;
+            }
+            Expect(ascii, "콘솔 출력에 영어가 아닌 글자가 있음");
+
+            // 화면에 맡기는 일은 한 번만 꺼내진다.
+            game.ConsoleExecute("clear");
+            Expect(game.ConsoleTakeAction() == DebugConsole.UiActionClear && game.ConsoleTakeAction() == string.Empty, "clear 가 화면에 한 번만 전달되지 않음");
+            game.ConsoleExecute("ss");
+            Expect(game.ConsoleTakeAction() == DebugConsole.UiActionScreenshot, "ss 가 화면에 전달되지 않음");
+            game.ConsoleExecute("f12");
+            Expect(game.ConsoleTakeAction() == DebugConsole.UiActionRestart, "f12 가 화면에 전달되지 않음");
+
+            Expect(game.ConsoleExecute("comp") == "Mission complete" && EventManager.Instance.Result == (int)MissionResult.Complete, "comp 로 미션이 끝나지 않음");
+            Expect(game.ConsoleExecute("fail").Contains("No mission") && EventManager.Instance.Result == (int)MissionResult.Complete, "끝난 미션이 fail 로 다시 바뀜");
+
+            // 다시 시작하면 이벤트 멈춤이 풀린다.
+            game.RestartMission();
+            Expect(!EventManager.Instance.LinesPaused && EventManager.Instance.Result == (int)MissionResult.InProgress, "재시작 뒤 이벤트 멈춤이나 결과가 남아 있음");
+
+            // 입력 차단: 켜면 조회가 전부 "안 눌림"이다.
+            InputManager input = InputManager.Instance;
+            input.InputBlocked = true;
+            Expect(!input.IsPressed(InputManager.Fire) && !input.WasKeyPressed(Key.Escape) && !input.IsClickPressed()
+                && input.ReadVector(InputManager.Move) == Vector2.Zero, "입력을 막았는데 눌린 것으로 나옴");
+            input.InputBlocked = false;
+            Expect(!input.InputBlocked, "입력 차단이 풀리지 않음");
         }
     }
 }

@@ -60,6 +60,26 @@ namespace GodotXOPS
         private string m_pressedPath = string.Empty;
         private bool m_clickHeld;
         private bool m_clickHeldBefore;
+        private bool m_inputBlocked;
+
+        // true 인 동안 모든 조회가 "안 눌림"을 돌려준다. 콘솔처럼 글자를 입력받는 화면이 켜서, 친 글자가 게임 조작으로 새지 않게 한다.
+        // 값이 바뀔 때 이번 프레임에 모아 둔 키도 버린다 (콘솔을 닫은 Esc 가 "메뉴로 나가기"로 읽히지 않게).
+        public bool InputBlocked
+        {
+            get => m_inputBlocked;
+            set
+            {
+                if (m_inputBlocked == value) return;
+
+                m_inputBlocked = value;
+                m_pendingPressedKeys.Clear();
+                m_pressedKeys.Clear();
+                m_pendingPressedPath = string.Empty;
+                m_pressedPath = string.Empty;
+                m_pendingMouseDelta = Vector2.Zero;
+                m_mouseDelta = Vector2.Zero;
+            }
+        }
 
         public override void _Ready()
         {
@@ -132,7 +152,7 @@ namespace GodotXOPS
         /// <returns>눌려 있으면 true. 없는 액션이면 false.</returns>
         public bool IsPressed(string action)
         {
-            return m_actions.TryGetValue(action, out ActionEntry entry) && Input.IsActionPressed(entry.button);
+            return !m_inputBlocked && m_actions.TryGetValue(action, out ActionEntry entry) && Input.IsActionPressed(entry.button);
         }
 
         /// <summary>
@@ -142,7 +162,7 @@ namespace GodotXOPS
         /// <returns>이번 프레임에 눌렸으면 true. 없는 액션이면 false.</returns>
         public bool WasPressed(string action)
         {
-            return m_actions.TryGetValue(action, out ActionEntry entry) && Input.IsActionJustPressed(entry.button);
+            return !m_inputBlocked && m_actions.TryGetValue(action, out ActionEntry entry) && Input.IsActionJustPressed(entry.button);
         }
 
         /// <summary>
@@ -152,7 +172,7 @@ namespace GodotXOPS
         /// <returns>이번 프레임에 떼어졌으면 true. 없는 액션이면 false.</returns>
         public bool WasReleased(string action)
         {
-            return m_actions.TryGetValue(action, out ActionEntry entry) && Input.IsActionJustReleased(entry.button);
+            return !m_inputBlocked && m_actions.TryGetValue(action, out ActionEntry entry) && Input.IsActionJustReleased(entry.button);
         }
 
         /// <summary>
@@ -164,7 +184,7 @@ namespace GodotXOPS
         /// <returns>2D 값. 없는 액션이면 (0, 0).</returns>
         public Vector2 ReadVector(string action)
         {
-            if (!m_actions.TryGetValue(action, out ActionEntry entry))
+            if (m_inputBlocked || !m_actions.TryGetValue(action, out ActionEntry entry))
             {
                 return Vector2.Zero;
             }
@@ -193,7 +213,7 @@ namespace GodotXOPS
         /// <returns>눌려 있으면 true.</returns>
         public bool IsKeyPressed(Key key)
         {
-            return Input.IsPhysicalKeyPressed(key);
+            return !m_inputBlocked && Input.IsPhysicalKeyPressed(key);
         }
 
         /// <summary>
@@ -203,7 +223,7 @@ namespace GodotXOPS
         /// <returns>이번 프레임에 눌렸으면 true.</returns>
         public bool WasKeyPressed(Key key)
         {
-            return m_pressedKeys.Contains(key);
+            return !m_inputBlocked && m_pressedKeys.Contains(key);
         }
 
         /// <summary>
@@ -212,7 +232,7 @@ namespace GodotXOPS
         /// <returns>눌려 있으면 true.</returns>
         public bool IsClickPressed()
         {
-            return m_clickHeld;
+            return !m_inputBlocked && m_clickHeld;
         }
 
         /// <summary>
@@ -221,7 +241,7 @@ namespace GodotXOPS
         /// <returns>이번 프레임에 눌렸으면 true.</returns>
         public bool WasClickPressed()
         {
-            return m_clickHeld && !m_clickHeldBefore;
+            return !m_inputBlocked && m_clickHeld && !m_clickHeldBefore;
         }
 
         /// <summary>
@@ -230,7 +250,7 @@ namespace GodotXOPS
         /// <returns>이번 프레임에 떼어졌으면 true.</returns>
         public bool WasClickReleased()
         {
-            return !m_clickHeld && m_clickHeldBefore;
+            return !m_inputBlocked && !m_clickHeld && m_clickHeldBefore;
         }
 
         /// <summary>

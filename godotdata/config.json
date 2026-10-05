@@ -79,6 +79,13 @@
           "value": "xopsPlayer",
           "min": 0,
           "max": 0
+        },
+        {
+          "name": "AllowConsole",
+          "type": "bool",
+          "value": "false",
+          "min": 0,
+          "max": 0
         }
       ]
     },

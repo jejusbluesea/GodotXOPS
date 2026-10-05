@@ -95,7 +95,7 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0. Next are convenience features (a pause menu with in-game settings, checkpoints) and modding support.
+The port was completed with 1.0.0. Next are bug fixes (1.0.1) and extended file formats that go beyond the limits of the original formats (1.1.0). The plan for each version is in the [roadmap](ROADMAP.md) (written in Korean).
 
 ## License and notices
 

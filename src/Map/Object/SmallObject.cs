@@ -43,6 +43,9 @@ namespace GodotXOPS
         public float HP => m_hp;
         public bool IsDestroyed => m_destroyed;
         public Vector3 LogicPosition => m_position;
+        // 판정 형상과 그 방향. 디버그 표시(ColliderView)가 판정과 같은 자리에 그릴 때 쓴다. 형상이 없으면 null.
+        public ObjectColliderData ColliderData => m_colliderData;
+        public Basis ColliderBasis => m_colliderBasis;
 
         /// <summary>
         /// 소물을 만든다. 트리에 추가한 뒤 호출한다.

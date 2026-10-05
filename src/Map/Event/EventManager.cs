@@ -43,6 +43,7 @@ namespace GodotXOPS
         private int m_messageId = -1;
         private int m_messageCnt;
         private int m_startCount;
+        private bool m_linesPaused;
 
         // 이벤트와 판정이 돌고 있는지.
         public bool Running => m_running;
@@ -53,6 +54,12 @@ namespace GodotXOPS
         // 표시 중인 메시지 번호. 없으면 −1.
         public int MessageId => m_messageId;
         public string MessageText => m_messageId >= 0 ? MapLoader.GetMessageText(m_messageId) : string.Empty;
+        // 이벤트 세 줄을 멈출지 (디버그 콘솔의 estop, 원본 gamemain.cpp:4598-4608). 자동 판정과 메시지 시간은 계속 돈다. 미션을 시작하면 풀린다.
+        public bool LinesPaused
+        {
+            get => m_linesPaused;
+            set => m_linesPaused = value;
+        }
         // BeginMission 이 불린 횟수. 값이 바뀌면 미션이 처음부터 다시 시작된 것이다.
         public int StartCount => m_startCount;
 
@@ -99,6 +106,7 @@ namespace GodotXOPS
             m_endTicks = 0;
             m_messageId = -1;
             m_messageCnt = 0;
+            m_linesPaused = false;
             m_running = true;
             m_startCount++;
         }
@@ -131,7 +139,7 @@ namespace GodotXOPS
 
             for (int line = 0; line < m_cursor.Length; line++)
             {
-                if (m_result != MissionResult.InProgress) break;
+                if (m_result != MissionResult.InProgress || m_linesPaused) break;
                 ProcessLine(line);
             }
 
@@ -227,6 +235,32 @@ namespace GodotXOPS
                 m_cursor[line] = point.param2;
             }
         }
+
+        /// <summary>
+        /// 진행 중인 미션을 강제로 끝낸다 (디버그 콘솔의 comp / fail, 원본 gamemain.cpp:4583-4596).
+        /// </summary>
+        /// <param name="complete">true 면 클리어, false 면 실패.</param>
+        /// <returns>끝냈으면 true. 미션이 돌고 있지 않거나 이미 끝났으면 false.</returns>
+        public bool ForceEnd(bool complete)
+        {
+            if (!m_running || m_result != MissionResult.InProgress) return false;
+
+            EndMission(complete ? MissionResult.Complete : MissionResult.Failed);
+            return true;
+        }
+
+        /// <summary>
+        /// 이벤트 한 줄이 지금 기다리는 포인트의 식별번호 (디버그 콘솔의 event).
+        /// </summary>
+        /// <param name="line">줄 번호 (0 부터).</param>
+        /// <returns>식별번호. 줄 번호가 범위 밖이면 −1.</returns>
+        public int LineCursor(int line)
+        {
+            return line >= 0 && line < m_cursor.Length ? m_cursor[line] : -1;
+        }
+
+        // 이벤트 줄 수.
+        public int LineCount => m_cursor.Length;
 
         /// <summary>
         /// 미션을 끝낸다.

@@ -136,6 +136,18 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 살아 있는 사람의 HP 를 사람 데이터의 처음 값으로 되돌린다 (디버그 콘솔의 treat, 원본 gamemain.cpp:4326-4343).
+        /// </summary>
+        /// <returns>되돌렸으면 true. 죽었거나 사람 데이터가 없으면 false.</returns>
+        public bool RestoreHP()
+        {
+            if (!Alive || m_humanData == null) return false;
+
+            m_hp = m_humanData.hp;
+            return true;
+        }
+
+        /// <summary>
         /// 사망 상태를 설정한다. 전이 로직은 HumanController 가 호출한다.
         /// </summary>
         /// <param name="value">새 사망 상태.</param>

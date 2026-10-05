@@ -78,8 +78,8 @@ dotnet build GodotXOPS.csproj
 - `--window 너비x높이` — 설정 파일의 전체화면 대신 그 크기의 창으로 띄운다.
 - `--scene 이름 [--mission 번호 [--addon] [--page 번호]]` — 그 화면에서 시작한다 (`mainmenu`, `briefing`, `maingame`, `result`).
 - `--ui-shot 경로.png [--ui-time 초]` — 화면을 PNG 로 저장하고 종료한다.
-- `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` 상태로 시작한다.
-- `--ui-click "목록"` — 가짜 입력을 차례로 넣는다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번). 좌표는 창 픽셀이고 실제 커서를 옮긴다. 버튼을 눌러 본 결과를 `--ui-shot`으로 볼 때 쓴다 (`--window 640x480`과 함께).
+- `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` / `console` 상태로 시작한다. `console`은 설정 파일과 무관하게 디버그 콘솔을 허용한다 (콘솔을 화면으로 확인할 때 `--ui-click "key:F11 text:help key:Enter"`와 함께 쓴다).
+- `--ui-click "목록"` — 가짜 입력을 차례로 넣는다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 친다. 띄어쓰기는 `key:Space`). 좌표는 창 픽셀이고 실제 커서를 옮긴다. 버튼을 눌러 본 결과를 `--ui-shot`으로 볼 때 쓴다 (`--window 640x480`과 함께).
 - `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다.
 
 `play_test.tscn` 은 AI 와 이벤트를 켠 채로 돈다. `--noai` 로 끄고 시작하고, 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), F9+↑/↓(복제), Insert(플레이어 무적), Home(디버그 텍스트 켜기/끄기)을 쓴다. `--invincible`, `--notext` 로 켜고 끈 채 시작할 수 있다. AI 가 꺼져 있어야 하는 점검 도구는 `AIController.Enabled = false` 로 둔다 (`WeaponCheck` 참조).
@@ -134,7 +134,7 @@ dotnet build GodotXOPS.csproj
   - 회전·경로 이동 의사는 매 틱 새로 정한다. 틱을 넘어 유지되는 것은 두리번거림과 전투 중 회피 이동뿐이다 (원본은 모든 플래그를 유지하고 확률로 해제한다).
   - 아군 시체를 보고 경계하는 조건(`CheckCorpse`)은 넣지 않는다.
   - 좀비는 적의 이동을 앞질러 겨누지 않는다 (원본 `AItrackability` 는 데이터에 없다).
-  - 맨손인 사람의 팔은 전투(좀비 공격, 항복) 중에만 조준 방향을 따른다.
+  - 맨손인 사람의 팔은 전투(좀비 공격, 항복) 중에만 조준 방향을 따른다. 전투가 끝나면 팔이 고정 자세의 각도까지 내려온 뒤에 고정 자세로 바꾼다 (바로 바꾸면 한 틱 만에 튄다).
   - AI 는 무기 관리 때 스코프를 해제하지 않는다.
   - 전투 중 수류탄을 든 AI 가 확률로 다른 무기로 바꾸는 분기(ai.cpp:1059-1089)는 넣지 않는다. 수류탄을 다 던진 뒤에 바꾼다.
   - 경로·이벤트 포인트는 종류별로 찾는다 (아래).
@@ -162,6 +162,10 @@ dotnet build GodotXOPS.csproj
 - `PlayerController`는 입력을 넣은 직후 `Controller.ApplyVisual()`을 한 번 더 부른다. 사람 노드의 회전·팔 각도가 `PlayerController`보다 먼저 갱신되므로, 다시 맞추지 않으면 1인칭 팔이 카메라보다 한 프레임 늦게 돈다.
 - 3D 무기 표시는 자기만의 3D 공간을 가진 뷰포트다. 무기 모델이 맵과 같은 안개 셰이더를 쓰므로 공간 전체를 1/100로 줄여 카메라 바로 앞에 둔다. 뷰포트는 표시 크기 × UIScale 로 렌더링한다 (표시 크기 그대로면 확대될 때 계단이 진다).
 - 메뉴의 OPTION(설정 화면)은 `ui/mainmenu_option.gd`(`MenuOption`)가 만든다. 구성과 수치는 UnityXOPS 0.4의 `mainmenu.lua`다. 탭은 General / Input / Graphic / Sound. 값은 바꾸는 즉시 `ConfigManager`에 들어가 화면에 반영되고(밝기·감마, 음량, 키 바인딩), SAVE 가 파일에 쓰고 `ApplyGraphic`을 부른다. UIScale 은 SAVE 때 적용한다 (바로 적용하면 누르고 있던 화살표가 움직인다. 사용자 결정). BACK 과 ESC 는 `RevertToSaved`로 되돌린다. playerName 은 쓰는 곳이 없어 화면에 넣지 않았다 (사용자 결정).
+- 디버그 콘솔(원본의 F11 콘솔)은 `config.json`의 `General` / `AllowConsole`이 true 일 때만 메인게임이 만든다 (사용자 결정. 실행 인자가 아니라 설정이다). 이 설정은 OPTION 화면에 넣지 않고 유저가 파일을 직접 고친다. OPTION 의 RESET 도 이 값은 건드리지 않는다 (`ConfigManager.ResetToDefaults`). 화면과 글자 입력은 `ui/common/xops_console.gd`(`XopsConsole`), 명령 표와 실행은 `src/Scene/DebugConsole.cs`(순수 클래스)이고 `Game.ConsoleExecute`로 잇는다. 명령을 추가할 때는 `DebugConsole` 생성자의 표에 한 줄을 더하고 `docs/development.md`의 명령 표도 고친다. 화면이 해야 하는 일(지우기, 닫기, 재시작, 화면 저장)은 명령이 `Game.ConsoleTakeAction`으로 넘긴다. 글자는 OS 글꼴이다 (사용자 결정. `char.dds`는 글자 크기 문제가 있다). **콘솔의 입력과 출력(사용법, 설명, 결과, 디버그 텍스트)은 영어만 쓴다** (사용자 결정). `ui_check`가 출력에 영어가 아닌 글자가 있는지 본다. 사람은 `MapLoader.Humans`의 인덱스로 가리킨다. 좌표를 받는 명령(`teleport x y z`)은 `info`가 보여 주는 것과 같은 Godot 공간의 미터 값을 받는다 (사용자 결정. 맵을 만드는 사람은 원본 XOPS 좌표를 잘 쓰지 않는다).
+- 콘솔의 `flight`(비행 모드)는 `HumanController.SetFlight`로 켠다. 원본에 없는 기능이고, 켜져 있고 살아 있는 동안 `Tick`이 평소의 이동·충돌 대신 `TickFlight`만 돈다 (기존 이동 코드는 건드리지 않는다). 시선 방향으로 움직이고 점프는 무시하며, `HumanCollision`도 그 사람을 건너뛴다. 총알 판정은 그대로다. 날고 있는 동안은 접지한 것으로 친다 (`Grounded` = true, 공중 조준 오차 없음. 사용자 결정). 끄면 그 자리에서 공중 상태가 되고 평소의 이동이 접지 여부를 다시 구한다.
+- 콘솔의 `collider`는 `src/Scene/ColliderView.cs`(`Game`의 자식 노드)가 그린다. 판정 코드와 같은 식으로 자리를 구해서 그리므로, 판정 계산(`HumanHitbox.Contains`, `WeaponManager.TickPickup`, `SmallObject.Contains`)을 고치면 이 표시도 같이 고친다.
+- 글자를 입력받는 화면은 열려 있는 동안 `InputManager.InputBlocked`를 켠다. 켜져 있으면 `InputManager`의 모든 조회가 "안 눌림"을 돌려준다. 끌 때는 키 이벤트를 받는 도중이 아니라 `_process`에서 끈다 (도중에 끄면 콘솔을 닫은 Esc 가 게임 쪽에서 "메뉴로 나가기"로 읽힌다).
 - 화면의 클릭은 `InputManager.WasClickPressed` / `WasClickReleased` / `IsClickPressed`(마우스 왼쪽 버튼 고정)로 읽는다. `"fire"` 액션으로 읽으면 발사 키를 바꿨을 때 메뉴를 누를 수 없게 된다.
 
 ## 맵과 렌더링
@@ -178,11 +182,12 @@ dotnet build GodotXOPS.csproj
 
 ## 문서
 
-유저가 읽는 문서는 `README.md`(한국어, 원문), `README.en.md`, `README.ja.md`, `docs/modding.md`, `docs/development.md`다. **코드나 데이터를 고치면 같은 작업 안에서 해당 문서도 고친다.** 문서가 실제 동작과 어긋난 채로 커밋하지 않는다.
+유저가 읽는 문서는 `README.md`(한국어, 원문), `README.en.md`, `README.ja.md`, `ROADMAP.md`, `docs/modding.md`, `docs/development.md`다. **코드나 데이터를 고치면 같은 작업 안에서 해당 문서도 고친다.** 문서가 실제 동작과 어긋난 채로 커밋하지 않는다.
 
 - `docs/modding.md`를 고쳐야 하는 변경: `godotdata/` JSON 의 키 추가·삭제·이름 변경, 값의 뜻이나 단위 변경, 열거형 값, 파일 추가, 지원하는 파일 형식, 에드온 페이지 방식, 풀 크기 같은 제한.
-- `docs/development.md`를 고쳐야 하는 변경: 빌드·익스포트 방법, 폴더 구조, 틱 순서(`SimOrder`)와 프레임 순서, Autoload 순서, 점검 씬과 인자, 개발용 실행 인자, 원본과 다르게 하기로 한 동작, 코드 규칙. 버전 규칙은 문서에 넣지 않는다 (사용자 결정. `TODO.md`에만 있다).
-- `README.md`를 고쳐야 하는 변경: 기능 목록, 설치 방법, 기본 키, 최신 릴리즈 버전, 앞으로 할 것. 고치면 `README.en.md`와 `README.ja.md`도 같은 내용으로 고친다 (두 번역은 맨 위에 AI 번역임을 알린다).
+- `docs/development.md`를 고쳐야 하는 변경: 빌드·익스포트 방법, 폴더 구조, 틱 순서(`SimOrder`)와 프레임 순서, Autoload 순서, 점검 씬과 인자, 개발용 실행 인자, 디버그 콘솔의 명령, 원본과 다르게 하기로 한 동작, 코드 규칙. 버전 규칙은 문서에 넣지 않는다 (사용자 결정. `TODO.md`에만 있다).
+- `ROADMAP.md`(한국어)는 버전별 현황이다: 버전, 이름, 상태(설계 중 → 작업 중 → 릴리즈됨), 항목 체크리스트. 버전에 넣을 것이 정해지거나 항목이 끝나거나 릴리즈하면 고친다. 항목은 유저가 읽는 수준으로만 적고, 설계의 세부 결정은 `TODO.md`에 둔다.
+- `README.md`를 고쳐야 하는 변경: 기능 목록, 설치 방법, 기본 키, 최신 릴리즈 버전, 앞으로 할 것(`ROADMAP.md`와 맞춘다). 고치면 `README.en.md`와 `README.ja.md`도 같은 내용으로 고친다 (두 번역은 맨 위에 AI 번역임을 알린다).
 - 키의 뜻은 이름으로 추정하지 않고 그 값을 쓰는 코드를 확인해서 적는다.
 - 한국어 문서의 용어: "에드온", "오브젝트"(소물), 오브젝트의 `hp`는 "체력". 코드 주석과 이 파일·`TODO.md`는 "어드온", "소물" 그대로 쓴다.
 - 한 줄에 물결표(`~`)를 두 번 쓰지 않는다 (GitHub 이 그 사이를 취소선으로 그린다). 범위는 "0 에서 255 사이"처럼 쓴다.

@@ -29,6 +29,8 @@ namespace GodotXOPS
         public const string KeyGamma = "gamma";
         public const string KeyMasterVolume = "MasterVolume";
         public const string KeyUIScale = "UIScale";
+        // 디버그 콘솔(메인게임의 F11)을 허용할지. 옵션 화면에 없는 설정이라 config.json 을 직접 고쳐서 켠다.
+        public const string KeyAllowConsole = "AllowConsole";
 
         /// <summary>
         /// config.json이 없을 때 기록할 기본 설정을 코드로 구성한다. 코어 섹션 4종과 기본 입력 바인딩을 담는다.
@@ -70,6 +72,7 @@ namespace GodotXOPS
                         new ConfigSetting { name = "aimColorB", type = TypeFloat, value = "0", min = 0f, max = 1f },
                         new ConfigSetting { name = "aimColorA", type = TypeFloat, value = "1", min = 0f, max = 1f },
                         new ConfigSetting { name = "playerName", type = TypeString, value = "xopsPlayer", min = 0f, max = 0f },
+                        new ConfigSetting { name = KeyAllowConsole, type = TypeBool, value = "false", min = 0f, max = 0f },
                     },
                 },
                 new ConfigSection

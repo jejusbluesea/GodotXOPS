@@ -66,6 +66,8 @@ namespace GodotXOPS
         private HumanMoveFlag m_moveFlagLt;
         private int m_moveYUpper;
         private bool m_cheatRise;
+        // 비행 모드 (디버그 콘솔의 flight). 켜져 있고 살아 있는 동안 평소의 이동·충돌 대신 TickFlight 가 돈다.
+        private bool m_flight;
         // 접지 여부 — 원본 move_y_flag 의 반전. 스폰 직후 첫 틱 전까지는 접지로 간주한다.
         private bool m_grounded = true;
         // 이번 틱에 소리가 날 만큼 빠르게 착지했는지 (원본 move_y_landing).
@@ -85,6 +87,7 @@ namespace GodotXOPS
         public HumanMoveFlag MoveFlag => m_moveFlag;
         public HumanMoveFlag MoveFlagLt => m_moveFlagLt;
         public bool Grounded => m_grounded;
+        public bool Flight => m_flight;
         public float Height => m_size.height;
         public float CameraHeight => m_size.cameraHeight;
         public float MapRadius => m_size.mapRadius;
@@ -137,6 +140,28 @@ namespace GodotXOPS
         public void SetCheatRise(bool active)
         {
             m_cheatRise = active;
+        }
+
+        /// <summary>
+        /// 비행 모드를 켜고 끈다 (디버그 콘솔의 flight). 원본에 없는 기능이다.
+        /// 켜져 있으면 중력, 블록 충돌, 사람끼리 밀어내기, 낙하 데미지 없이 시선 방향으로 움직인다. 총알 판정은 그대로다.
+        /// 날고 있는 동안은 접지한 것으로 치고, 끄면 평소의 이동으로 돌아가 떨어지는 동안 공중 상태가 된다.
+        /// </summary>
+        /// <param name="active">true 면 비행.</param>
+        public void SetFlight(bool active)
+        {
+            if (m_flight == active) return;
+
+            m_flight = active;
+            if (active)
+            {
+                m_moveVelocity = Vector3.Zero;
+            }
+            else
+            {
+                // 비행을 끄면 보통 공중이다. 다음 이동 틱이 접지 여부를 다시 구할 때까지 공중으로 둔다 (그 사이의 무기 틱이 조준 오차에 쓴다).
+                m_grounded = false;
+            }
         }
 
         /// <summary>
@@ -218,6 +243,8 @@ namespace GodotXOPS
         private void EmitFootsteps()
         {
             if (!m_human.Alive || m_human.HP <= 0f) return;
+            // 날고 있으면 발이 땅에 닿지 않는다.
+            if (m_flight) return;
 
             if ((m_moveFlagLt & HumanMoveFlag.Walk) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Walk);
             else if ((m_moveFlagLt & HumanMoveFlag.Forward) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Forward);
@@ -253,6 +280,13 @@ namespace GodotXOPS
             HumanControllerData ctrl = DataManager.Instance.HumanParameterData.humanControllerData;
             float dt = SimClock.FrameTime;
             bool player = m_human == MapLoader.Player;
+
+            // 비행 모드는 살아 있는 동안만이다. 죽으면 평소대로 떨어진다.
+            if (m_flight && m_human.Alive)
+            {
+                TickFlight(type, dt);
+                return;
+            }
 
             // 원본 ControlProcess: 가속을 더한 뒤 이번 입력을 MoveFlag_lt 로 넘기고 입력을 비운다.
             // 아래 점프·미끄러짐 판정이 읽는 MoveFlag_lt 는 그래서 "이번 틱" 입력이다.
@@ -810,6 +844,37 @@ namespace GodotXOPS
                 && AnyBlockContains(blocks, pos.X - cos * radius, y, pos.Z - sin * radius)
                 && AnyBlockContains(blocks, pos.X - sin * radius, y, pos.Z + cos * radius)
                 && AnyBlockContains(blocks, pos.X + sin * radius, y, pos.Z - cos * radius);
+        }
+
+        /// <summary>
+        /// 비행 모드의 한 틱 (디버그 콘솔의 flight, 원본에 없는 기능).
+        /// 전진·후진은 시선 방향(위아래 포함)으로, 좌우는 수평 옆으로 움직인다. 점프 입력은 버린다. 블록을 통과하고 중력을 받지 않는다.
+        /// 속도는 평지에서 달릴 때 수렴하는 속도와 같고, 걷기 입력을 함께 주면 걷는 속도가 된다.
+        /// </summary>
+        /// <param name="type">인간 종류 데이터 (가속도와 감쇠).</param>
+        /// <param name="dt">틱 시간.</param>
+        private void TickFlight(HumanTypeData type, float dt)
+        {
+            m_moveFlagLt = m_moveFlag & ~HumanMoveFlag.Jump;
+            m_moveFlag = HumanMoveFlag.None;
+            m_moveVelocity = Vector3.Zero;
+            m_moveYUpper = 0;
+            // 날고 있는 동안은 공중에 뜬 상태로 치지 않는다 (공중 조준 오차 가산이 붙지 않는다. 사용자 결정).
+            m_grounded = true;
+            m_landedHard = false;
+
+            float forward = ((m_moveFlagLt & HumanMoveFlag.Forward) != 0 ? 1f : 0f) - ((m_moveFlagLt & HumanMoveFlag.Back) != 0 ? 1f : 0f);
+            float right = ((m_moveFlagLt & HumanMoveFlag.Right) != 0 ? 1f : 0f) - ((m_moveFlagLt & HumanMoveFlag.Left) != 0 ? 1f : 0f);
+            Vector3 direction = Coord.AimDirection(m_rotationX, m_armRotationY) * forward + Coord.YawRight(m_rotationX) * right;
+            if (direction.LengthSquared() < 1e-6f) return;
+
+            // 평소 이동은 틱마다 가속을 더하고 감쇠하므로 속도가 "가속 × dt ÷ (1 − 감쇠)"로 수렴한다. 그 값을 바로 쓴다.
+            bool walk = (m_moveFlagLt & HumanMoveFlag.Walk) != 0;
+            float accel = walk ? type.progressWalkAcceleration : type.progressRunAcceleration;
+            float decay = Mathf.Exp(-type.attenuation * dt);
+            float speed = decay < 1f ? accel * dt / (1f - decay) : accel * dt;
+
+            m_position += direction.Normalized() * (speed * dt);
         }
 
         /// <summary>

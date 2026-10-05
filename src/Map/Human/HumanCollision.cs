@@ -23,6 +23,8 @@ namespace GodotXOPS
             {
                 Human a = humans[i];
                 if (!a.Alive || a.HP <= 0f) continue;
+                // 비행 모드(디버그 콘솔의 flight)인 사람은 밀지도 밀리지도 않는다.
+                if (a.Controller.Flight) continue;
 
                 HumanController ca = a.Controller;
                 Vector3 pa = ca.Position;
@@ -31,6 +33,7 @@ namespace GodotXOPS
                 {
                     Human b = humans[j];
                     if (!b.Alive || b.HP <= 0f) continue;
+                    if (b.Controller.Flight) continue;
 
                     HumanController cb = b.Controller;
                     Vector3 pb = cb.Position;

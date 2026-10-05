@@ -155,6 +155,9 @@ func _ready() -> void:
 	_build_scope()
 	_build_crosshair()
 	_build_overlays()
+	# 콘솔은 설정 파일의 AllowConsole 로 허용한다. 개발용 인자 --ui-state console 은 설정 파일을 고치지 않고 화면을 확인할 때 쓴다.
+	if ConfigManager.GetBool("General", "AllowConsole", false) or Dev.value("--ui-state", "") == "console":
+		XopsConsole.create(_ui)
 
 	var start_mode := Dev.value("--ui-state", "normal")
 	if start_mode in MODES:

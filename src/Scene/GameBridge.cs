@@ -6,7 +6,7 @@ namespace GodotXOPS
     /// 화면(GDScript)이 게임을 다루는 창구. Autoload 이름은 Game 이다.
     /// 화면 스크립트는 게임플레이 노드를 직접 만지지 않고 이 클래스와 EventManager·ConfigManager·InputManager 만 부른다.
     /// GDScript 가 볼 수 있도록 public 멤버는 Godot Variant 호환 타입만 쓴다. 좌표와 각도는 UnityXOPS 공간으로 주고받는다 (화면 수치가 그 공간 기준이다).
-    /// 관심사별 partial: 이 파일(화면 전환, 맵 로드, 카메라, 밝기) / GameBridgeData(미션 목록·브리핑·통계) / GameBridgePlayer(플레이어 값, 무기 표시).
+    /// 관심사별 partial: 이 파일(화면 전환, 맵 로드, 카메라, 밝기) / GameBridgeData(미션 목록·브리핑·통계) / GameBridgePlayer(플레이어 값, 무기 표시) / GameBridgeConsole(디버그 콘솔).
     /// </summary>
     public partial class GameBridge : Singleton<GameBridge>
     {
@@ -31,6 +31,9 @@ namespace GodotXOPS
             m_sceneCamera = new Camera3D { Name = "SceneCamera", TopLevel = true };
             AddChild(m_sceneCamera);
             MapLoader.ApplyCameraSettings(m_sceneCamera);
+
+            m_colliderView = new ColliderView { Name = "ColliderView" };
+            AddChild(m_colliderView);
 
             if (DisplayServer.GetName() != "headless")
             {
@@ -146,6 +149,7 @@ namespace GodotXOPS
             AIController.DrivePlayer = false;
             SimClock.TickEnabled = true;
             EventManager.Instance.BeginMission();
+            m_console.Reset();
         }
 
         /// <summary>
