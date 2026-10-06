@@ -107,7 +107,7 @@ namespace GodotXOPS
 
         private void LoadEffectParameterData()
         {
-            EffectParameterData = LoadOrDefault<EffectParameterData>(k_effectParameterDataPath);
+            EffectParameterData = LoadOrDefault<EffectParameterData>(k_effectDataPath);
         }
 
         private void LoadSkyData()

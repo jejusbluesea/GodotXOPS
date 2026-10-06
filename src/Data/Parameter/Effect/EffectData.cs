@@ -20,7 +20,7 @@ namespace GodotXOPS
     /// </summary>
     public class EffectEmitter
     {
-        public int textureIndex; // EffectGeneralData.texturePaths 인덱스
+        public int textureIndex; // EffectParameterData.effectTextureData 인덱스
         public EffectFlags flags; // 빌보드/맵 충돌 동작 플래그
         public EffectBlendMode blendMode; // 색을 섞는 방식. 기본은 원본과 같은 알파 블렌딩
         public int spawnCount; // 같은 emitter 를 N 번 발사 (랜덤 시드만 다름)

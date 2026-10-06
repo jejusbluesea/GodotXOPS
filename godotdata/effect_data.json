@@ -1,17 +1,17 @@
 {
   "effectGeneralData": {
-    "texturePaths": [
-      "data/blood.dds",
-      "data/mflash.dds",
-      "data/smoke.dds",
-      "data/yakkyou.dds"
-    ],
     "wallBloodEffectIndex": 5,
     "decalSurfaceOffset": 0.05,
     "poolInitialSize": 256,
     "poolGrowStep": 64,
     "poolMaxSize": 0
   },
+  "effectTextureData": [
+    { "texturePath": "data/blood.dds" },
+    { "texturePath": "data/mflash.dds" },
+    { "texturePath": "data/smoke.dds" },
+    { "texturePath": "data/yakkyou.dds" }
+  ],
   "effectData": [
     {
       "name": "NONE",

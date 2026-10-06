@@ -24,7 +24,7 @@ namespace GodotXOPS
         private const string k_objectListDataPath = "godotdata/object/list.json";
         private const string k_objectModelDataPath = "godotdata/object/model.json";
         private const string k_objectColliderDataPath = "godotdata/object/collider.json";
-        private const string k_effectParameterDataPath = "godotdata/effect_parameter_data.json";
+        private const string k_effectDataPath = "godotdata/effect_data.json";
         private const string k_skyDataPath = "godotdata/sky_data.json";
         private const string k_missionDataPath = "godotdata/mission_data.json";
         private const string k_globalDataPath = "godotdata/global.json";

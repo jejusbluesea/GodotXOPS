@@ -353,17 +353,17 @@ namespace GodotXOPS
         /// <summary>
         /// 텍스처 번호에 해당하는 이펙트 머티리얼을 얻는다. 한 번 만들면 계속 쓴다.
         /// </summary>
-        /// <param name="textureIndex">EffectGeneralData.texturePaths 인덱스.</param>
+        /// <param name="textureIndex">EffectParameterData.effectTextureData 인덱스.</param>
         /// <param name="blendMode">색을 섞는 방식. 방식마다 셰이더가 달라 따로 캐시한다.</param>
         /// <returns>머티리얼. 텍스처가 없으면 null.</returns>
         private ShaderMaterial GetMaterial(int textureIndex, EffectBlendMode blendMode)
         {
             if (m_materials.TryGetValue((textureIndex, blendMode), out ShaderMaterial cached)) return cached;
 
-            List<string> paths = DataManager.Instance.EffectParameterData.effectGeneralData.texturePaths;
-            if (textureIndex < 0 || textureIndex >= paths.Count) return null;
+            List<EffectTextureData> textures = DataManager.Instance.EffectParameterData.effectTextureData;
+            if (textureIndex < 0 || textureIndex >= textures.Count) return null;
 
-            string fullPath = GamePath.Resolve(paths[textureIndex]);
+            string fullPath = GamePath.Resolve(textures[textureIndex].texturePath);
             ImageTexture texture = fullPath != null ? ImageLoader.LoadTexture(fullPath) : null;
             if (texture == null) return null;
 

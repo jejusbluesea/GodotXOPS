@@ -298,7 +298,7 @@ namespace GodotXOPS.Dev
                 foreach (EffectEmitter emitter in data.effectData[i].emitters)
                 {
                     // 텍스처를 읽지 못하는 emitter 는 아무것도 내지 않는다 (헤드리스에서도 이미지 로더는 동작한다).
-                    if (emitter.textureIndex < 0 || emitter.textureIndex >= data.effectGeneralData.texturePaths.Count) continue;
+                    if (emitter.textureIndex < 0 || emitter.textureIndex >= data.effectTextureData.Count) continue;
                     expected += emitter.countPerTrigger > 0f
                         ? Mathf.FloorToInt(trigger * emitter.countPerTrigger)
                         : emitter.spawnCount;
@@ -511,7 +511,7 @@ namespace GodotXOPS.Dev
                 List<EffectEmitter> emitters = data.effectData[i].emitters;
                 if (emitters.Count != 1) continue;
                 if (emitters[0].spawnCount != 1 || emitters[0].countPerTrigger > 0f) continue;
-                if (emitters[0].textureIndex < 0 || emitters[0].textureIndex >= data.effectGeneralData.texturePaths.Count) continue;
+                if (emitters[0].textureIndex < 0 || emitters[0].textureIndex >= data.effectTextureData.Count) continue;
                 return i;
             }
             return -1;

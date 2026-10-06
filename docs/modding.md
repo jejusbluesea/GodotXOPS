@@ -48,7 +48,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `global.json` | 제품 이름, 버전, 크레딧에 나오는 라이선스 문구 |
 | `mission_data.json` | 오프닝·메뉴 배경 맵, 공식 미션 목록 |
 | `sky_data.json` | 스카이 텍스처, 배경색, 안개, 시야 거리 |
-| `effect_parameter_data.json` | 이펙트 텍스처와 프리셋 |
+| `effect_data.json` | 이펙트 텍스처와 프리셋 |
 | `weapon/list.json` | 무기 목록 (데미지, 발사 속도, 탄창, 반동 등) |
 | `weapon/model.json` | 무기 모델, 총구 화염, 탄피, 팔 모양 |
 | `weapon/bullet.json` | 탄환 종류 (직선 탄, 수류탄. 폭발, 착탄 소리와 이펙트) |
@@ -249,13 +249,20 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 ## 이펙트
 
-`effect_parameter_data.json`에 있습니다. 총구 화염, 탄피, 연기, 혈흔, 폭발이 모두 이 파일의 값으로 그려집니다.
+`effect_data.json`에 있습니다. 총구 화염, 탄피, 연기, 혈흔, 폭발이 모두 이 파일의 값으로 그려집니다.
+
+### `effectTextureData`
+
+이펙트가 쓰는 텍스처 목록입니다. 개수 제한은 없습니다. `emitters`의 `textureIndex`가 이 목록의 번호입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `texturePath` | 텍스처 파일 경로 (게임 폴더 기준) |
 
 ### `effectGeneralData`
 
 | 키 | 뜻 |
 |---|---|
-| `texturePaths` | 이펙트가 쓰는 텍스처 목록. 개수 제한은 없습니다. `emitters`의 `textureIndex`가 이 목록의 번호입니다 |
 | `wallBloodEffectIndex` | 혈흔 입자가 벽에 닿았을 때 그 자리에 남길 프리셋 번호 |
 | `decalSurfaceOffset` | 벽에 붙는 자국(`flags` 1)을 면에서 띄우는 거리 (미터). 0 이면 면과 겹쳐 떨려 보입니다 |
 | `poolInitialSize` | 시작할 때 만들어 두는 이펙트 자리 수 (원본은 256 고정) |
@@ -272,7 +279,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 | 키 | 뜻 |
 |---|---|
-| `textureIndex` | `texturePaths`의 번호 |
+| `textureIndex` | `effectTextureData`의 번호 |
 | `flags` | 동작 플래그. 0 없음, 1 빌보드를 끄고 방향을 고정(벽에 붙는 자국. 아래 설명), 2 블록에 닿는지 검사(닿으면 `wallBloodEffectIndex` 자국을 남기고 사라집니다). 더해서 씁니다 |
 | `blendMode` | 색을 섞는 방식. 0 알파(원본과 같습니다), 1 가산(뒤에 있는 색에 더합니다. 불꽃·섬광처럼 발광하는 것) |
 | `spawnCount` | 한 번에 내는 개수 |
@@ -353,7 +360,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 - 맵(BD1) 하나가 쓸 수 있는 텍스처는 10개입니다.
 - 미션 파일(PD1)의 포인트 값은 0~255 범위입니다. 사람·무기·오브젝트 번호도 이 범위 안에서만 가리킬 수 있습니다.
 - 동시에 존재할 수 있는 수: 떨어진 무기 200개, 탄환 160개. 넘으면 새로 생기지 않습니다.
-- 이펙트는 기본 256개이고 모자라면 늘어납니다 (`effect_parameter_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`).
+- 이펙트는 기본 256개이고 모자라면 늘어납니다 (`effect_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`).
 - 이벤트는 세 줄, 메시지는 미션당 16개입니다.
 - 이미지·모델·소리는 한 번 읽으면 게임을 끌 때까지 기억합니다. 실행 중에 파일을 바꿨다면 게임을 다시 켭니다.
 - 유저가 만든 코드(스크립트)를 넣는 방법은 아직 없습니다.

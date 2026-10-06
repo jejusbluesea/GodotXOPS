@@ -82,7 +82,7 @@ namespace GodotXOPS.Dev
 
             switch (relative)
             {
-                case "effect_parameter_data.json": return data.EffectParameterData;
+                case "effect_data.json": return data.EffectParameterData;
                 case "sky_data.json": return data.SkyData;
                 case "mission_data.json": return data.MissionData;
                 case "global.json": return data.GlobalData;

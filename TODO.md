@@ -276,6 +276,56 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 - BD1 의 블록 플래그(int32)는 BD2 에 없다 (현재 코드도 읽고 쓰지 않는다). BD1 의 판형 블록 추론(정점 모양)은 BD1 에만 남긴다. BD2 는 플래그로 명시한다.
 - **파일 버전 필드는 넣지 않고 보류했다** (사용자 결정, 2026-10-06). 나중에 블록마다 필드를 더해야 하면 매직을 바꾼 새 형식이나 별도 파일(BD2 바리에이션)로 간다. 그때 다시 논의한다.
 
+### PD2 와 MIF2 (2026-10-06 사용자 결정. BD2 보다 먼저 정했다)
+
+PD2 는 바이너리, 리틀 엔디안이다. 버전 필드는 BD2 처럼 넣지 않는다.
+
+| 크기 | 내용 |
+|---|---|
+| 8 | 매직 `GDXOPSPD` |
+| 4 | 이벤트 시작 번호 개수 (uint32) |
+| 4 × 개수 | 이벤트 시작 번호들 (int32) |
+| 4 | 포인트 개수 (uint32) |
+| 가변 × 개수 | 포인트들 |
+
+포인트 하나.
+
+| 크기 | 내용 |
+|---|---|
+| 12 | 위치 (float32 × 3, 미터, Godot 축. `Coord` 변환 없음) |
+| 4 | 방향 (float32, 도. **실제로 바라보는 방향**) |
+| 16 | 파라미터 4개 (int32 × 4: 종류, P2, P3, 식별번호) |
+| 4 | 추가 파라미터 개수 n (uint32) |
+| 4 × n | 추가 파라미터 (4바이트 칸) |
+
+- **이벤트 줄 수가 파일마다 다르다** (사용자 결정). 시작 번호를 머리말에 나열한다. PD1 로더는 `[156, 146, 136]` 을 넣어 같은 구조로 만든다. `EventManager` 의 줄 3개 고정(`s_lineEntryIds`)을 목록으로 바꿔야 한다.
+- **방향은 변환해서 저장한다** (사용자 결정). PD2 에는 실제로 바라보는 방향을 적고, 로더가 `RawPointData.look`(사람 기준 yaw) 으로 맞춘다. 소물 포인트는 +180 해서 넣으면 기존 `look − 180` 이 저장한 값이 된다. 떨어진 무기의 방향은 원본 대조가 덜 됐으므로 구현할 때 확인한다.
+- **추가 파라미터의 용도** (사용자): 이벤트를 인자 3개로 연출하기에는 모자라다. 나중에 IF / AND / OR 도 생각하고 있다. 종류별로 무엇을 넣을지는 아직 정하지 않았다.
+- **추가 파라미터는 4바이트 칸이고 종류별로 코드가 해석한다** (사용자 결정): 정수(int32), 실수(float32, `BitConverter.Int32BitsToSingle`), 불(0 이면 거짓, 그 밖은 참). 형식을 바꾸지 않고 반경이나 소수 초를 받을 수 있다.
+- 읽은 뒤에는 `RawPointData` 에 추가 파라미터 배열 하나만 더한 모양이다. 옛 파일에 모자란 칸은 0 으로 읽는다.
+- **메시지는 레거시 `.msg` 그대로** (사용자 결정). 포인트 파일 옆의 같은 이름 파일이다.
+
+MIF2 는 JSON 이고 확장자는 `.mif2` 다 (사용자 결정. `MD2` 는 버렸다).
+
+- 키: `name`, `fullname`, `blockPath`, `pointPath`, `skyIndex`, `adjustCollision`, `darkScreen`, `image0`, `image1`, `briefing`(**줄 배열**, 사용자 결정), `defaultBlockMaterial`, 그리고 종류별 에드온 데이터 파일.
+- 경로는 전부 exe 폴더 기준.
+- **MIF2 는 BD2 와 PD2 만 불러온다. 섞어 쓰지 못한다** (사용자 결정, 2026-10-07). 레거시(BD1, PD1)를 쓰려면 MIF 를 쓴다. 그래서 에드온 번호(10000 이상)와 이벤트 시작 번호 목록은 MIF2 미션에서만 나온다. `blockPath` / `pointPath` 가 BD2 / PD2 가 아니면 로드 오류다.
+- **미션 목록을 만드는 쪽이 `.mif` 와 `.mif2` 를 둘 다 모아 가른다** (사용자 결정). `AddonMissionData.mifPath` 의 확장자로 로더를 고른다.
+- `defaultBlockMaterial` 이 BD2 면 재질 −1 이 가리키는 재질이다.
+- **에드온 데이터는 기본 파라미터 파일과 같은 형식의 JSON 을 가리킨다** (사용자 결정). 사람, 무기, 오브젝트, 이펙트가 같은 방식이고 나중에 스카이 등도 넣는다. 초안의 `humanLists` 같은 "목록의 배열"이 아니다.
+- **번호는 10000 으로 가른다** (사용자 결정). 10000 미만은 기본 데이터, 10000 이상은 에드온 데이터의 (n − 10000) 번째다. 기본 목록은 10000 개 미만으로 제한한다. 에드온 파일 안의 상호 참조(`modelIndex` 등)도 같은 규칙이라 로드할 때 번호를 옮길 필요가 없다.
+- **에드온 데이터 파일은 종류마다 하나다** (사용자 결정). 목적이 "맵 팩 전용 추가 사람·무기·오브젝트·환경"을 열어 주는 것이다. 위 "정한 것"의 "여러 에드온 목록을 적은 순서대로 이어 붙인다"는 이것으로 대체됐다.
+- **에드온 파일은 섹션이 하나로 묶인 JSON 이다** (사용자 결정). 기본 데이터는 `godotdata/human/list.json`, `model.json` … 으로 나뉘어 있지만 에드온은 한 파일에 다 넣는다. 최상위 키는 컨테이너 클래스(`HumanParameterData` 등)의 필드 이름 그대로라서, 새 컨테이너에 `JsonData.Overwrite` 한 번으로 읽을 수 있다.
+- **에드온 파일은 GeneralData 를 갖지 않는다** (사용자 결정). 목록인 섹션만 읽는다. 내가 정리한 범위 (사용자가 든 것은 사람의 list, model, arm, leg, type, ai 다. 나머지는 "목록이면 받는다"는 내 해석):
+  - 사람: `humanData`, `humanModelData`, `humanArmModelData`, `humanLegModelData`, `humanTypeData`, `humanAIParameterData` 의 `aiData` · `aiScopeData`, 그리고 `controllerSizeData`, `humanHitboxSizeData`. 무시: `humanGeneralData`, `humanControllerData`, `humanInteractionData`, `humanAnimationData`, AI 의 전역 수치.
+  - 무기: `weaponData`, `bulletData`, `scopeData`, `weaponModelData`. 무시: `weaponGeneralData`, `weaponAccuracyData`, `weaponDropPhysicsData`.
+  - 오브젝트: `objectData`, `objectModelData`, `objectColliderData`. 무시: `objectGeneralData`.
+  - 이펙트: `effectData`, `effectTextureData`. 무시: `effectGeneralData`. **텍스처 목록을 `effectGeneralData.texturePaths` 에서 꺼내 최상위 `effectTextureData`(항목은 객체 `{ "texturePath": ... }`)로 옮기고, 파일 이름을 `effect_parameter_data.json` → `effect_data.json` 으로 바꿨다** (사용자 결정, 2026-10-07 구현. 커밋 전). `effectGeneralData` 에는 `wallBloodEffectIndex`, `decalSurfaceOffset`, 풀 크기 셋이 남는다 (사용자 확정). 컨테이너 클래스 이름 `EffectParameterData` 는 그대로다. 이 아래 "이펙트 외부 데이터화" 절의 옛 이름(`effect_parameter_data.json`, `texturePaths`)은 그때의 기록이다. 점검 씬 9개 통과, 빌드 경고 0.
+  - 사람의 `controllerSizeData`, `humanHitboxSizeData` 도 에드온으로 받는다 (사용자 확정).
+- MIF2 의 키 이름은 `addonHumanDataPath`, `addonWeaponDataPath`, `addonObjectDataPath`, `addonEffectDataPath`, `addonBlockMaterialDataPath` 다 (사용자 확정. 기존 `bd1Path`, `mifPath` 처럼 경로는 `Path` 로 끝낸다).
+- **10000 규칙의 범위 검사**: 번호에서 10000 을 빼기만 하면 범위를 벗어날 수 있다 (에드온 데이터 파일을 적지 않은 MIF2 에서 10000 이상, 에드온 항목 수를 넘는 번호, 기본 항목 수와 9999 사이의 빈 구간, 음수). 조회 함수 하나가 네 경우를 모두 "없음"으로 돌려주고 호출하는 쪽은 지금의 범위 밖 처리를 그대로 쓴다. 기본 목록이 10000 개 이상이면 로드할 때 오류로 잡는다.
+- 구현할 때: 지금 코드는 `parameter.weaponData[index]` 처럼 목록을 직접 인덱싱하고 `index >= Count` 로 범위를 본다. 10000 으로 가르려면 번호를 받는 조회 함수를 두고 모든 지점을 그쪽으로 돌려야 한다. 맵을 내릴 때 에드온 데이터를 비운다.
+
 ### 재질 데이터의 모양 (2026-10-06)
 
 재질 항목 하나가 발소리 목록과 피격 이펙트·소리를 다 갖는다 (사용자). 전역 JSON 의 배열이고 BD2 의 면 재질 인덱스가 이 배열을 가리킨다.
@@ -302,8 +352,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 
 ### 아직 정하지 않은 것
 
-- **PD2 와 MD2 의 형식은 나중에 정한다** (사용자 결정, 2026-10-06). 바이너리인지 JSON 인지, 그리고 MD2 라는 확장자 이름 자체도 바뀔 수 있다 (모호하다).
-- **기본 재질이 무엇인지** (면 재질 −1 이 가리키는 것). 재질 목록의 0번일 수도 있고 텍스처 항목에 둔 기본값일 수도 있다. 나중에 정한다.
+- PD2 와 MIF2 의 형식은 닫혔다 (2026-10-07). 남은 것은 종류별 추가 파라미터의 내용과 IF / AND / OR 이고, 이벤트를 확장할 때 정한다.
 - 발소리를 플레이어에게 어디까지 들려줄지. 박자는 정해졌지만, 사방의 AI 달리는 소리가 다 들리면 혼란스러울 수 있다 (사용자). 볼륨·거리 값은 설계만 두고 구현할 때 정한다.
 - 재질 항목에 이펙트를 하나만 둘지 여러 개를 둘지 (프리셋 자체가 이미 emitter 묶음이라 하나를 권고했다).
 - GodotXOPS 자체 에셋(발소리 WAV 등)을 둘 폴더. Git 으로 관리하지 않는다는 것만 정해졌다.

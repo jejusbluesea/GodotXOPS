@@ -130,9 +130,9 @@ dotnet build GodotXOPS.csproj
 ## 떨어진 무기, 소물, 이펙트, 소리
 
 - 게임 결과에 영향을 주는 것은 틱에서, 연출은 렌더 프레임에서 한다. 떨어진 무기의 낙하·줍기(`WeaponManager`)와 소물의 내구력·파괴 판정은 틱이고, 이펙트(`EffectManager`)·부서진 소물이 튀는 움직임·소리 볼륨 갱신은 렌더 프레임이다. 연출에는 `GameRandom.Visual`만 쓴다.
-- 떨어진 무기 200, 탄환 160 은 원본 상수이고 가득 차면 새로 만들지 않고 버린다 (게임 결과에 영향을 주므로 가변으로 바꾸지 않는다). 이펙트 풀만 데이터로 정하고 모자라면 묶음 단위로 늘린다 (`effect_parameter_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`). 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
+- 떨어진 무기 200, 탄환 160 은 원본 상수이고 가득 차면 새로 만들지 않고 버린다 (게임 결과에 영향을 주므로 가변으로 바꾸지 않는다). 이펙트 풀만 데이터로 정하고 모자라면 묶음 단위로 늘린다 (`effect_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`). 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
 - 틱에서 일어난 일의 이펙트를 무기 모델 위치에 맞춰야 하면(총구 화염, 탄피) 틱에서는 표시만 해 두고 `Human._Process`에서 낸다. 무기 모델은 틱 사이를 보간해 움직이므로 틱에서 내면 어긋난다.
-- 이펙트 프리셋·텍스처는 `effect_parameter_data.json`, 호출하는 쪽은 인덱스(무기 모델·탄환·사람 종류 데이터에 있다)와 위치만 넘긴다. 이펙트 머티리얼은 `MaterialManager.CreateEffectMaterial`, 투명도는 인스턴스 유니폼 `effect_alpha`다.
+- 이펙트 프리셋·텍스처는 `effect_data.json`(`effectData`, `effectTextureData`), 호출하는 쪽은 인덱스(무기 모델·탄환·사람 종류 데이터에 있다)와 위치만 넘긴다. 이펙트 머티리얼은 `MaterialManager.CreateEffectMaterial`, 투명도는 인스턴스 유니폼 `effect_alpha`다.
 - 블록 면 위에서 나는 이펙트(착탄, 벽 혈흔)는 `EffectManager.PlayOnSurface(번호, 위치, 면 위의 점, 법선)`로 낸다. 빌보드 emitter 는 `Play`와 똑같이 나오고, `NoBillboard` emitter(데칼)만 면에 눕혀 `decalSurfaceOffset`만큼 띄운다. 법선은 판정이 이미 구한 레이캐스트에서 받는다 (이펙트 때문에 판정을 바꾸지 않는다). 기본 데이터에 탄흔은 없다 (원본에 없다. 쇼케이스·에드온이 넣는다).
 - 이펙트의 블렌드 모드는 emitter 의 `blendMode`다. Godot 의 `blend_mix` / `blend_add` 는 컴파일 타임 설정이라 셰이더가 두 개이고(`effect_blend`, `effect_blend_add`), 머티리얼 캐시 키가 (텍스처 번호, 블렌드 모드)다. 가산일 때만 `brightness` 가 발광 세기로 쓰이고 인스턴스 유니폼 `effect_bright` 로 들어간다. 원본에는 가산이 없다.
 - 소리는 `SoundManager.PlayAt(경로, 위치, 볼륨)`으로 낸다. `AudioStreamPlayer3D`를 쓰지 않는다 (원본의 선형 감쇠를 낼 수 없다). 헤드리스에서는 실제 재생을 하지 않는다.
