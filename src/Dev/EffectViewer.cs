@@ -269,6 +269,7 @@ namespace GodotXOPS.Dev
             CheckPoolGrowth(manager, general);
             CheckBlendMaterials(data, manager);
             CheckBrightnessDecay(data, manager);
+            CheckSurface(data, manager);
 
             manager.Clear();
             GD.Print($"이펙트 점검 {m_checks}항목 — 문제 {m_problems.Count}건");
@@ -428,6 +429,74 @@ namespace GodotXOPS.Dev
             emitter.alphaRate = savedAlphaRate;
             emitter.lifetime = savedLifetime;
             manager.Clear();
+        }
+
+        /// <summary>
+        /// 면 위에 재생할 때 데칼(빌보드가 아닌 emitter)만 면에 눕고 면에서 떠 있는지, 빌보드 emitter 는 그대로인지 확인한다.
+        /// </summary>
+        /// <param name="data">이펙트 데이터.</param>
+        /// <param name="manager">이펙트 매니저.</param>
+        private void CheckSurface(EffectParameterData data, EffectManager manager)
+        {
+            const float tolerance = 1e-4f;
+            EffectGeneralData general = data.effectGeneralData;
+
+            int index = general.wallBloodEffectIndex;
+            bool usable = index >= 0 && index < data.effectData.Count && data.effectData[index].emitters.Count == 1;
+            Expect(usable, "벽 혈흔 프리셋이 emitter 하나가 아니어서 면 재생을 확인할 수 없음");
+            if (!usable) return;
+
+            EffectEmitter emitter = data.effectData[index].emitters[0];
+            EffectFlags savedFlags = emitter.flags;
+            Vector3 billboardPoint = new Vector3(3f, 2f, 1f);
+            Vector3 surfacePoint = new Vector3(3.1f, 2f, 1f);
+
+            // 데칼: 벽(옆을 보는 면)과 바닥(위를 보는 면).
+            emitter.flags = EffectFlags.NoBillboard;
+            foreach (Vector3 normal in new[] { Vector3.Left, Vector3.Up })
+            {
+                manager.Clear();
+                manager.PlayOnSurface(index, billboardPoint, surfacePoint, normal);
+                MeshInstance3D decal = FindActiveNode();
+                Expect(decal != null, $"면 위에 데칼이 나오지 않음 (법선 {normal})");
+                if (decal == null) continue;
+
+                Vector3 expected = surfacePoint + normal * general.decalSurfaceOffset;
+                Expect(decal.Position.DistanceTo(expected) < tolerance,
+                    $"데칼이 면에서 decalSurfaceOffset 만큼 떠 있지 않음 (자리 {decal.Position}, 기대 {expected})");
+                Vector3 facing = decal.Basis.Z.Normalized();
+                Expect(facing.DistanceTo(normal) < tolerance, $"데칼의 앞면이 법선을 향하지 않음 (앞면 {facing}, 법선 {normal})");
+            }
+
+            // 빌보드: 면과 무관하게 착탄 지점에 그대로 나온다.
+            emitter.flags = EffectFlags.None;
+            manager.Clear();
+            manager.PlayOnSurface(index, billboardPoint, surfacePoint, Vector3.Left);
+            MeshInstance3D billboard = FindActiveNode();
+            Expect(billboard != null && billboard.Position.DistanceTo(billboardPoint) < tolerance,
+                "면 위에 재생한 빌보드가 착탄 지점에서 벗어남");
+
+            // 법선이 없으면 방향 없이 재생한다.
+            emitter.flags = EffectFlags.NoBillboard;
+            manager.Clear();
+            manager.PlayOnSurface(index, billboardPoint, surfacePoint, Vector3.Zero);
+            Expect(manager.CountActive() == 1, "법선이 없을 때 이펙트가 나오지 않음");
+
+            emitter.flags = savedFlags;
+            manager.Clear();
+        }
+
+        /// <summary>
+        /// 재생 중인 이펙트 노드를 하나 가져온다.
+        /// </summary>
+        /// <returns>보이는 노드. 없으면 null.</returns>
+        private static MeshInstance3D FindActiveNode()
+        {
+            foreach (Node child in EffectManager.Instance.GetChildren())
+            {
+                if (child is MeshInstance3D mesh && mesh.Visible) return mesh;
+            }
+            return null;
         }
 
         /// <summary>

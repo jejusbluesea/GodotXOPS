@@ -13,9 +13,6 @@ namespace GodotXOPS
     /// </summary>
     public partial class EffectManager : Singleton<EffectManager>
     {
-        // 벽 데칼을 면에서 살짝 띄워 겹쳐 떨리는 것을 막는다 (m).
-        private const float k_decalSurfaceOffset = 0.05f;
-
         private static readonly StringName s_effectAlpha = "effect_alpha";
         private static readonly StringName s_effectBright = "effect_bright";
 
@@ -127,6 +124,48 @@ namespace GodotXOPS
         /// <param name="triggerValue">개수를 정하는 값. countPerTrigger 가 0 보다 큰 emitter 는 개수 = floor(이 값 × countPerTrigger).</param>
         public void Play(int effectIndex, Vector3 position, Basis orientation, float sizeScale, Vector3 extraVelocity, float triggerValue = 0f)
         {
+            Spawn(effectIndex, position, orientation, position, orientation, sizeScale, extraVelocity, triggerValue);
+        }
+
+        /// <summary>
+        /// 이펙트 프리셋을 블록 면 위에 재생한다. 착탄, 혈흔이 벽에 닿은 자리처럼 면이 있는 곳에 쓴다.
+        /// 빌보드 emitter 는 방향 없이 재생한 것과 같고, 빌보드가 아닌 emitter(데칼)만 면에 눕혀서 면에서 decalSurfaceOffset 만큼 띄운다.
+        /// </summary>
+        /// <param name="effectIndex">EffectParameterData.effectData 인덱스. 범위 밖이면 무시.</param>
+        /// <param name="position">빌보드 emitter 의 재생 위치.</param>
+        /// <param name="surfacePoint">면 위의 점. 데칼은 여기서 법선 쪽으로 띄운 자리에 놓인다.</param>
+        /// <param name="normal">면의 바깥쪽 법선. 길이가 0 이면 방향 없이 재생한다.</param>
+        /// <param name="triggerValue">개수를 정하는 값. countPerTrigger 를 쓰는 emitter 에만 영향을 준다.</param>
+        public void PlayOnSurface(int effectIndex, Vector3 position, Vector3 surfacePoint, Vector3 normal, float triggerValue = 0f)
+        {
+            if (normal.LengthSquared() < 1e-6f)
+            {
+                Play(effectIndex, position, triggerValue);
+                return;
+            }
+            normal = normal.Normalized();
+
+            // 쿼드의 앞면(+Z)이 법선을 향하게 한다. 바닥·천장이면 위쪽 기준을 바꾼다.
+            Vector3 up = Mathf.Abs(normal.Y) > 0.99f ? Vector3.Forward : Vector3.Up;
+            Basis surface = Basis.LookingAt(-normal, up);
+
+            float offset = DataManager.Instance.EffectParameterData.effectGeneralData.decalSurfaceOffset;
+            Spawn(effectIndex, position, Basis.Identity, surfacePoint + normal * offset, surface, 1f, Vector3.Zero, triggerValue);
+        }
+
+        /// <summary>
+        /// 프리셋의 emitter 마다 지정된 개수만큼 풀에서 꺼내 무작위 범위를 적용한다. 빌보드 emitter 와 빌보드가 아닌 emitter 의 자리·방향을 따로 받는다.
+        /// </summary>
+        /// <param name="effectIndex">EffectParameterData.effectData 인덱스. 범위 밖이면 무시.</param>
+        /// <param name="position">빌보드 emitter 의 재생 위치.</param>
+        /// <param name="orientation">빌보드 emitter 의 위치 오프셋과 속도를 돌리는 기준.</param>
+        /// <param name="fixedPosition">빌보드가 아닌 emitter 의 재생 위치.</param>
+        /// <param name="fixedOrientation">빌보드가 아닌 emitter 가 고정되는 방향. 위치 오프셋과 속도도 이 기준으로 돌린다.</param>
+        /// <param name="sizeScale">emitter 크기에 곱하는 배율.</param>
+        /// <param name="extraVelocity">방향과 무관하게 더하는 속도.</param>
+        /// <param name="triggerValue">개수를 정하는 값.</param>
+        private void Spawn(int effectIndex, Vector3 position, Basis orientation, Vector3 fixedPosition, Basis fixedOrientation, float sizeScale, Vector3 extraVelocity, float triggerValue)
+        {
             List<EffectData> all = DataManager.Instance.EffectParameterData.effectData;
             if (effectIndex < 0 || effectIndex >= all.Count) return;
 
@@ -140,14 +179,18 @@ namespace GodotXOPS
                 // 혈흔이 튀는 수는 데미지에 비례한다 (원본 damage / 10).
                 int count = emitter.countPerTrigger > 0f ? Mathf.FloorToInt(triggerValue * emitter.countPerTrigger) : emitter.spawnCount;
 
+                bool billboard = (emitter.flags & EffectFlags.NoBillboard) == 0;
+                Vector3 origin = billboard ? position : fixedPosition;
+                Basis basis = billboard ? orientation : fixedOrientation;
+
                 for (int s = 0; s < count; s++)
                 {
                     Slot slot = FindIdle();
                     if (slot == null) return;
 
                     slot.active = true;
-                    slot.position = position + orientation * Coord.FromUnity(emitter.positionOffset + RandomVector(emitter.positionRandomRange));
-                    slot.velocity = orientation * Coord.FromUnity(emitter.velocity + RandomVector(emitter.velocityRandomRange)) + extraVelocity;
+                    slot.position = origin + basis * Coord.FromUnity(emitter.positionOffset + RandomVector(emitter.positionRandomRange));
+                    slot.velocity = basis * Coord.FromUnity(emitter.velocity + RandomVector(emitter.velocityRandomRange)) + extraVelocity;
                     slot.gravityY = emitter.gravityY;
                     slot.rotation = emitter.rotationDeg + RandomRange(emitter.rotationRandomRange);
                     slot.rotationRate = emitter.rotationRateDeg + RandomRange(emitter.rotationRateRandomRange);
@@ -156,9 +199,9 @@ namespace GodotXOPS
                     slot.alpha = emitter.alpha;
                     slot.alphaRate = emitter.alphaRate;
                     slot.lifetime = emitter.lifetime;
-                    slot.billboard = (emitter.flags & EffectFlags.NoBillboard) == 0;
+                    slot.billboard = billboard;
                     slot.collideMap = (emitter.flags & EffectFlags.CollideMap) != 0;
-                    slot.fixedBasis = orientation;
+                    slot.fixedBasis = basis;
                     slot.additive = emitter.blendMode == EffectBlendMode.Additive;
                     slot.brightness = emitter.brightness;
                     slot.brightnessRate = emitter.brightnessRate;
@@ -181,12 +224,8 @@ namespace GodotXOPS
         /// <param name="normal">닿은 면의 법선.</param>
         public void SpawnWallBlood(Vector3 point, Vector3 normal)
         {
-            // 쿼드의 앞면(+Z)이 법선을 향하게 한다. 바닥·천장이면 위쪽 기준을 바꾼다.
-            Vector3 up = Mathf.Abs(normal.Y) > 0.99f ? Vector3.Forward : Vector3.Up;
-            Basis basis = Basis.LookingAt(-normal, up);
-
             int index = DataManager.Instance.EffectParameterData.effectGeneralData.wallBloodEffectIndex;
-            Play(index, point + normal * k_decalSurfaceOffset, basis, 1f, Vector3.Zero);
+            PlayOnSurface(index, point, point, normal);
         }
 
         /// <summary>

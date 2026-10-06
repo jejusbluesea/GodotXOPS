@@ -140,7 +140,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 오브젝트, 통계 |
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
 | `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름 |
-| `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠 |
+| `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠, 면 위 재생(데칼의 방향과 띄우는 거리) |
 
 눈으로 확인하는 도구 (`--headless` 없이 실행):
 

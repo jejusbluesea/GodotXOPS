@@ -168,8 +168,9 @@ namespace GodotXOPS
         private void TickStraight()
         {
             // 이번 틱 경로 위에 블록이 있는지. 0 없음 / 1 있으나 아직 내부 점에 안 걸림 / 2 내부 점에 걸림.
-            int mapFlag = MapLoader.RaycastBlock(m_position, m_direction, m_speedPerTick, out float wallDist) ? 1 : 0;
+            int mapFlag = MapLoader.RaycastBlock(m_position, m_direction, m_speedPerTick, out float wallDist, out Vector3 wallNormal) ? 1 : 0;
             Vector3 wallEntry = m_position + m_direction * (wallDist - k_wallEntryMargin);
+            Vector3 wallSurface = m_position + m_direction * wallDist;
 
             int steps = Mathf.RoundToInt(m_speedPerTick / k_substep);
             for (int step = 0; step < steps; step++)
@@ -195,7 +196,7 @@ namespace GodotXOPS
                 if (mapFlag > 0 && MapLoader.IsInsideBlock(point))
                 {
                     if (ExplodeOnTrigger(ExplosionTrigger.Block, wallEntry)) return;
-                    HitMap(wallEntry);
+                    HitMap(wallEntry, wallSurface, wallNormal);
 
                     m_penetration--;
                     if (m_penetration >= 0) m_attacks = (int)(m_attacks * k_pierceAttenWall);
@@ -207,7 +208,7 @@ namespace GodotXOPS
             if (mapFlag == 1)
             {
                 if (ExplodeOnTrigger(ExplosionTrigger.Block, wallEntry)) return;
-                HitMap(wallEntry);
+                HitMap(wallEntry, wallSurface, wallNormal);
                 m_attacks = (int)(m_attacks * (m_penetration > 0 ? k_thinWallAttenPierce : k_thinWallAttenStop));
             }
 
@@ -385,10 +386,12 @@ namespace GodotXOPS
         /// <summary>
         /// 총알이 블록에 맞은 연출: 착탄 연기와 소리, 주변 AI 가 듣는 처리. 원본 ObjectManager::HitBulletMap (objectmanager.cpp:891-898).
         /// </summary>
-        /// <param name="position">착탄 지점.</param>
-        private void HitMap(Vector3 position)
+        /// <param name="position">착탄 지점. 면에서 조금 앞이다.</param>
+        /// <param name="surfacePoint">탄환이 면에 닿은 점. 이펙트의 데칼이 놓이는 자리다.</param>
+        /// <param name="normal">맞은 면의 바깥쪽 법선.</param>
+        private void HitMap(Vector3 position, Vector3 surfacePoint, Vector3 normal)
         {
-            if (EffectManager.Loaded) EffectManager.Instance.Play(m_data.wallHitEffectIndex, position);
+            if (EffectManager.Loaded) EffectManager.Instance.PlayOnSurface(m_data.wallHitEffectIndex, position, surfacePoint, normal);
             if (SoundManager.Loaded) SoundManager.Instance.PlayRandomAt(m_data.wallHitSounds, position, k_wallHitVolume);
 
             float hearDistance = DataManager.Instance.HumanParameterData.humanAIParameterData.aiHearBulletWallHitDist;

@@ -7,6 +7,7 @@
       "data/yakkyou.dds"
     ],
     "wallBloodEffectIndex": 5,
+    "decalSurfaceOffset": 0.05,
     "poolInitialSize": 256,
     "poolGrowStep": 64,
     "poolMaxSize": 0

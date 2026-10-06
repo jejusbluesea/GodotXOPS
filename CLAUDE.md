@@ -79,7 +79,7 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/ai_check.tscn` — AI(시야·청각·경계·조준 예측·무기 운용·좀비·경로·복제)와 미션 이벤트·판정을 수치로 확인한다 (헤드리스). 점검용 PD1 을 임시 폴더에 만들어 로드하고, 사람들을 공중에 놓은 채 AI 틱과 무기 틱만 직접 돌린다. AI, 이벤트, 포인트 조회 코드를 고친 뒤에 돌린다.
 
-- `res://scenes/dev/effect_viewer.tscn` — 이펙트 프리셋을 골라 눈으로 보고(`--effect 번호`, `--additive`, `--screenshot 경로.png`), `--selftest` 로 재생 수·풀 증가·블렌드 모드·발광 감쇠를 수치로 확인한다 (헤드리스 가능). 이펙트 데이터나 `EffectManager` 를 고친 뒤에 돌린다.
+- `res://scenes/dev/effect_viewer.tscn` — 이펙트 프리셋을 골라 눈으로 보고(`--effect 번호`, `--additive`, `--screenshot 경로.png`), `--selftest` 로 재생 수·풀 증가·블렌드 모드·발광 감쇠·면 위 재생을 수치로 확인한다 (헤드리스 가능). 이펙트 데이터나 `EffectManager` 를 고친 뒤에 돌린다.
 
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 
@@ -133,6 +133,7 @@ dotnet build GodotXOPS.csproj
 - 떨어진 무기 200, 탄환 160 은 원본 상수이고 가득 차면 새로 만들지 않고 버린다 (게임 결과에 영향을 주므로 가변으로 바꾸지 않는다). 이펙트 풀만 데이터로 정하고 모자라면 묶음 단위로 늘린다 (`effect_parameter_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`). 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
 - 틱에서 일어난 일의 이펙트를 무기 모델 위치에 맞춰야 하면(총구 화염, 탄피) 틱에서는 표시만 해 두고 `Human._Process`에서 낸다. 무기 모델은 틱 사이를 보간해 움직이므로 틱에서 내면 어긋난다.
 - 이펙트 프리셋·텍스처는 `effect_parameter_data.json`, 호출하는 쪽은 인덱스(무기 모델·탄환·사람 종류 데이터에 있다)와 위치만 넘긴다. 이펙트 머티리얼은 `MaterialManager.CreateEffectMaterial`, 투명도는 인스턴스 유니폼 `effect_alpha`다.
+- 블록 면 위에서 나는 이펙트(착탄, 벽 혈흔)는 `EffectManager.PlayOnSurface(번호, 위치, 면 위의 점, 법선)`로 낸다. 빌보드 emitter 는 `Play`와 똑같이 나오고, `NoBillboard` emitter(데칼)만 면에 눕혀 `decalSurfaceOffset`만큼 띄운다. 법선은 판정이 이미 구한 레이캐스트에서 받는다 (이펙트 때문에 판정을 바꾸지 않는다). 기본 데이터에 탄흔은 없다 (원본에 없다. 쇼케이스·에드온이 넣는다).
 - 이펙트의 블렌드 모드는 emitter 의 `blendMode`다. Godot 의 `blend_mix` / `blend_add` 는 컴파일 타임 설정이라 셰이더가 두 개이고(`effect_blend`, `effect_blend_add`), 머티리얼 캐시 키가 (텍스처 번호, 블렌드 모드)다. 가산일 때만 `brightness` 가 발광 세기로 쓰이고 인스턴스 유니폼 `effect_bright` 로 들어간다. 원본에는 가산이 없다.
 - 소리는 `SoundManager.PlayAt(경로, 위치, 볼륨)`으로 낸다. `AudioStreamPlayer3D`를 쓰지 않는다 (원본의 선형 감쇠를 낼 수 없다). 헤드리스에서는 실제 재생을 하지 않는다.
 - 소리가 나는 자리에서는 `WorldSound.EmitPointSound`로 AI 에게도 알린다 (듣는 거리는 `aiHear*` 데이터).
