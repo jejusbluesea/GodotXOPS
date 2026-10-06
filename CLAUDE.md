@@ -44,12 +44,20 @@
 
 ## 빌드와 실행
 
-```bash
+**사용자에게 보여 주는 명령은 PowerShell 기준으로, 블록 하나가 그대로 돌아가게 쓴다** (사용자 결정). 사용자는 Claude Code 에서 코드 블록의 재생 버튼을 눌러 돌린다. 그래서:
+
+- **한 줄짜리 완결된 명령으로 쓴다.** 앞 줄에 변수를 선언해 두고 뒷줄에서 쓰거나, `foreach` 로 여러 개를 묶지 않는다. 실행 파일 경로는 매번 전부 적는다. 여러 개를 돌려야 하면 **블록을 따로** 쓴다 (블록마다 재생 버튼이 생긴다).
+- 따옴표로 감싼 실행 파일 경로 앞에는 호출 연산자 `&` 를 붙인다.
+- 게임에 넘기는 인자 구분자는 `'--'` 로 감싼다 (PowerShell 이 삼키지 않게).
+- Windows PowerShell 5.1 에는 `&&` 와 `||` 가 없다. 이어서 돌리려면 `;`, 성공했을 때만 돌리려면 `if ($?) { ... }`.
+- 경로 구분자는 슬래시·역슬래시 둘 다 동작한다. 이 문서의 형식대로 슬래시를 쓴다.
+
+```powershell
 dotnet build GodotXOPS.csproj
 ```
 
-```bash
-"C:/Users/twoj2/Desktop/Game Engine/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe" --headless --path . res://scenes/dev/loader_check.tscn
+```powershell
+& "C:/Users/twoj2/Desktop/Game Engine/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe" --headless --path . res://scenes/dev/loader_check.tscn
 ```
 
 두 번째 명령은 `data/`와 `addon/`의 모든 이미지·사운드·모델을 로더로 읽어 보는 점검이다. 실패가 있으면 종료 코드 1.
@@ -71,6 +79,8 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/ai_check.tscn` — AI(시야·청각·경계·조준 예측·무기 운용·좀비·경로·복제)와 미션 이벤트·판정을 수치로 확인한다 (헤드리스). 점검용 PD1 을 임시 폴더에 만들어 로드하고, 사람들을 공중에 놓은 채 AI 틱과 무기 틱만 직접 돌린다. AI, 이벤트, 포인트 조회 코드를 고친 뒤에 돌린다.
 
+- `res://scenes/dev/effect_viewer.tscn` — 이펙트 프리셋을 골라 눈으로 보고(`--effect 번호`, `--additive`, `--screenshot 경로.png`), `--selftest` 로 재생 수·풀 증가·블렌드 모드·발광 감쇠를 수치로 확인한다 (헤드리스 가능). 이펙트 데이터나 `EffectManager` 를 고친 뒤에 돌린다.
+
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 
 게임 자체는 씬을 지정하지 않고 실행한다 (`--path .`만). 화면을 고친 뒤에는 개발용 인자("--" 뒤)로 직접 확인한다:
@@ -86,8 +96,8 @@ dotnet build GodotXOPS.csproj
 
 ## 익스포트 빌드
 
-```bash
-"C:/Users/twoj2/Desktop/Game Engine/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe" --headless --path . --export-release "Windows Desktop" build/windows/GodotXOPS.exe
+```powershell
+& "C:/Users/twoj2/Desktop/Game Engine/Godot_v4.7.2-stable_mono_win64/Godot_v4.7.2-stable_mono_win64_console.exe" --headless --path . --export-release "Windows Desktop" build/windows/GodotXOPS.exe
 ```
 
 - 프리셋은 `export_presets.cfg`의 "Windows Desktop" 이다. `build/`는 커밋하지 않는다 (`.gitignore`, `.gdignore`).
@@ -120,9 +130,10 @@ dotnet build GodotXOPS.csproj
 ## 떨어진 무기, 소물, 이펙트, 소리
 
 - 게임 결과에 영향을 주는 것은 틱에서, 연출은 렌더 프레임에서 한다. 떨어진 무기의 낙하·줍기(`WeaponManager`)와 소물의 내구력·파괴 판정은 틱이고, 이펙트(`EffectManager`)·부서진 소물이 튀는 움직임·소리 볼륨 갱신은 렌더 프레임이다. 연출에는 `GameRandom.Visual`만 쓴다.
-- 풀 크기는 원본 상수다: 떨어진 무기 200, 탄환 160, 이펙트 256. 풀이 가득 차면 새로 만들지 않고 버린다. 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
+- 떨어진 무기 200, 탄환 160 은 원본 상수이고 가득 차면 새로 만들지 않고 버린다 (게임 결과에 영향을 주므로 가변으로 바꾸지 않는다). 이펙트 풀만 데이터로 정하고 모자라면 묶음 단위로 늘린다 (`effect_parameter_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`). 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
 - 틱에서 일어난 일의 이펙트를 무기 모델 위치에 맞춰야 하면(총구 화염, 탄피) 틱에서는 표시만 해 두고 `Human._Process`에서 낸다. 무기 모델은 틱 사이를 보간해 움직이므로 틱에서 내면 어긋난다.
 - 이펙트 프리셋·텍스처는 `effect_parameter_data.json`, 호출하는 쪽은 인덱스(무기 모델·탄환·사람 종류 데이터에 있다)와 위치만 넘긴다. 이펙트 머티리얼은 `MaterialManager.CreateEffectMaterial`, 투명도는 인스턴스 유니폼 `effect_alpha`다.
+- 이펙트의 블렌드 모드는 emitter 의 `blendMode`다. Godot 의 `blend_mix` / `blend_add` 는 컴파일 타임 설정이라 셰이더가 두 개이고(`effect_blend`, `effect_blend_add`), 머티리얼 캐시 키가 (텍스처 번호, 블렌드 모드)다. 가산일 때만 `brightness` 가 발광 세기로 쓰이고 인스턴스 유니폼 `effect_bright` 로 들어간다. 원본에는 가산이 없다.
 - 소리는 `SoundManager.PlayAt(경로, 위치, 볼륨)`으로 낸다. `AudioStreamPlayer3D`를 쓰지 않는다 (원본의 선형 감쇠를 낼 수 없다). 헤드리스에서는 실제 재생을 하지 않는다.
 - 소리가 나는 자리에서는 `WorldSound.EmitPointSound`로 AI 에게도 알린다 (듣는 거리는 `aiHear*` 데이터).
 
@@ -241,5 +252,6 @@ dotnet build GodotXOPS.csproj
 - **조작감에 직결되는 코드(이동, 충돌, 무기, 총알, AI)는 UnityXOPS 코드와 원본 C++를 함께 대조한다.** 둘이 다르면 원본을 따르고, 무엇이 달랐는지 사용자에게 표로 알린다. 원본 분석에는 `openxops-analyzer` 에이전트를 쓸 수 있다 (사용자가 에이전트 사용을 요청한 경우).
 - **구현한 것은 점검 씬으로 직접 검증한다.** 새 시스템에는 `src/Dev/`에 점검 씬을 추가하거나 기존 씬에 `--selftest`를 확장한다. 화면에 보이는 것은 `--screenshot`으로 PNG를 저장해 직접 확인하고, 그 뒤 창을 띄워 사용자가 확인하게 한다.
 - **확인하지 못한 것은 확인하지 못했다고 보고한다.** 조작감처럼 직접 판단할 수 없는 것은 사용자에게 확인을 요청한다.
+- **사용자에게 적어 주는 명령은 PowerShell 기준이고, 블록 하나가 재생 버튼만 눌러도 돌아가야 한다** (사용자 결정, 2026-10-06). Bash 문법이거나 앞 줄의 변수에 기대는 명령은 사용자가 그대로 돌려 볼 수 없다. 형식은 "빌드와 실행" 맨 위에 있다.
 - 작업을 마칠 때마다 기존 점검 씬 전부를 다시 돌려 통과를 확인한다 (`TODO.md`의 목록 참조).
 - PowerShell로 파일을 고칠 때는 UTF-8(BOM 없음)로 읽고 쓴다. `Get-Content`는 `-Encoding UTF8` 없이 쓰면 한글이 깨져 보인다.

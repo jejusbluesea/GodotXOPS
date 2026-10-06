@@ -20,15 +20,15 @@ GodotXOPS 를 소스에서 빌드하거나 코드를 고치려는 사람을 위�
 
 `data`와 `addon`은 저작권 때문에 저장소에 없습니다. 클론한 뒤 프로젝트 루트에 직접 복사합니다. 두 폴더는 `.gitignore`에 들어 있어 커밋되지 않습니다.
 
-아래 명령의 `godot`는 Godot 콘솔 실행 파일(`Godot_v4.7.2-stable_mono_win64_console.exe`)의 경로로 바꿔 씁니다.
+아래 명령의 `godot`는 Godot 콘솔 실행 파일(`Godot_v4.7.2-stable_mono_win64_console.exe`)의 경로로 바꿔 씁니다. PowerShell 에서는 경로를 따옴표로 감싸므로 앞에 호출 연산자 `&`를 붙이고(`& "C:/.../Godot_v4.7.2-stable_mono_win64_console.exe" ...`), 게임에 넘기는 인자 구분자는 `'--'`로 감쌉니다.
 
 ### 빌드와 실행
 
-```bash
+```powershell
 dotnet build GodotXOPS.csproj
 ```
 
-```bash
+```powershell
 godot --path .
 ```
 
@@ -38,7 +38,7 @@ godot --path .
 
 Godot 에 익스포트 템플릿이 설치되어 있어야 합니다. 프리셋은 `export_presets.cfg`의 "Windows Desktop" 입니다.
 
-```bash
+```powershell
 godot --headless --path . --export-release "Windows Desktop" build/windows/GodotXOPS.exe
 ```
 
@@ -126,7 +126,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 
 Godot 콘솔 실행 파일로 헤드리스 실행합니다. 종료 코드 0 이 통과입니다. 코드를 고친 뒤에는 전부 다시 돌립니다.
 
-```bash
+```powershell
 godot --headless --path . res://scenes/dev/loader_check.tscn
 ```
 
@@ -140,11 +140,13 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 오브젝트, 통계 |
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
 | `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름 |
+| `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠 |
 
 눈으로 확인하는 도구 (`--headless` 없이 실행):
 
 - `asset_viewer.tscn` — 에셋 뷰어.
 - `map_viewer.tscn` — 미션을 골라 자유 카메라로 봅니다. `-- --mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]`로 화면을 저장하고 종료합니다.
+- `effect_viewer.tscn` — 이펙트 프리셋을 골라 봅니다. 인자: `-- [--effect 번호] [--additive] [--screenshot 경로.png]`. 창에서는 ← →(프리셋), Space(다시 재생), B(가산 미리보기), ↑ ↓(카메라 거리).
 - `play_test.tscn` — 미션을 로드해 플레이어를 직접 조작합니다. 인자: `--mission 번호 [--addon] [--third] [--weapon 번호] [--fire] [--hitbox] [--look yaw,pitch] [--pos x,y,z] [--noai] [--invincible] --screenshot 경로.png`. 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), Insert(플레이어 무적), Home(디버그 텍스트).
 
 ## 개발용 실행 인자
@@ -160,7 +162,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `--ui-shot 경로.png [--ui-time 초]` | 화면을 PNG 로 저장하고 종료합니다 |
 | `--ui-quit 초` | 그 시간 뒤 종료합니다 |
 
-```bash
+```powershell
 godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.png
 ```
 

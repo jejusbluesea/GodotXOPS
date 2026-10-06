@@ -5,19 +5,19 @@ using GodotXOPS.IO;
 namespace GodotXOPS
 {
     /// <summary>
-    /// 이펙트(총구 화염, 연기, 탄피, 혈흔, 폭발) 빌보드 쿼드의 풀을 관리하는 싱글톤. 풀 크기는 원본 MAX_EFFECT(256) 이다.
+    /// 이펙트(총구 화염, 연기, 탄피, 혈흔, 폭발) 빌보드 쿼드의 풀을 관리하는 싱글톤.
+    /// 풀 크기는 effectGeneralData 가 정한다. 자리가 다 차면 정해진 수만큼 늘리고, 한계에 닿으면 원본처럼 새 이펙트를 버린다.
     /// 이펙트 프리셋(EffectData) 하나는 여러 emitter 의 묶음이고, emitter 하나가 원본의 AddEffect 호출 하나에 해당한다.
     /// 게임 결과에 영향을 주지 않는 연출이라 틱이 아니라 렌더 프레임에서 진행하고, 난수도 연출용 스트림을 쓴다.
     /// 원본 effect::ProcessObject (object.cpp:3168-3207) 처럼 위치·크기·투명도·회전을 시간에 따라 바꾸고, 투명도나 수명이 다하면 풀로 돌려보낸다.
     /// </summary>
     public partial class EffectManager : Singleton<EffectManager>
     {
-        public const int PoolSize = 256;
-
         // 벽 데칼을 면에서 살짝 띄워 겹쳐 떨리는 것을 막는다 (m).
         private const float k_decalSurfaceOffset = 0.05f;
 
         private static readonly StringName s_effectAlpha = "effect_alpha";
+        private static readonly StringName s_effectBright = "effect_bright";
 
         /// <summary>
         /// 풀 한 자리의 상태.
@@ -39,30 +39,58 @@ namespace GodotXOPS
             public bool billboard;
             public bool collideMap;
             public Basis fixedBasis;
+            public bool additive;
+            public float brightness;
+            public float brightnessRate;
         }
 
-        private readonly Slot[] m_pool = new Slot[PoolSize];
-        private readonly Dictionary<int, ShaderMaterial> m_materials = new Dictionary<int, ShaderMaterial>();
+        private readonly List<Slot> m_pool = new List<Slot>();
+        private readonly Dictionary<(int texture, EffectBlendMode blend), ShaderMaterial> m_materials =
+            new Dictionary<(int, EffectBlendMode), ShaderMaterial>();
+        private QuadMesh m_quad;
+        private int m_growStep;
+        private int m_maxSize;
 
         // 점검 도구용 누계.
         public static int SpawnCount { get; private set; }
+        // 지금 확보된 풀 자리 수. 모자라면 늘어난다.
+        public int PoolCapacity => m_pool.Count;
 
         public override void _Ready()
         {
             // 1 × 1 쿼드. 앞면이 +Z 를 향한다. 크기는 노드 스케일로 조절한다.
-            var quad = new QuadMesh { Size = Vector2.One };
-            for (int i = 0; i < PoolSize; i++)
+            m_quad = new QuadMesh { Size = Vector2.One };
+
+            EffectGeneralData general = DataManager.Instance.EffectParameterData.effectGeneralData;
+            m_growStep = general.poolGrowStep;
+            m_maxSize = general.poolMaxSize;
+            Grow(general.poolInitialSize);
+        }
+
+        /// <summary>
+        /// 풀 자리를 늘린다. 한계(poolMaxSize)를 넘지 않는 만큼만 만든다.
+        /// </summary>
+        /// <param name="count">늘리려는 자리 수.</param>
+        /// <returns>실제로 만든 자리 수.</returns>
+        private int Grow(int count)
+        {
+            if (count <= 0) return 0;
+            if (m_maxSize > 0) count = Mathf.Min(count, m_maxSize - m_pool.Count);
+            if (count <= 0) return 0;
+
+            for (int i = 0; i < count; i++)
             {
                 var node = new MeshInstance3D
                 {
-                    Name = $"Effect_{i}",
-                    Mesh = quad,
+                    Name = $"Effect_{m_pool.Count}",
+                    Mesh = m_quad,
                     Visible = false,
                     CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
                 };
                 AddChild(node);
-                m_pool[i] = new Slot { node = node };
+                m_pool.Add(new Slot { node = node });
             }
+            return count;
         }
 
         public override void _Process(double delta)
@@ -71,7 +99,7 @@ namespace GodotXOPS
             Vector3 cameraPosition = camera != null ? camera.GlobalPosition : Vector3.Zero;
             float dt = (float)delta;
 
-            for (int i = 0; i < PoolSize; i++)
+            for (int i = 0; i < m_pool.Count; i++)
             {
                 if (m_pool[i].active) Tick(m_pool[i], dt, cameraPosition);
             }
@@ -106,7 +134,7 @@ namespace GodotXOPS
             for (int e = 0; e < emitters.Count; e++)
             {
                 EffectEmitter emitter = emitters[e];
-                ShaderMaterial material = GetMaterial(emitter.textureIndex);
+                ShaderMaterial material = GetMaterial(emitter.textureIndex, emitter.blendMode);
                 if (material == null) continue;
 
                 // 혈흔이 튀는 수는 데미지에 비례한다 (원본 damage / 10).
@@ -131,11 +159,15 @@ namespace GodotXOPS
                     slot.billboard = (emitter.flags & EffectFlags.NoBillboard) == 0;
                     slot.collideMap = (emitter.flags & EffectFlags.CollideMap) != 0;
                     slot.fixedBasis = orientation;
+                    slot.additive = emitter.blendMode == EffectBlendMode.Additive;
+                    slot.brightness = emitter.brightness;
+                    slot.brightnessRate = emitter.brightnessRate;
 
                     slot.node.MaterialOverride = material;
                     Camera3D camera = GetViewport().GetCamera3D();
                     ApplyTransform(slot, camera != null ? camera.GlobalPosition : slot.position);
                     slot.node.SetInstanceShaderParameter(s_effectAlpha, slot.alpha);
+                    if (slot.additive) slot.node.SetInstanceShaderParameter(s_effectBright, slot.brightness);
                     slot.node.Visible = true;
                     SpawnCount++;
                 }
@@ -162,7 +194,7 @@ namespace GodotXOPS
         /// </summary>
         public void Clear()
         {
-            for (int i = 0; i < PoolSize; i++) Recycle(m_pool[i]);
+            for (int i = 0; i < m_pool.Count; i++) Recycle(m_pool[i]);
         }
 
         /// <summary>
@@ -172,7 +204,7 @@ namespace GodotXOPS
         public int CountActive()
         {
             int count = 0;
-            for (int i = 0; i < PoolSize; i++)
+            for (int i = 0; i < m_pool.Count; i++)
             {
                 if (m_pool[i].active) count++;
             }
@@ -214,8 +246,10 @@ namespace GodotXOPS
 
             slot.size += slot.sizeRate * dt;
             slot.alpha += slot.alphaRate * dt;
+            slot.brightness += slot.brightnessRate * dt;
             // 원본은 투명도가 0 이하가 되면 수명이 남아도 바로 지운다 (object.cpp:3196).
-            if (slot.size <= 0f || slot.alpha <= 0f)
+            // 가산 블렌딩은 세기가 0 이면 아무것도 더하지 않아 보이지 않으므로 같이 돌려보낸다.
+            if (slot.size <= 0f || slot.alpha <= 0f || (slot.additive && slot.brightness <= 0f))
             {
                 Recycle(slot);
                 return;
@@ -225,6 +259,7 @@ namespace GodotXOPS
 
             ApplyTransform(slot, cameraPosition);
             slot.node.SetInstanceShaderParameter(s_effectAlpha, slot.alpha);
+            if (slot.additive) slot.node.SetInstanceShaderParameter(s_effectBright, slot.brightness);
         }
 
         /// <summary>
@@ -266,21 +301,25 @@ namespace GodotXOPS
 
         private Slot FindIdle()
         {
-            for (int i = 0; i < PoolSize; i++)
+            for (int i = 0; i < m_pool.Count; i++)
             {
                 if (!m_pool[i].active) return m_pool[i];
             }
-            return null;
+
+            // 자리가 다 찼다. 묶음 단위로 늘린다 (한 개씩 늘리면 노드를 만드는 비용이 프레임마다 흩어져 끊긴다).
+            int first = m_pool.Count;
+            return Grow(m_growStep) > 0 ? m_pool[first] : null;
         }
 
         /// <summary>
         /// 텍스처 번호에 해당하는 이펙트 머티리얼을 얻는다. 한 번 만들면 계속 쓴다.
         /// </summary>
         /// <param name="textureIndex">EffectGeneralData.texturePaths 인덱스.</param>
+        /// <param name="blendMode">색을 섞는 방식. 방식마다 셰이더가 달라 따로 캐시한다.</param>
         /// <returns>머티리얼. 텍스처가 없으면 null.</returns>
-        private ShaderMaterial GetMaterial(int textureIndex)
+        private ShaderMaterial GetMaterial(int textureIndex, EffectBlendMode blendMode)
         {
-            if (m_materials.TryGetValue(textureIndex, out ShaderMaterial cached)) return cached;
+            if (m_materials.TryGetValue((textureIndex, blendMode), out ShaderMaterial cached)) return cached;
 
             List<string> paths = DataManager.Instance.EffectParameterData.effectGeneralData.texturePaths;
             if (textureIndex < 0 || textureIndex >= paths.Count) return null;
@@ -289,8 +328,8 @@ namespace GodotXOPS
             ImageTexture texture = fullPath != null ? ImageLoader.LoadTexture(fullPath) : null;
             if (texture == null) return null;
 
-            ShaderMaterial material = MaterialManager.Instance.CreateEffectMaterial(texture);
-            m_materials[textureIndex] = material;
+            ShaderMaterial material = MaterialManager.Instance.CreateEffectMaterial(texture, blendMode);
+            m_materials[(textureIndex, blendMode)] = material;
             return material;
         }
 

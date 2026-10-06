@@ -249,12 +249,46 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 ## 이펙트
 
-**완전히 모딩 가능하게 구현된 부분이 아닙니다. 수정하지 마세요.**
+`effect_parameter_data.json`에 있습니다. 총구 화염, 탄피, 연기, 혈흔, 폭발이 모두 이 파일의 값으로 그려집니다.
 
-`effect_parameter_data.json`에 있습니다.
+### `effectGeneralData`
 
-- `effectGeneralData.texturePaths` — 이펙트가 쓰는 텍스처 목록.
-- `effectData` — 이펙트 프리셋 목록. 무기 모델·탄환·사람 종류의 `...EffectIndex`가 이 목록의 번호를 가리킵니다. 프리셋 하나는 `emitters`(한 번에 내는 입자 묶음) 여러 개로 이루어집니다.
+| 키 | 뜻 |
+|---|---|
+| `texturePaths` | 이펙트가 쓰는 텍스처 목록. 개수 제한은 없습니다. `emitters`의 `textureIndex`가 이 목록의 번호입니다 |
+| `wallBloodEffectIndex` | 혈흔 입자가 벽에 닿았을 때 그 자리에 남길 프리셋 번호 |
+| `poolInitialSize` | 시작할 때 만들어 두는 이펙트 자리 수 (원본은 256 고정) |
+| `poolGrowStep` | 자리가 다 찼을 때 한 번에 늘리는 수. 0 이면 늘리지 않고 원본처럼 새 이펙트를 버립니다 |
+| `poolMaxSize` | 늘릴 수 있는 한계. 0 이면 한계 없음 |
+
+자리를 늘리는 데는 비용이 들므로 `poolGrowStep`은 한 번에 넉넉히(수십 개) 잡는 편이 좋습니다. 한 번 늘린 자리는 줄지 않습니다.
+
+### `effectData`
+
+이펙트 프리셋 목록입니다. 무기 모델·탄환·사람 종류의 `...EffectIndex`가 이 목록의 번호를 가리킵니다. 프리셋 하나는 `name`과 `emitters`(한 번에 내는 입자 묶음) 여러 개로 이루어집니다. 예를 들어 폭발은 섬광 하나와 연기 넷입니다.
+
+`emitters`의 항목 하나가 입자 한 종류입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `textureIndex` | `texturePaths`의 번호 |
+| `flags` | 동작 플래그. 0 없음, 1 빌보드를 끄고 `orientation` 방향으로 고정(벽에 붙는 자국), 2 블록에 닿는지 검사(닿으면 `wallBloodEffectIndex` 자국을 남기고 사라집니다). 더해서 씁니다 |
+| `blendMode` | 색을 섞는 방식. 0 알파(원본과 같습니다), 1 가산(뒤에 있는 색에 더합니다. 불꽃·섬광처럼 발광하는 것) |
+| `spawnCount` | 한 번에 내는 개수 |
+| `countPerTrigger` | 0 보다 크면 개수 = 내림(트리거값 × 이 값)이고 `spawnCount`를 무시합니다. 트리거값은 피격 데미지입니다 (혈흔이 데미지에 비례해 튀는 것) |
+| `positionOffset`, `positionRandomRange` | 내는 자리와 그 ± 흔들림 |
+| `velocity`, `velocityRandomRange` | 처음 속도와 그 ± 흔들림 (초당 미터) |
+| `gravityY` | 초당 속도에 더하는 세로 가속도. 떨어뜨리려면 음수 |
+| `rotationDeg`, `rotationRandomRange` | 텍스처를 돌리는 각도와 그 ± 흔들림 (도) |
+| `rotationRateDeg`, `rotationRateRandomRange` | 초당 회전 속도와 그 ± 흔들림 (도) |
+| `size`, `sizeRandomRange`, `sizeRate` | 크기(미터), 그 ± 흔들림, 초당 크기 변화 |
+| `alpha`, `alphaRate` | 불투명도(0 에서 1 사이)와 초당 변화. 사라지게 하려면 음수 |
+| `brightness`, `brightnessRate` | 가산일 때의 발광 세기(0 에서 1 사이)와 초당 변화. **알파일 때는 쓰이지 않습니다** |
+| `lifetime` | 수명 (초) |
+
+크기가 0 이하, 불투명도가 0 이하가 되면 수명이 남아도 사라집니다. 가산인 경우 발광 세기가 0 이하일 때도 같습니다.
+
+`blendMode`를 1 로 바꿀 때는 `brightness`도 함께 올리세요. 기본 데이터의 `brightness`는 대부분 0 에 가깝고, 가산에서 세기가 0 이면 아무것도 더해지지 않아 보이지 않습니다.
 
 ## 미션과 스카이
 
@@ -303,7 +337,8 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 - 맵(BD1) 하나가 쓸 수 있는 텍스처는 10개입니다.
 - 미션 파일(PD1)의 포인트 값은 0~255 범위입니다. 사람·무기·오브젝트 번호도 이 범위 안에서만 가리킬 수 있습니다.
-- 동시에 존재할 수 있는 수: 떨어진 무기 200개, 탄환 160개, 이펙트 256개. 넘으면 새로 생기지 않습니다.
+- 동시에 존재할 수 있는 수: 떨어진 무기 200개, 탄환 160개. 넘으면 새로 생기지 않습니다.
+- 이펙트는 기본 256개이고 모자라면 늘어납니다 (`effect_parameter_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`).
 - 이벤트는 세 줄, 메시지는 미션당 16개입니다.
 - 이미지·모델·소리는 한 번 읽으면 게임을 끌 때까지 기억합니다. 실행 중에 파일을 바꿨다면 게임을 다시 켭니다.
 - 유저가 만든 코드(스크립트)를 넣는 방법은 아직 없습니다.

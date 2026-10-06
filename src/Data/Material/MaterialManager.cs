@@ -10,6 +10,7 @@ namespace GodotXOPS
         private const string k_alphaClipBlendPath = "res://shaders/alpha_clip_blend.gdshader";
         private const string k_skyMeshPath = "res://shaders/sky_mesh.gdshader";
         private const string k_effectBlendPath = "res://shaders/effect_blend.gdshader";
+        private const string k_effectBlendAddPath = "res://shaders/effect_blend_add.gdshader";
 
         // 원본은 맵 블록을 먼저, 소물/사람/무기를 나중에 그린다. 같은 평면에서 겹칠 때 나중 것이 위에 오도록 우선순위로 순서를 고정한다.
         private const int k_blockRenderPriority = -1;
@@ -23,22 +24,26 @@ namespace GodotXOPS
         private Shader m_alphaClipBlend;
         private Shader m_skyMesh;
         private Shader m_effectBlend;
+        private Shader m_effectBlendAdd;
 
         public override void _Ready()
         {
             m_alphaClipBlend = GD.Load<Shader>(k_alphaClipBlendPath);
             m_skyMesh = GD.Load<Shader>(k_skyMeshPath);
             m_effectBlend = GD.Load<Shader>(k_effectBlendPath);
+            m_effectBlendAdd = GD.Load<Shader>(k_effectBlendAddPath);
         }
 
         /// <summary>
         /// 이펙트 빌보드용 머티리얼을 만든다. 투명도는 노드마다 인스턴스 유니폼(effect_alpha)으로 준다.
         /// </summary>
         /// <param name="texture">입힐 텍스처.</param>
+        /// <param name="blendMode">색을 섞는 방식. 가산은 셰이더가 따로다(블렌드 모드가 컴파일 타임 설정이라서).</param>
         /// <returns>새 머티리얼.</returns>
-        public ShaderMaterial CreateEffectMaterial(Texture2D texture)
+        public ShaderMaterial CreateEffectMaterial(Texture2D texture, EffectBlendMode blendMode = EffectBlendMode.Alpha)
         {
-            return Create(m_effectBlend, texture, k_effectRenderPriority);
+            Shader shader = blendMode == EffectBlendMode.Additive ? m_effectBlendAdd : m_effectBlend;
+            return Create(shader, texture, k_effectRenderPriority);
         }
 
         /// <summary>
