@@ -88,6 +88,8 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/pd2_check.tscn` — 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰 결과가 같은지 대조하고, 넓은 파라미터·추가 파라미터·방향·이벤트 줄 수·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.pd1 출력.pd2` 는 파일 하나를 변환한다. 포인트 로더, `PD2File`, 이벤트 줄을 고친 뒤에 돌린다.
 
+- `res://scenes/dev/block_bench.tscn` — 블록 수를 늘려 가며(상자 블록을 맵 옆에 더 얹는다) 한 틱의 시간과 레이·내부 판정 한 번의 시간을 잰다 (헤드리스). 점검이 아니라 측정이라 항상 종료 코드 0 이다. 충돌 조회의 속도를 고칠 때 앞뒤로 돌려 비교한다.
+
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 
 게임 자체는 씬을 지정하지 않고 실행한다 (`--path .`만). 화면을 고친 뒤에는 개발용 인자("--" 뒤)로 직접 확인한다:
@@ -164,6 +166,7 @@ dotnet build GodotXOPS.csproj
 - 발소리는 `HumanController`가 매 틱 `WorldSound.EmitFootstep(사람, 종류)`로 다른 팀 AI 에게 알린다 (달리는 소리만. 원본도 WAV 를 재생하지 않는다). 들리는 소리는 따로 `WorldSound.PlayFootstep`이 낸다: 다리 애니메이션이 `footstepPhase`를 지나는 틱(`HumanVisual.FootstepDue`)과 착지한 틱에, 발밑 면의 재질에서 소리를 골라 재생한다. 기본 데이터의 0번 재질에는 발소리가 없어서 BD1 맵에서는 나지 않는다. AI 청각과 판정에는 영향이 없다.
 - 포인트 데이터는 확장자로 PD1 / PD2 로더가 갈리고 읽은 뒤에는 같은 구조다 (`RawPointData`). PD2 는 파라미터가 int32 이고 포인트마다 추가 파라미터(`extra`, 4바이트 칸)를 갖는다. 칸은 `GetExtraInt` / `GetExtraFloat` / `GetExtraBool`(0 이면 거짓)로 읽고, 없는 칸은 기본값이다. PD2 의 읽기·쓰기는 `src/IO/PD2File.cs`, 구조는 `docs/modding.md` 에 있다.
 - 이벤트 줄 수와 시작 식별번호는 포인트 데이터가 정한다 (`MapLoader.EventEntryIds`). PD1 은 항상 156, 146, 136 세 줄이고 PD2 는 파일에 적힌 만큼이다. `EventManager.BeginMission`이 그 목록으로 줄을 만든다.
+- **원본의 제한은 원본 형식(PD1)에만 건다** (사용자 결정으로 푼 것. PD1 까지 풀면 원본과 다른 틱에 이벤트가 일어난다): 메시지 16개와 한 틱에 한 줄이 처리하는 이벤트 6개는 `MapLoader.PointDataExtended` 가 false 일 때만이다. PD2 는 기다리는 이벤트를 만날 때까지 한 틱에 다 처리하고, 이번 틱에 이미 지난 포인트로 돌아오면 다음 틱으로 넘긴다 (바로 넘어가는 이벤트의 고리에서 틱이 끝나지 않는 것을 막는다). 포인트 종류 번호에는 제한이 없다 (종류별 사전).
 - `EventManager`(Autoload, SimOrder 300)가 이벤트 줄들과 자동 판정을 돌린다. `BeginMission()`을 부른 뒤에만 돌고 맵을 내리면 멈춘다. UI(GDScript)는 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`와 프로퍼티 `Result`, `EndTicks`, `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`를 쓴다.
 
 ## 화면 (씬 UI)

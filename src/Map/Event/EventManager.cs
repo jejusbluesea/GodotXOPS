@@ -20,21 +20,23 @@ namespace GodotXOPS
         [Signal]
         public delegate void MissionEndedEventHandler(bool complete);
 
-        // 한 틱에 한 줄이 처리하는 최대 포인트 수 (원본 TOTAL_EVENTFRAMESTEP).
-        private const int k_maxFrameSteps = 6;
+        // 원본 형식(PD1)에서 한 틱에 한 줄이 처리하는 최대 포인트 수 (원본 TOTAL_EVENTFRAMESTEP). 확장 형식(PD2)에는 이 제한이 없다.
+        private const int k_legacyMaxFrameSteps = 6;
         // 도착 판정 거리 (m). 원본 DISTANCE_CHECKPOINT 25.0.
         private const float k_arrivalDistance = 2.5f;
         // 메시지를 표시하는 시간과 나타나고 사라지는 시간 (초). 원본 TOTAL_EVENTENT_SHOWMESSEC 5.0, gamemain.cpp:3143-3144 의 0.2.
         private const float k_messageSeconds = 5.0f;
         private const float k_messageFadeSeconds = 0.2f;
-        // .msg 파일의 최대 메시지 수 (원본 MAX_POINTMESSAGES).
-        private const int k_maxMessages = 16;
+        // 원본 형식(PD1)의 최대 메시지 수 (원본 MAX_POINTMESSAGES). 확장 형식(PD2)에는 이 제한이 없다.
+        private const int k_legacyMaxMessages = 16;
         // 시간 대기 이벤트의 1초에 해당하는 틱 수. 원본 (int)GAMEFPS.
         private const int k_ticksPerSecond = (int)SimClock.FrameRate;
 
         // 줄마다 지금 처리할 포인트의 식별번호와 시간 대기 카운터. 줄 수는 미션을 시작할 때 포인트 데이터에서 받는다.
         private int[] m_cursor = System.Array.Empty<int>();
         private int[] m_waitCnt = System.Array.Empty<int>();
+        // 한 줄이 이번 틱에 이미 처리한 포인트의 식별번호. 확장 형식에서 바로 넘어가는 이벤트끼리 고리를 이뤘을 때 틱이 끝나지 않는 것을 막는다.
+        private readonly HashSet<int> m_visited = new HashSet<int>();
 
         private bool m_running;
         private MissionResult m_result = MissionResult.InProgress;
@@ -158,14 +160,20 @@ namespace GodotXOPS
         /// <summary>
         /// 이벤트 한 줄을 진행한다. 원본 EventControl::ProcessEventPoint (event.cpp:260-353).
         /// 기다리는 포인트를 만나거나, 다음 포인트가 없거나, 한 틱의 처리 한도에 닿으면 멈춘다.
+        /// 한도는 원본 형식(PD1)에서만 6개다 (원본과 같은 틱에 같은 이벤트가 일어나게 한다).
+        /// 확장 형식(PD2)은 기다리는 포인트를 만날 때까지 한 틱에 다 처리하고, 이번 틱에 이미 지난 포인트로 돌아오면 다음 틱으로 넘긴다.
         /// </summary>
         /// <param name="line">줄 번호.</param>
         private void ProcessLine(int line)
         {
-            for (int step = 0; step < k_maxFrameSteps; step++)
+            bool extended = MapLoader.PointDataExtended;
+            m_visited.Clear();
+
+            for (int step = 0; extended || step < k_legacyMaxFrameSteps; step++)
             {
                 RawPointData point = MapLoader.GetEventPoint(m_cursor[line]);
                 if (point == null) return;
+                if (extended && !m_visited.Add(m_cursor[line])) return;
 
                 switch ((EventType)point.param0)
                 {
@@ -223,7 +231,7 @@ namespace GodotXOPS
 
                     case EventType.Message:
                         // 범위 밖 번호면 표시 중인 메시지는 그대로 두고 표시 시간만 처음부터 다시 센다.
-                        if (point.param1 >= 0 && point.param1 < k_maxMessages) m_messageId = point.param1;
+                        if (point.param1 >= 0 && (MapLoader.PointDataExtended || point.param1 < k_legacyMaxMessages)) m_messageId = point.param1;
                         m_messageCnt = 0;
                         if (m_messageId >= 0) EmitSignal(SignalName.MessageShown, m_messageId, MessageText);
                         break;

@@ -70,7 +70,6 @@ namespace GodotXOPS
         public const int PointEventFirst = 10;
         public const int PointEventLast = 19;
 
-        private const int k_maxParameterCount = 20;
         // 소물은 원본이 방향을 그대로 그린다. 사람 기준 yaw 인 look 과 180° 차이가 난다 (원본 object.cpp:2158 사람은 +π, :2765 소물은 그대로).
         private const float k_modelYawOffset = 180f;
         // PD1 의 이벤트 세 줄의 시작 식별번호. 원본은 −100, −110, −120 인데 PD1 의 파라미터를 부호 없는 바이트로 읽으므로 156, 146, 136 이다.
@@ -95,7 +94,8 @@ namespace GodotXOPS
         private int[] m_eventEntryIds = s_legacyEventEntryIds;
 
         // 종류(param0)별 → 식별번호(param3)별 포인트 목록. 파일 순서를 유지한다.
-        private List<Dictionary<int, List<RawPointData>>> m_sortedRawPointData;
+        private Dictionary<int, Dictionary<int, List<RawPointData>>> m_sortedRawPointData;
+        private bool m_pointDataExtended;
 
         public static Human Player => Instance.m_player;
         // 스폰된 전체 Human 목록 (스폰 순서).
@@ -108,6 +108,8 @@ namespace GodotXOPS
         public static int MessageCount => Instance.m_messages.Count;
         // 이벤트 줄마다의 시작 식별번호. 개수가 이벤트 줄 수다. PD1 은 항상 세 줄이고, PD2 는 파일이 정한다.
         public static IReadOnlyList<int> EventEntryIds => Instance.m_eventEntryIds;
+        // 로드된 포인트 데이터가 확장 형식(PD2)인지. 원본 형식(PD1)에만 걸리는 원본의 제한(메시지 16개, 한 틱의 이벤트 6개)을 가르는 데 쓴다.
+        public static bool PointDataExtended => Instance.m_pointDataExtended;
 
         // m_humans 내 플레이어 인덱스. 플레이어가 없으면 -1.
         public static int PlayerIndex => Instance.m_player != null ? Instance.m_humans.IndexOf(Instance.m_player) : -1;
@@ -144,20 +146,20 @@ namespace GodotXOPS
 
             MapLoader loader = Instance;
             loader.m_eventEntryIds = eventEntryIds;
+            loader.m_pointDataExtended = pd2;
 
             // 사람·무기·소물을 만들기 전에 미션의 에드온 데이터를 붙인다 (MIF2 가 아닌 미션이면 에드온 없음).
             LoadAddonData();
 
-            loader.m_sortedRawPointData = new List<Dictionary<int, List<RawPointData>>>();
-            for (int i = 0; i < k_maxParameterCount; i++)
-            {
-                loader.m_sortedRawPointData.Add(new Dictionary<int, List<RawPointData>>());
-            }
+            // 종류 번호에 제한을 두지 않는다 (원본의 종류는 1 에서 19 사이지만, 나중에 종류를 더할 수 있다).
+            loader.m_sortedRawPointData = new Dictionary<int, Dictionary<int, List<RawPointData>>>();
             foreach (RawPointData raw in points)
             {
-                if (raw.param0 < 0 || raw.param0 >= k_maxParameterCount) continue;
-
-                Dictionary<int, List<RawPointData>> byId = loader.m_sortedRawPointData[raw.param0];
+                if (!loader.m_sortedRawPointData.TryGetValue(raw.param0, out Dictionary<int, List<RawPointData>> byId))
+                {
+                    byId = new Dictionary<int, List<RawPointData>>();
+                    loader.m_sortedRawPointData[raw.param0] = byId;
+                }
                 if (!byId.TryGetValue(raw.param3, out List<RawPointData> list))
                 {
                     list = new List<RawPointData>();
@@ -359,6 +361,7 @@ namespace GodotXOPS
             loader.m_entityMaterialCache.Clear();
             loader.m_sortedRawPointData = null;
             loader.m_eventEntryIds = s_legacyEventEntryIds;
+            loader.m_pointDataExtended = false;
 
             // 에드온 데이터를 쓰던 것(사람, 무기, 이펙트)을 다 지운 뒤에 뗀다.
             UnloadAddonData();
@@ -387,10 +390,10 @@ namespace GodotXOPS
         /// <returns>첫 매치. 없거나 맵이 로드돼 있지 않으면 null.</returns>
         public static RawPointData GetPoint(int category, int id)
         {
-            List<Dictionary<int, List<RawPointData>>> sorted = Instance.m_sortedRawPointData;
-            if (sorted == null || category < 0 || category >= sorted.Count) return null;
+            Dictionary<int, Dictionary<int, List<RawPointData>>> sorted = Instance.m_sortedRawPointData;
+            if (sorted == null || !sorted.TryGetValue(category, out Dictionary<int, List<RawPointData>> byId)) return null;
 
-            return sorted[category].TryGetValue(id, out List<RawPointData> list) && list.Count > 0 ? list[0] : null;
+            return byId.TryGetValue(id, out List<RawPointData> list) && list.Count > 0 ? list[0] : null;
         }
 
         /// <summary>

@@ -360,6 +360,8 @@ namespace GodotXOPS.Dev
             SimClock.Step();
             Expect(loaded && events.LineCount == 0 && events.Result == (int)MissionResult.InProgress, "이벤트 줄이 없는 PD2 가 그대로 진행되지 않음");
 
+            CheckLimits(pd2Path);
+
             // PD1 은 항상 세 줄이고, 포인트를 내리면 기본값으로 돌아간다.
             MapLoader.UnloadPointData();
             entryIds = MapLoader.EventEntryIds;
@@ -367,6 +369,63 @@ namespace GodotXOPS.Dev
             Expect(MapLoader.LoadMissionData(0, false, 0) && MapLoader.LoadPointData(MapLoader.Instance.MissionPD1Path)
                 && MapLoader.EventEntryIds.Count == 3 && MapLoader.GetPoint(MapLoader.PointHuman, 0)?.extra.Length == 0,
                 "PD1 의 이벤트 줄이 셋이 아니거나 추가 파라미터가 있음");
+        }
+
+        /// <summary>
+        /// 원본 형식에만 있는 제한이 확장 형식에는 없는지 확인한다: 포인트 종류 번호, 메시지 16개, 한 틱에 한 줄이 처리하는 이벤트 6개.
+        /// 바로 넘어가는 이벤트끼리 고리를 이뤄도 틱이 끝나야 한다.
+        /// </summary>
+        /// <param name="pd2Path">점검용 PD2 를 쓸 전체 경로.</param>
+        private void CheckLimits(string pd2Path)
+        {
+            const int farType = 250;
+            const int lineA = 1000;
+            const int lineB = 2000;
+            const int chainLength = 10;
+            const int messageIndex = 20;
+
+            var file = new PD2File();
+            file.eventEntryIds.Add(lineA);
+            file.eventEntryIds.Add(lineB);
+            // 자동 판정이 미션을 끝내지 않게 두 팀을 한 명씩 둔다.
+            file.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = 0, param2 = 0, id = 1 });
+            file.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 1, param2 = -1, id = 0, position = new Vector3(0f, 500f, 0f) });
+            file.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = 0, param2 = 1, id = 2 });
+            file.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 2, param2 = -1, id = 500, position = new Vector3(100f, 500f, 0f) });
+            file.points.Add(new PD2Point { type = farType, param1 = 7, id = 42 });
+
+            // 줄 A: 바로 넘어가는 이벤트 열 개 → 메시지 20번 → 시간 대기.
+            for (int i = 0; i < chainLength; i++)
+            {
+                file.points.Add(new PD2Point { type = (int)EventType.ChangeTeam, param1 = 9999, param2 = lineA + i + 1, id = lineA + i });
+            }
+            file.points.Add(new PD2Point { type = (int)EventType.Message, param1 = messageIndex, param2 = lineA + chainLength + 1, id = lineA + chainLength });
+            file.points.Add(new PD2Point { type = (int)EventType.WaitTime, param1 = 1000, param2 = lineA + chainLength + 2, id = lineA + chainLength + 1 });
+
+            // 줄 B: 바로 넘어가는 이벤트 둘이 서로를 가리킨다.
+            file.points.Add(new PD2Point { type = (int)EventType.ChangeTeam, param1 = 9999, param2 = lineB + 1, id = lineB });
+            file.points.Add(new PD2Point { type = (int)EventType.ChangeTeam, param1 = 9999, param2 = lineB, id = lineB + 1 });
+
+            var messages = new string[messageIndex + 1];
+            for (int i = 0; i < messages.Length; i++) messages[i] = $"message {i}";
+            File.WriteAllLines(Path.ChangeExtension(pd2Path, ".msg"), messages);
+
+            if (!file.Write(pd2Path, out _) || !MapLoader.LoadPointData(pd2Path))
+            {
+                Expect(false, "제한 점검용 PD2 로드 실패");
+                return;
+            }
+
+            Expect(MapLoader.PointDataExtended && MapLoader.GetPoint(farType, 42)?.param1 == 7, "20 이상의 포인트 종류를 조회하지 못함");
+
+            EventManager events = EventManager.Instance;
+            events.BeginMission();
+            SimClock.Step();
+            Expect(events.LineCursor(0) == lineA + chainLength + 1, $"한 틱에 이벤트 {chainLength}개와 메시지를 지나 시간 대기까지 가지 않음 (지금 {events.LineCursor(0)})");
+            Expect(events.MessageId == messageIndex && events.MessageText == $"message {messageIndex}", "16번 이상의 메시지가 표시되지 않음");
+            Expect(events.Result == (int)MissionResult.InProgress && (events.LineCursor(1) == lineB || events.LineCursor(1) == lineB + 1), "이벤트 고리가 있는 줄의 상태가 다름");
+            for (int tick = 0; tick < 5; tick++) SimClock.Step();
+            Expect(events.LineCursor(0) == lineA + chainLength + 1 && events.Result == (int)MissionResult.InProgress, "이벤트 고리가 있는 미션이 계속 돌지 않음");
         }
 
         /// <summary>
