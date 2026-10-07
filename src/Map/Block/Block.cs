@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 namespace GodotXOPS
@@ -55,6 +56,20 @@ namespace GodotXOPS
         public Vector3 boundsMin;
         public Vector3 boundsMax;
 
+        // 레이가 이 블록에 맞을 수 있는 자리 전체를 감싸는 월드 AABB. 맵 로드 시 1회 계산 (ComputeRayBounds).
+        // 레이 판정은 "한 면의 평면과 만나고 나머지 면의 안쪽"이라 면이 뒤틀린 블록에서는 맞는 자리가 8정점의 범위를 벗어날 수 있다. 그래서 boundsMin / boundsMax 와 따로 둔다.
+        public Vector3 rayBoundsMin;
+        public Vector3 rayBoundsMax;
+        // false 면 여섯 평면이 닫힌 영역을 이루지 않아 범위를 구할 수 없는 블록이다. 레이를 거르지 않고 항상 검사한다.
+        public bool rayBounded;
+
+        // 레이 범위를 구할 때 면의 평면을 바깥으로 미는 거리 (m). IntersectRay 의 허용 오차(1e-4)와 float 계산 오차를 넉넉히 덮는다.
+        private const double k_rayBoundsMargin = 0.01;
+        // 닫힌 영역인지 볼 때의 허용 오차. 애매하면 "닫히지 않음"으로 본다 (거르지 않을 뿐 결과는 같다).
+        private const double k_rayBoundsOpenTolerance = 1e-6;
+        // 이보다 큰 범위는 사실상 열린 영역으로 보고 거르지 않는다 (m).
+        private const double k_rayBoundsMaxExtent = 1e6;
+
         /// <summary>
         /// 이 블록이 해당 판정에서 충돌하는지 알려 준다.
         /// </summary>
@@ -90,6 +105,194 @@ namespace GodotXOPS
                 float d = faceNormals[i].Dot(faceCenters[i] - worldPoint);
                 if (d <= 0f) return false;
             }
+            return true;
+        }
+
+        /// <summary>
+        /// 레이가 이 블록에 맞을 수 있는 자리의 범위(rayBoundsMin / rayBoundsMax)를 구한다. faceNormals 와 faceCenters 가 채워진 뒤에 부른다.
+        /// IntersectRay 가 맞았다고 하는 점은 항상 "여섯 평면을 조금씩 바깥으로 민 영역" 안에 있다. 그 영역의 꼭짓점(평면 셋의 교점 중 나머지 평면의 안쪽인 것)을 모아 감싼다.
+        /// 영역이 닫혀 있지 않으면(한쪽으로 끝없이 열려 있으면) rayBounded 를 false 로 둔다.
+        /// </summary>
+        public void ComputeRayBounds()
+        {
+            rayBounded = false;
+            rayBoundsMin = Vector3.Zero;
+            rayBoundsMax = Vector3.Zero;
+
+            // 길이가 0 인 법선(찌그러진 면)은 판정에서 아무것도 거르지 않으므로 뺀다.
+            var nx = new double[6];
+            var ny = new double[6];
+            var nz = new double[6];
+            var offsets = new double[6];
+            int count = 0;
+            for (int i = 0; i < 6; i++)
+            {
+                Vector3 n = faceNormals[i];
+                Vector3 c = faceCenters[i];
+                if (!n.IsFinite() || !c.IsFinite()) return;
+                if (n == Vector3.Zero) continue;
+
+                nx[count] = n.X;
+                ny[count] = n.Y;
+                nz[count] = n.Z;
+                // 영역: n·p <= n·c + 여유
+                offsets[count] = (double)n.X * c.X + (double)n.Y * c.Y + (double)n.Z * c.Z + k_rayBoundsMargin;
+                count++;
+            }
+            if (count < 4) return;
+
+            // 닫힌 영역인지: 모든 면에 대해 n·v <= 0 인 방향 v 가 있으면 그쪽으로 열려 있다. 그런 방향이 있다면 두 평면의 교선 방향 중에 있다.
+            bool anyEdge = false;
+            for (int a = 0; a < count; a++)
+            {
+                for (int b = a + 1; b < count; b++)
+                {
+                    double vx = ny[a] * nz[b] - nz[a] * ny[b];
+                    double vy = nz[a] * nx[b] - nx[a] * nz[b];
+                    double vz = nx[a] * ny[b] - ny[a] * nx[b];
+                    double length = Math.Sqrt(vx * vx + vy * vy + vz * vz);
+                    if (length == 0.0) continue;
+
+                    anyEdge = true;
+                    vx /= length;
+                    vy /= length;
+                    vz /= length;
+
+                    bool openForward = true;
+                    bool openBackward = true;
+                    for (int j = 0; j < count; j++)
+                    {
+                        double dot = nx[j] * vx + ny[j] * vy + nz[j] * vz;
+                        if (dot > k_rayBoundsOpenTolerance) openForward = false;
+                        if (dot < -k_rayBoundsOpenTolerance) openBackward = false;
+                    }
+                    if (openForward || openBackward) return;
+                }
+            }
+            if (!anyEdge) return;
+
+            double minX = double.MaxValue, minY = double.MaxValue, minZ = double.MaxValue;
+            double maxX = double.MinValue, maxY = double.MinValue, maxZ = double.MinValue;
+            bool anyVertex = false;
+            for (int a = 0; a < count; a++)
+            {
+                for (int b = a + 1; b < count; b++)
+                {
+                    // n_b × n_c 와 섞기 전에 n_a × n_b 를 한 번만 구한다.
+                    double abx = ny[a] * nz[b] - nz[a] * ny[b];
+                    double aby = nz[a] * nx[b] - nx[a] * nz[b];
+                    double abz = nx[a] * ny[b] - ny[a] * nx[b];
+                    for (int c = b + 1; c < count; c++)
+                    {
+                        double det = abx * nx[c] + aby * ny[c] + abz * nz[c];
+                        if (det == 0.0) continue;
+
+                        double bcx = ny[b] * nz[c] - nz[b] * ny[c];
+                        double bcy = nz[b] * nx[c] - nx[b] * nz[c];
+                        double bcz = nx[b] * ny[c] - ny[b] * nx[c];
+                        double cax = ny[c] * nz[a] - nz[c] * ny[a];
+                        double cay = nz[c] * nx[a] - nx[c] * nz[a];
+                        double caz = nx[c] * ny[a] - ny[c] * nx[a];
+                        double px = (offsets[a] * bcx + offsets[b] * cax + offsets[c] * abx) / det;
+                        double py = (offsets[a] * bcy + offsets[b] * cay + offsets[c] * aby) / det;
+                        double pz = (offsets[a] * bcz + offsets[b] * caz + offsets[c] * abz) / det;
+                        if (!double.IsFinite(px) || !double.IsFinite(py) || !double.IsFinite(pz)) continue;
+
+                        // 나머지 평면의 안쪽이어야 꼭짓점이다. 여유를 한 번 더 줘서 계산 오차로 진짜 꼭짓점을 놓치지 않게 한다 (더 받아들이면 범위가 커질 뿐이다).
+                        bool inside = true;
+                        for (int j = 0; j < count; j++)
+                        {
+                            if (j == a || j == b || j == c) continue;
+                            if (nx[j] * px + ny[j] * py + nz[j] * pz > offsets[j] + k_rayBoundsMargin)
+                            {
+                                inside = false;
+                                break;
+                            }
+                        }
+                        if (!inside) continue;
+
+                        anyVertex = true;
+                        minX = Math.Min(minX, px);
+                        minY = Math.Min(minY, py);
+                        minZ = Math.Min(minZ, pz);
+                        maxX = Math.Max(maxX, px);
+                        maxY = Math.Max(maxY, py);
+                        maxZ = Math.Max(maxZ, pz);
+                    }
+                }
+            }
+            if (!anyVertex) return;
+            if (maxX - minX > k_rayBoundsMaxExtent || maxY - minY > k_rayBoundsMaxExtent || maxZ - minZ > k_rayBoundsMaxExtent) return;
+            if (Math.Abs(minX) > k_rayBoundsMaxExtent || Math.Abs(minY) > k_rayBoundsMaxExtent || Math.Abs(minZ) > k_rayBoundsMaxExtent) return;
+
+            // double → float 로 줄일 때 안쪽으로 반올림되지 않게 여유를 한 번 더 준다.
+            float margin = (float)k_rayBoundsMargin;
+            rayBoundsMin = new Vector3((float)minX - margin, (float)minY - margin, (float)minZ - margin);
+            rayBoundsMax = new Vector3((float)maxX + margin, (float)maxY + margin, (float)maxZ + margin);
+            rayBounded = true;
+        }
+
+        /// <summary>
+        /// 레이가 이 블록에 맞을 가능성이 있는지 본다 (레이와 rayBounds 의 겹침). false 면 IntersectRay 도 반드시 false 다.
+        /// 원본 Collision::CheckALLBlockIntersectRay 의 범위 프리컷에 해당한다. 범위를 구하지 못한 블록은 항상 true 다.
+        /// </summary>
+        /// <param name="origin">레이 시작점.</param>
+        /// <param name="direction">레이 방향.</param>
+        /// <param name="maxDist">최대 거리. 0 이하이면 무한.</param>
+        /// <returns>맞을 수 있으면 true.</returns>
+        public bool MayIntersectRay(Vector3 origin, Vector3 direction, float maxDist)
+        {
+            if (!rayBounded) return true;
+
+            float tMin = 0f;
+            float tMax = (maxDist > 0f) ? maxDist : float.MaxValue;
+
+            // 축마다 레이가 범위 안에 있는 구간을 구해 겹친다. NaN 이 나오는 비교는 전부 거짓이라 구간을 좁히지 않는다 (거르지 않는 쪽).
+            if (direction.X == 0f)
+            {
+                if (origin.X < rayBoundsMin.X || origin.X > rayBoundsMax.X) return false;
+            }
+            else
+            {
+                float inverse = 1f / direction.X;
+                float t1 = (rayBoundsMin.X - origin.X) * inverse;
+                float t2 = (rayBoundsMax.X - origin.X) * inverse;
+                if (t1 > t2) (t1, t2) = (t2, t1);
+                if (t1 > tMin) tMin = t1;
+                if (t2 < tMax) tMax = t2;
+                if (tMin > tMax) return false;
+            }
+
+            if (direction.Y == 0f)
+            {
+                if (origin.Y < rayBoundsMin.Y || origin.Y > rayBoundsMax.Y) return false;
+            }
+            else
+            {
+                float inverse = 1f / direction.Y;
+                float t1 = (rayBoundsMin.Y - origin.Y) * inverse;
+                float t2 = (rayBoundsMax.Y - origin.Y) * inverse;
+                if (t1 > t2) (t1, t2) = (t2, t1);
+                if (t1 > tMin) tMin = t1;
+                if (t2 < tMax) tMax = t2;
+                if (tMin > tMax) return false;
+            }
+
+            if (direction.Z == 0f)
+            {
+                if (origin.Z < rayBoundsMin.Z || origin.Z > rayBoundsMax.Z) return false;
+            }
+            else
+            {
+                float inverse = 1f / direction.Z;
+                float t1 = (rayBoundsMin.Z - origin.Z) * inverse;
+                float t2 = (rayBoundsMax.Z - origin.Z) * inverse;
+                if (t1 > t2) (t1, t2) = (t2, t1);
+                if (t1 > tMin) tMin = t1;
+                if (t2 < tMax) tMax = t2;
+                if (tMin > tMax) return false;
+            }
+
             return true;
         }
 

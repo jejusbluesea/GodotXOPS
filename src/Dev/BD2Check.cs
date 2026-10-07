@@ -18,6 +18,10 @@ namespace GodotXOPS.Dev
         private const int k_raysPerMap = 200;
         private const int k_pointsPerMap = 200;
         private const float k_rayStartHeight = 1000f;
+        // 레이 범위 거르기를 전부 훑은 결과와 대조할 때 맵마다 쏘는 레이 수.
+        private const int k_filterRaysPerMap = 2000;
+        private const int k_fuzzBlocks = 400;
+        private const int k_fuzzRays = 20000;
 
         private static readonly BlockLayer[] s_layers = { BlockLayer.Human, BlockLayer.Bullet, BlockLayer.Sight };
 
@@ -57,6 +61,7 @@ namespace GodotXOPS.Dev
 
             int maps = CheckAllMissions(workFolder);
             CheckFlags(workFolder);
+            CheckRayFilterFuzz(workFolder);
             CheckMaterials(workFolder);
             CheckBrokenFiles(workFolder);
 
@@ -161,6 +166,8 @@ namespace GodotXOPS.Dev
                     continue;
                 }
                 Snapshot before = TakeSnapshot(index);
+                string filterDifference = CompareRayFilter(index, k_filterRaysPerMap, out _);
+                Expect(filterDifference == null, $"{label}: 레이 범위 거르기의 결과가 전부 훑은 결과와 다름 — {filterDifference}");
 
                 if (!MapLoader.ConvertBD1(bd1Path, listRelative, out BD2File file, out BlockTextureListData textures)
                     || !file.Write(bd2Path, out _))
@@ -260,6 +267,153 @@ namespace GodotXOPS.Dev
             }
 
             return snapshot;
+        }
+
+        /// <summary>
+        /// 거르지 않고 모든 블록의 여섯 면을 검사하는 레이. MapLoader.RaycastBlock 에서 범위 거르기만 뺀 것이다.
+        /// </summary>
+        /// <param name="layer">판정 종류.</param>
+        /// <param name="origin">레이 시작점.</param>
+        /// <param name="direction">레이 방향.</param>
+        /// <param name="maxDist">최대 거리. 0 이하이면 무한.</param>
+        /// <returns>맞은 블록 번호 / 면 / 거리. 못 맞으면 "-".</returns>
+        private static string BruteRaycast(BlockLayer layer, Vector3 origin, Vector3 direction, float maxDist)
+        {
+            IReadOnlyList<Block> colliders = MapLoader.GetBlockColliders(layer);
+            float nearest = maxDist;
+            Block found = null;
+            int foundFace = -1;
+            for (int i = 0; i < colliders.Count; i++)
+            {
+                if (colliders[i].IntersectRay(origin, direction, nearest, out int face, out float dist))
+                {
+                    nearest = dist;
+                    found = colliders[i];
+                    foundFace = face;
+                }
+            }
+            return found != null ? $"{found.index}/{foundFace}/{nearest:R}" : "-";
+        }
+
+        /// <summary>
+        /// 지금 로드된 블록에 레이를 쏴서 MapLoader.RaycastBlock(범위로 거른다)과 전부 훑은 결과가 같은지 본다.
+        /// 시작점은 맵 범위 안팎과 블록 면 바로 앞, 거리는 무한과 유한을 섞는다.
+        /// </summary>
+        /// <param name="seed">난수 씨앗.</param>
+        /// <param name="rayCount">판정마다 쏠 레이 수.</param>
+        /// <param name="hits">맞은 레이 수 (점검이 빈 곳만 쏘지 않았는지 보는 용도).</param>
+        /// <returns>처음 발견한 차이의 설명. 같으면 null.</returns>
+        private static string CompareRayFilter(int seed, int rayCount, out int hits)
+        {
+            hits = 0;
+            IReadOnlyList<Block> blocks = MapLoader.Blocks;
+            if (blocks.Count == 0) return null;
+
+            var min = new Vector3(float.MaxValue, float.MaxValue, float.MaxValue);
+            var max = new Vector3(float.MinValue, float.MinValue, float.MinValue);
+            foreach (Block block in blocks)
+            {
+                min = min.Min(block.boundsMin);
+                max = max.Max(block.boundsMax);
+            }
+            Vector3 pad = (max - min) * 0.2f + Vector3.One;
+
+            var random = new Random(seed);
+            for (int r = 0; r < rayCount; r++)
+            {
+                Vector3 origin;
+                Vector3 direction;
+                int kind = r % 4;
+                if (kind == 0)
+                {
+                    // 블록 면의 중심을 향해, 면 가까이에서 쏜다 (범위의 가장자리를 스치는 경우).
+                    Block block = blocks[random.Next(blocks.Count)];
+                    int face = random.Next(6);
+                    Vector3 target = block.faceCenters[face] + new Vector3(Lerp(-0.5f, 0.5f, random), Lerp(-0.5f, 0.5f, random), Lerp(-0.5f, 0.5f, random));
+                    origin = target + block.faceNormals[face] * Lerp(0.001f, 3f, random) + new Vector3(Lerp(-1f, 1f, random), Lerp(-1f, 1f, random), Lerp(-1f, 1f, random));
+                    direction = target - origin;
+                }
+                else if (kind == 1)
+                {
+                    // 축과 나란한 레이 (방향 성분이 0 인 경우).
+                    origin = new Vector3(Lerp(min.X - pad.X, max.X + pad.X, random), Lerp(min.Y - pad.Y, max.Y + pad.Y, random), Lerp(min.Z - pad.Z, max.Z + pad.Z, random));
+                    direction = Vector3.Zero;
+                    direction[random.Next(3)] = random.Next(2) == 0 ? 1f : -1f;
+                }
+                else
+                {
+                    origin = new Vector3(Lerp(min.X - pad.X, max.X + pad.X, random), Lerp(min.Y - pad.Y, max.Y + pad.Y, random), Lerp(min.Z - pad.Z, max.Z + pad.Z, random));
+                    direction = new Vector3((float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f, (float)random.NextDouble() - 0.5f);
+                }
+                if (direction.LengthSquared() < 1e-8f) direction = Vector3.Down;
+                direction = direction.Normalized();
+                float maxDist = random.Next(3) == 0 ? 0f : Lerp(0.05f, 60f, random);
+
+                for (int l = 0; l < s_layers.Length; l++)
+                {
+                    bool hit = MapLoader.RaycastBlock(s_layers[l], origin, direction, maxDist, out float dist, out Block hitBlock, out int hitFace);
+                    string filtered = hit ? $"{hitBlock.index}/{hitFace}/{dist:R}" : "-";
+                    string brute = BruteRaycast(s_layers[l], origin, direction, maxDist);
+                    if (hit) hits++;
+                    if (filtered != brute) return $"레이 {r} ({s_layers[l]}, 시작 {origin}, 방향 {direction}, 거리 {maxDist}): {filtered} / {brute}";
+                }
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 모양이 이상한 블록(면이 뒤틀린 것, 정점이 겹친 것, 뒤집힌 것, 납작한 것)을 마구 만들어 레이 범위 거르기가 전부 훑은 결과와 같은지 본다.
+        /// BD2 는 모양과 무관하게 플래그대로 충돌하므로 이런 블록도 전부 판정 대상이다.
+        /// </summary>
+        /// <param name="workFolder">파일을 쓸 폴더 전체 경로.</param>
+        private void CheckRayFilterFuzz(string workFolder)
+        {
+            var random = new Random(7);
+            var file = new BD2File { textureListPath = string.Empty };
+            for (int i = 0; i < k_fuzzBlocks; i++)
+            {
+                var center = new Vector3(Lerp(-40f, 40f, random), Lerp(-10f, 10f, random), Lerp(-40f, 40f, random));
+                var half = new Vector3(Lerp(0.2f, 4f, random), Lerp(0.2f, 4f, random), Lerp(0.2f, 4f, random));
+                BD2Block block = MakeBox(center, half, 0);
+                int shape = i % 6;
+                // 0: 상자 그대로. 1: 정점을 조금씩 흔든다 (뒤틀린 면). 2: 크게 흔든다 (오목하거나 뒤집힌다).
+                // 3: 윗면을 한 점으로 모은다 (뿔). 4: 한 축을 납작하게. 5: 윗면과 아랫면을 바꾼다 (전부 뒤집힌 법선).
+                float jitter = shape == 1 ? 0.3f : shape == 2 ? 3f : 0f;
+                for (int v = 0; v < 8; v++)
+                {
+                    if (jitter > 0f) block.vertices[v] += new Vector3(Lerp(-jitter, jitter, random), Lerp(-jitter, jitter, random), Lerp(-jitter, jitter, random));
+                    if (shape == 3 && v < 4) block.vertices[v] = center + Vector3.Up * half.Y;
+                    if (shape == 4) block.vertices[v].Y = center.Y;
+                }
+                if (shape == 5)
+                {
+                    for (int v = 0; v < 4; v++) (block.vertices[v], block.vertices[v + 4]) = (block.vertices[v + 4], block.vertices[v]);
+                }
+                file.blocks.Add(block);
+            }
+
+            string path = Path.Combine(workFolder, "fuzz.bd2");
+            if (!file.Write(path, out _) || !MapLoader.LoadBlockData(path))
+            {
+                Expect(false, "레이 범위 점검용 BD2 로드 실패");
+                return;
+            }
+
+            int bounded = 0;
+            foreach (Block block in MapLoader.Blocks)
+            {
+                if (block.rayBounded) bounded++;
+            }
+            // 상자는 반드시 범위가 구해져야 한다 (거르기가 통째로 꺼져 있으면 대조가 의미 없다).
+            bool boxesBounded = true;
+            for (int i = 0; i < MapLoader.Blocks.Count; i += 6) boxesBounded &= MapLoader.Blocks[i].rayBounded;
+            Expect(boxesBounded, "상자 블록의 레이 범위가 구해지지 않음");
+            Expect(bounded < MapLoader.Blocks.Count, "범위를 구할 수 없는 블록(거르지 않는 경로)이 점검에 하나도 없음");
+
+            string difference = CompareRayFilter(11, k_fuzzRays, out int hits);
+            Expect(difference == null, $"이상한 모양의 블록에서 레이 범위 거르기의 결과가 다름 — {difference}");
+            Expect(hits > k_fuzzRays / 10, $"레이 범위 점검의 레이가 거의 맞지 않음 ({hits})");
+            GD.Print($"레이 범위 대조: 블록 {MapLoader.Blocks.Count}개 중 범위 있음 {bounded}개, 레이 {k_fuzzRays * s_layers.Length}개 중 명중 {hits}개");
         }
 
         private static float Lerp(float from, float to, Random random)

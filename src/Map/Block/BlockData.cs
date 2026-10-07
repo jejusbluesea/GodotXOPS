@@ -198,11 +198,15 @@ namespace GodotXOPS
 
             for (int i = 0; i < colliders.Count; i++)
             {
+                // 범위로 먼저 걸러 6면 판정 비용을 줄인다 (원본 collision.cpp:657-732 의 범위 프리컷 대응). 걸러진 블록은 어차피 맞지 않으므로 결과는 같다.
+                Block candidate = colliders[i];
+                if (!candidate.MayIntersectRay(origin, direction, nearest)) continue;
+
                 // nearest 를 최대 거리로 넘겨, 이미 찾은 것보다 먼 교차는 블록 쪽에서 걸러지게 한다.
-                if (colliders[i].IntersectRay(origin, direction, nearest, out int hitFace, out float hitDist))
+                if (candidate.IntersectRay(origin, direction, nearest, out int hitFace, out float hitDist))
                 {
                     nearest = hitDist;
-                    block = colliders[i];
+                    block = candidate;
                     face = hitFace;
                     found = true;
                 }
@@ -466,7 +470,7 @@ namespace GodotXOPS
                 boundsMax = boundsMax.Max(raw.vertices[i]);
             }
 
-            return new Block
+            var block = new Block
             {
                 mesh = mesh,
                 surfaceTextureIndices = surfaceTextures.ToArray(),
@@ -479,6 +483,8 @@ namespace GodotXOPS
                 boundsMin = boundsMin - Vector3.One * k_collisionAddSize,
                 boundsMax = boundsMax + Vector3.One * k_collisionAddSize,
             };
+            block.ComputeRayBounds();
+            return block;
         }
 
         /// <summary>
