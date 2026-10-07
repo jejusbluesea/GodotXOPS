@@ -69,6 +69,9 @@ const WEAPON_VIEW := {
 # ----- 이벤트 메시지: 화면 아래에서 box_height 높이의 상자 위쪽에 가운데 정렬 -----
 const MESSAGE := {"box_height": 140, "font_size": 18, "color": Color(1, 1, 1)}
 
+# ----- 이벤트가 놓는 글자: 글꼴 번호 1 이 char.dds 스프라이트 글꼴이고 그 밖은 OS 글꼴이다 (EventManager.HudFontSprite) -----
+const EVENT_TEXT_FONT_SPRITE := 1
+
 # ----- 피격 번쩍임: hold 동안 가장 진하고 fade 동안 옅어진다 -----
 const FLASH := {"color": Color(1, 0, 0, 0.5), "hold": 0.05, "fade": 0.1}
 
@@ -123,6 +126,8 @@ var _scope_hides_crosshair := false
 var _shown_scope := -1
 
 var _message: Label
+var _event_texts: Control
+var _last_hud_revision := -1
 var _last_message := -1
 var _flash: ColorRect
 var _flash_timer := 0.0
@@ -211,6 +216,7 @@ func _process(delta: float) -> void:
 
 	_update_blind()
 	_update_message()
+	_update_event_texts()
 	_update_flash(delta)
 	_update_fade(delta)
 	_update_fps(delta)
@@ -324,6 +330,12 @@ func _build_overlays() -> void:
 	_message.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	XopsUI.place_stretch(_message, XopsUI.Stretch.BOTTOM, 0, 0, 0, MESSAGE["box_height"])
 	_message.modulate.a = 0.0
+
+	# 이벤트가 놓는 글자. 메시지와 같은 층(화면 높이 480 기준으로 확대)에 둔다.
+	_event_texts = Control.new()
+	_event_texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_event_texts.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_layer(MESSAGE_ORDER, true).add_child(_event_texts)
 
 	_flash = XopsUI.panel_stretch(_layer(FLASH_ORDER, false), XopsUI.Stretch.FULL, 0, 0, 0, 0, FLASH["color"])
 	_flash.visible = false
@@ -542,6 +554,29 @@ func _update_blind() -> void:
 		XopsUI.place_stretch(_blind[3], XopsUI.Stretch.RIGHT, 0, 0, half.x, 0)
 	for i in 4:
 		_blind[i].visible = (bits & (1 << i)) != 0
+
+
+## 이벤트가 화면에 놓은 글자 (EventManager.HudTexts). 내용이 바뀌었을 때만 다시 만든다.
+## 목록은 놓인 순서대로 오고, 그 순서대로 자식으로 붙이므로 나중에 놓인 글자가 위에 그려진다.
+func _update_event_texts() -> void:
+	var revision: int = EventManager.HudRevision
+	if revision == _last_hud_revision:
+		return
+	_last_hud_revision = revision
+
+	for child in _event_texts.get_children():
+		_event_texts.remove_child(child)
+		child.free()
+
+	for entry: Dictionary in EventManager.HudTexts():
+		var anchor: int = entry["anchor"]
+		var pivot := Vector2((anchor % 3) * 0.5, (anchor / 3) * 0.5)
+		if entry["font"] == EVENT_TEXT_FONT_SPRITE:
+			XopsUI.text(_event_texts, pivot, pivot, entry["text"], entry["x"], entry["y"], entry["width"], entry["size"], entry["color"])
+		else:
+			var label := XopsUI.label(_event_texts, entry["text"], int(entry["size"]), entry["color"])
+			var box := label.get_minimum_size()
+			XopsUI.place(label, pivot, entry["x"], entry["y"], box.x, box.y)
 
 
 ## 이벤트 메시지. 글은 바뀔 때만 다시 쓰고, 진하기는 EventManager 가 계산한 값을 매 프레임 쓴다.

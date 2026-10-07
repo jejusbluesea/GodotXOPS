@@ -92,6 +92,7 @@ namespace GodotXOPS
             Add("loadmission", "loadmission <index> [skipbriefing]", "Load an official mission by its index in the mission list (0 is the first) and start playing. With skipbriefing false, show the briefing first (default true).", LoadMission);
             Add("loadmissionmif", "loadmissionmif <mif file> [skipbriefing]", "Load a mission file (mif or mif2) and start playing. Paths are relative to the game folder. With skipbriefing false, show the briefing first (default true).", LoadMissionFile);
 
+            Add("hudtext", "hudtext <slot> <font> <anchor> <x> <y> <size> <text> | hudtext clear", "Put event text on the screen to try a placement. Font: 0 OS font, 1 char.dds. Anchor: 0 top-left to 8 bottom-right (4 is the center). x, y: offset from the anchor on a 480-high screen, +y is up.", HudText);
             Add("collider", "collider <human|weapon|object>", "Toggle drawing hit ranges: human hitboxes (green), weapon pickup ranges (red), object colliders (blue).", Collider);
             Add("fog", "fog", "Toggle the fog.", _ => ToggleFog());
             Add("sky", "sky <index>", "Change the sky (0 is none).", Sky);
@@ -351,9 +352,31 @@ namespace GodotXOPS
             {
                 int cursor = events.LineCursor(line);
                 RawPointData point = MapLoader.GetEventPoint(cursor);
-                text.Append($"\n  line {line}: point {cursor} ({(point != null ? ((EventType)point.param0).ToString() : "none")})");
+                text.Append($"\n  line {line}: point {cursor} ({(point != null ? events.EventName(point.param0) : "none")}){(events.LineStopped(line) ? " stopped" : string.Empty)}");
             }
             return text.ToString();
+        }
+
+        private static string HudText(string[] args)
+        {
+            EventManager events = EventManager.Instance;
+            if (args.Length == 1 && args[0].ToLowerInvariant() == "clear")
+            {
+                events.ClearHudText(-1);
+                return "Event text cleared";
+            }
+            if (args.Length < 7 || !int.TryParse(args[0], out int slot) || !int.TryParse(args[1], out int font) || !int.TryParse(args[2], out int anchor)
+                || !TryParseFloat(args[3], out float x) || !TryParseFloat(args[4], out float y) || !TryParseFloat(args[5], out float size))
+            {
+                return "Usage: hudtext <slot> <font> <anchor> <x> <y> <size> <text> | hudtext clear";
+            }
+            if (slot < 0 || slot >= EventManager.HudSlotCount) return $"Slot must be 0 to {EventManager.HudSlotCount - 1}";
+
+            events.SetHudText(slot, string.Join(" ", args, 6, args.Length - 6), new Godot.Collections.Dictionary
+            {
+                ["font"] = font, ["anchor"] = anchor, ["x"] = x, ["y"] = y, ["size"] = size,
+            });
+            return $"Slot {slot} set";
         }
 
         private static string NoDamage(string[] args)

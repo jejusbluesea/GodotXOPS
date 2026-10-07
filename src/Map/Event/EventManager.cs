@@ -7,6 +7,7 @@ namespace GodotXOPS
     /// 미션 이벤트와 클리어·실패 판정. 원본 OpenXOPS EventControl (event.cpp) 과 maingame::Process 의 판정·이벤트 부분 (gamemain.cpp:2559-2616),
     /// ObjectManager::CheckGameOverorComplete (objectmanager.cpp:2561-2602) 에 해당한다.
     /// 이벤트는 여러 줄이 따로 진행된다 (PD1 은 세 줄, PD2 는 파일이 정한 만큼). 줄마다 지금 처리할 포인트의 식별번호를 들고, 포인트의 param2(원본 p3)가 가리키는 번호로 넘어간다.
+    /// 포인트의 종류별 처리는 처리기(IEventHandler)가 한다. 이 클래스는 줄을 진행시키고 처리기가 돌려준 출구로 넘어가기만 한다.
     /// UI(GDScript)가 쓰는 창구이기도 하다. 메시지와 미션 종료를 시그널로 알리고, 현재 값은 프로퍼티로 읽는다.
     /// BeginMission 을 부른 뒤에만 돌고, 맵을 내리면 멈춘다.
     /// </summary>
@@ -22,19 +23,16 @@ namespace GodotXOPS
 
         // 원본 형식(PD1)에서 한 틱에 한 줄이 처리하는 최대 포인트 수 (원본 TOTAL_EVENTFRAMESTEP). 확장 형식(PD2)에는 이 제한이 없다.
         private const int k_legacyMaxFrameSteps = 6;
-        // 도착 판정 거리 (m). 원본 DISTANCE_CHECKPOINT 25.0.
-        private const float k_arrivalDistance = 2.5f;
         // 메시지를 표시하는 시간과 나타나고 사라지는 시간 (초). 원본 TOTAL_EVENTENT_SHOWMESSEC 5.0, gamemain.cpp:3143-3144 의 0.2.
         private const float k_messageSeconds = 5.0f;
         private const float k_messageFadeSeconds = 0.2f;
         // 원본 형식(PD1)의 최대 메시지 수 (원본 MAX_POINTMESSAGES). 확장 형식(PD2)에는 이 제한이 없다.
         private const int k_legacyMaxMessages = 16;
-        // 시간 대기 이벤트의 1초에 해당하는 틱 수. 원본 (int)GAMEFPS.
-        private const int k_ticksPerSecond = (int)SimClock.FrameRate;
 
-        // 줄마다 지금 처리할 포인트의 식별번호와 시간 대기 카운터. 줄 수는 미션을 시작할 때 포인트 데이터에서 받는다.
-        private int[] m_cursor = System.Array.Empty<int>();
-        private int[] m_waitCnt = System.Array.Empty<int>();
+        // 이벤트 줄들. 줄 수는 미션을 시작할 때 포인트 데이터에서 받는다.
+        private EventLine[] m_lines = System.Array.Empty<EventLine>();
+        // 포인트 종류 번호 → 처리기.
+        private readonly Dictionary<int, IEventHandler> m_handlers = new Dictionary<int, IEventHandler>();
         // 한 줄이 이번 틱에 이미 처리한 포인트의 식별번호. 확장 형식에서 바로 넘어가는 이벤트끼리 고리를 이뤘을 때 틱이 끝나지 않는 것을 막는다.
         private readonly HashSet<int> m_visited = new HashSet<int>();
 
@@ -84,6 +82,11 @@ namespace GodotXOPS
 
         public override void _Ready()
         {
+            var builtin = new BuiltinEventHandler();
+            for (int type = MapLoader.PointEventFirst; type <= MapLoader.PointEventLast; type++)
+            {
+                m_handlers[type] = builtin;
+            }
             SimClock.Register(this);
         }
 
@@ -99,12 +102,15 @@ namespace GodotXOPS
         public void BeginMission()
         {
             IReadOnlyList<int> entryIds = MapLoader.EventEntryIds;
-            m_cursor = new int[entryIds.Count];
-            m_waitCnt = new int[entryIds.Count];
-            for (int i = 0; i < m_cursor.Length; i++)
+            m_lines = new EventLine[entryIds.Count];
+            for (int i = 0; i < m_lines.Length; i++)
             {
-                m_cursor[i] = entryIds[i];
+                m_lines[i] = new EventLine(i, entryIds[i]);
             }
+            ResetHud();
+            m_variables.Clear();
+            m_autoJudge = true;
+            m_missionTicks = 0;
             m_result = MissionResult.InProgress;
             m_endTicks = 0;
             m_messageId = -1;
@@ -120,6 +126,7 @@ namespace GodotXOPS
         public void StopMission()
         {
             m_running = false;
+            ResetHud();
         }
 
         /// <summary>
@@ -130,9 +137,11 @@ namespace GodotXOPS
         {
             if (!m_running) return;
 
+            LatchInteract();
             if (m_result == MissionResult.InProgress)
             {
-                MissionResult judged = CheckGameOverOrComplete();
+                m_missionTicks++;
+                MissionResult judged = m_autoJudge ? CheckGameOverOrComplete() : MissionResult.InProgress;
                 if (judged != MissionResult.InProgress) EndMission(judged);
             }
             else
@@ -140,11 +149,13 @@ namespace GodotXOPS
                 m_endTicks++;
             }
 
-            for (int line = 0; line < m_cursor.Length; line++)
+            foreach (EventLine line in m_lines)
             {
                 if (m_result != MissionResult.InProgress || m_linesPaused) break;
                 ProcessLine(line);
             }
+
+            TickHud();
 
             if (m_messageId != -1 && m_messageCnt < (int)(k_messageSeconds * SimClock.FrameRate))
             {
@@ -162,87 +173,46 @@ namespace GodotXOPS
         /// 기다리는 포인트를 만나거나, 다음 포인트가 없거나, 한 틱의 처리 한도에 닿으면 멈춘다.
         /// 한도는 원본 형식(PD1)에서만 6개다 (원본과 같은 틱에 같은 이벤트가 일어나게 한다).
         /// 확장 형식(PD2)은 기다리는 포인트를 만날 때까지 한 틱에 다 처리하고, 이번 틱에 이미 지난 포인트로 돌아오면 다음 틱으로 넘긴다.
+        /// 처리기가 실패했거나 없는 출구를 돌려주면 그 줄만 멈춘다.
         /// </summary>
-        /// <param name="line">줄 번호.</param>
-        private void ProcessLine(int line)
+        /// <param name="line">진행할 줄.</param>
+        private void ProcessLine(EventLine line)
         {
+            if (line.Stopped) return;
+
             bool extended = MapLoader.PointDataExtended;
             m_visited.Clear();
 
             for (int step = 0; extended || step < k_legacyMaxFrameSteps; step++)
             {
-                RawPointData point = MapLoader.GetEventPoint(m_cursor[line]);
+                RawPointData point = MapLoader.GetEventPoint(line.Cursor);
                 if (point == null) return;
-                if (extended && !m_visited.Add(m_cursor[line])) return;
+                if (extended && !m_visited.Add(line.Cursor)) return;
+                if (!m_handlers.TryGetValue(point.param0, out IEventHandler handler)) return;
 
-                switch ((EventType)point.param0)
+                int exit = handler.Tick(this, line, point);
+                // 처리기가 미션을 끝냈거나 이 줄을 멈췄거나 다른 포인트로 보냈으면(start_line) 여기서 끝낸다.
+                if (exit == IEventHandler.Wait || m_result != MissionResult.InProgress || line.Stopped || line.Cursor != point.param3) return;
+                if (exit == IEventHandler.Failed || !handler.TryGetNext(point, exit, out int next))
                 {
-                    case EventType.MissionComplete:
-                        EndMission(MissionResult.Complete);
-                        return;
-
-                    case EventType.MissionFailed:
-                        EndMission(MissionResult.Failed);
-                        return;
-
-                    case EventType.WaitDeath:
-                    {
-                        // 대상이 없으면 계속 기다린다.
-                        Human target = MapLoader.SearchHuman(point.param1);
-                        if (target == null || target.Alive) return;
-                        break;
-                    }
-
-                    case EventType.WaitArrival:
-                        if (!Arrived(MapLoader.SearchHuman(point.param1), point.position)) return;
-                        break;
-
-                    case EventType.ChangeToWalk:
-                    {
-                        // 경로 포인트(랜덤 분기 포함)의 이동 모드를 걷기로 바꾼다 (원본 SetMovePathMode).
-                        RawPointData path = MapLoader.GetPathPoint(point.param1);
-                        if (path != null) path.param1 = 0;
-                        break;
-                    }
-
-                    case EventType.WaitBreakObject:
-                    {
-                        // 대상이 없으면 부서진 것으로 본다.
-                        SmallObject target = MapLoader.SearchSmallObject(point.param1);
-                        if (target != null && !target.IsDestroyed) return;
-                        break;
-                    }
-
-                    case EventType.WaitCase:
-                    {
-                        Human target = MapLoader.SearchHuman(point.param1);
-                        if (!Arrived(target, point.position) || !HasCaseWeapon(target)) return;
-                        break;
-                    }
-
-                    case EventType.WaitTime:
-                        if (k_ticksPerSecond * point.param1 > m_waitCnt[line])
-                        {
-                            m_waitCnt[line]++;
-                            return;
-                        }
-                        m_waitCnt[line] = 0;
-                        break;
-
-                    case EventType.Message:
-                        // 범위 밖 번호면 표시 중인 메시지는 그대로 두고 표시 시간만 처음부터 다시 센다.
-                        if (point.param1 >= 0 && (MapLoader.PointDataExtended || point.param1 < k_legacyMaxMessages)) m_messageId = point.param1;
-                        m_messageCnt = 0;
-                        if (m_messageId >= 0) EmitSignal(SignalName.MessageShown, m_messageId, MessageText);
-                        break;
-
-                    case EventType.ChangeTeam:
-                        MapLoader.SearchHuman(point.param1)?.SetTeam(0);
-                        break;
+                    line.Stopped = true;
+                    return;
                 }
 
-                m_cursor[line] = point.param2;
+                line.MoveTo(next);
             }
+        }
+
+        /// <summary>
+        /// 메시지를 표시한다 (원본 event.cpp:330-337). 범위 밖 번호면 표시 중인 메시지는 그대로 두고 표시 시간만 처음부터 다시 센다.
+        /// 원본 형식(PD1)에서는 16개까지만 받는다.
+        /// </summary>
+        /// <param name="id">메시지 번호.</param>
+        public void ShowMessage(int id)
+        {
+            if (id >= 0 && (MapLoader.PointDataExtended || id < k_legacyMaxMessages)) m_messageId = id;
+            m_messageCnt = 0;
+            if (m_messageId >= 0) EmitSignal(SignalName.MessageShown, m_messageId, MessageText);
         }
 
         /// <summary>
@@ -265,49 +235,23 @@ namespace GodotXOPS
         /// <returns>식별번호. 줄 번호가 범위 밖이면 −1.</returns>
         public int LineCursor(int line)
         {
-            return line >= 0 && line < m_cursor.Length ? m_cursor[line] : -1;
+            return line >= 0 && line < m_lines.Length ? m_lines[line].Cursor : -1;
         }
 
         // 이벤트 줄 수.
-        public int LineCount => m_cursor.Length;
+        public int LineCount => m_lines.Length;
 
         /// <summary>
         /// 미션을 끝낸다.
         /// </summary>
         /// <param name="result">결과.</param>
-        private void EndMission(MissionResult result)
+        internal void EndMission(MissionResult result)
         {
             m_result = result;
             m_endTicks = 1;
+            // 미션이 끝나면 이벤트 줄이 더 돌지 않아 스크립트가 글자를 지울 기회가 없다.
+            ResetHud();
             EmitSignal(SignalName.MissionEnded, result == MissionResult.Complete);
-        }
-
-        /// <summary>
-        /// 대상이 지점 근처에 있는지 본다. 원본 EventControl::CheckArrival (event.cpp:102-122).
-        /// </summary>
-        /// <param name="human">대상. null 이면 false.</param>
-        /// <param name="position">지점.</param>
-        /// <returns>도착 판정 거리 안이면 true.</returns>
-        private static bool Arrived(Human human, Vector3 position)
-        {
-            return human != null && (human.Controller.Position - position).Length() <= k_arrivalDistance;
-        }
-
-        /// <summary>
-        /// 대상이 케이스(임무 물품) 무기를 어느 슬롯에든 들고 있는지 본다. 원본 EventControl::CheckHaveWeapon (event.cpp:130-164).
-        /// </summary>
-        /// <param name="human">대상. null 이면 false.</param>
-        /// <returns>들고 있으면 true.</returns>
-        private static bool HasCaseWeapon(Human human)
-        {
-            if (human == null) return false;
-
-            List<int> caseIndices = DataManager.Instance.WeaponParameterData.weaponGeneralData.caseWeaponIndex;
-            for (int slot = 0; slot < Human.WeaponSlotCount; slot++)
-            {
-                if (caseIndices.Contains(human.GetWeapon(slot).WeaponIndex)) return true;
-            }
-            return false;
         }
 
         /// <summary>

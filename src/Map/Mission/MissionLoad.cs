@@ -30,6 +30,7 @@ namespace GodotXOPS
         private string m_addonObjectDataPath = string.Empty;
         private string m_addonEffectDataPath = string.Empty;
         private string m_addonBlockMaterialDataPath = string.Empty;
+        private string m_addonEventDataPath = string.Empty;
 
         // 경로는 모두 전체 경로다. 해당 항목이 없으면 빈 문자열.
         public string MissionName => m_missionName;
@@ -191,6 +192,7 @@ namespace GodotXOPS
             loader.m_addonObjectDataPath = data.addonObjectDataPath ?? string.Empty;
             loader.m_addonEffectDataPath = data.addonEffectDataPath ?? string.Empty;
             loader.m_addonBlockMaterialDataPath = data.addonBlockMaterialDataPath ?? string.Empty;
+            loader.m_addonEventDataPath = data.addonEventDataPath ?? string.Empty;
             return true;
         }
 
@@ -248,6 +250,7 @@ namespace GodotXOPS
             loader.m_addonObjectDataPath = string.Empty;
             loader.m_addonEffectDataPath = string.Empty;
             loader.m_addonBlockMaterialDataPath = string.Empty;
+            loader.m_addonEventDataPath = string.Empty;
         }
 
         /// <summary>

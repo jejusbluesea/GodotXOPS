@@ -56,12 +56,14 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 | `src/IO/` | 파일 로더 (이미지, 모델 `.x`, 소리)와 확장 형식의 읽기·쓰기 (`BD2File`, `PD2File`, `MIF2File`). 게임 싱글톤과 무관해서 다른 도구에서도 쓸 수 있습니다 |
 | `src/Data/` | 데이터 클래스와 `DataManager`, 설정, 입력 |
 | `src/Map/` | 맵, 사람, 무기, 총알, 오브젝트, 이펙트, 소리, AI, 이벤트 |
+| `src/Map/Event/` | 미션 이벤트. 원본 이벤트(`BuiltinEventHandler`)와 스크립트 이벤트(`ScriptEventPack`, `ScriptEventHandler`, `EventApi`) |
 | `src/Scene/` | 화면이 쓰는 창구 `GameBridge`(Autoload `Game`) |
 | `src/Dev/` | 점검 도구 |
 | `ui/` | GDScript. 화면 5종의 배치·연출·입력, `ui/common/`의 공용 도우미 |
 | `scenes/` | `.tscn`. 화면 씬과 `scenes/dev/`의 점검 씬 |
 | `shaders/` | `.gdshader` |
 | `godotdata/` | 외부 게임 데이터 JSON ([모딩 문서](modding.md)) |
+| `addons/godot_sandbox/` | Godot Sandbox 확장 (스크립트 이벤트의 실행기. Windows x86_64 용 바이너리를 버전을 고정해 커밋합니다). 저장소를 새로 받으면 `--headless --import` 를 한 번 돌려야 등록됩니다 |
 | `data/`, `addon/` | 원본 XOPS 에셋. 커밋하지 않습니다 |
 
 `data/`, `addon/`, `godotdata/`는 Godot 이 임포트하지 않습니다 (`.gdignore`). 런타임에 `GamePath.Resolve()`로 전체 경로를 얻어 파일로 직접 읽습니다.
@@ -149,6 +151,8 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `mif2_check.tscn` | — | 모든 공식 미션을 확장 형식(BD2, PD2, MIF2)으로 바꿔 미션 정보와 같은 난수 씨앗으로 돌린 100틱의 결과가 원본과 같은지, 에드온 데이터와 10000 번호 규칙, MIF2 의 형식 오류, 미션 목록 스캔, MIF 추가 오브젝트의 변환 |
 | `pd2_check.tscn` | — | 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰된 사람·무기·오브젝트가 같은지, 255 를 넘는 번호, 추가 파라미터, 방향, 이벤트 줄 수, 깨진 파일 |
 | `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠, 면 위 재생(데칼의 방향과 띄우는 거리) |
+| `event_check.tscn` | — | 스크립트 이벤트: 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 화면 글자와 Interact, 실패한 줄만 멈추는지, 로드 때 거절되는 경우, 기본 제공 묶음의 이벤트 전부 |
+| `script_probe.tscn` | — | Godot Sandbox 의 격리와 자원 제한 (아래) |
 
 눈으로 확인하는 도구 (`--headless` 없이 실행):
 
@@ -156,7 +160,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 - `map_viewer.tscn` — 미션을 골라 자유 카메라로 봅니다. `-- --mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]`로 화면을 저장하고 종료합니다. `-- --file 경로`는 미션 대신 블록 데이터 파일(BD1, BD2) 하나를 띄웁니다 (게임 폴더 기준 경로).
 - `mif2_check.tscn` — 원본 미션을 확장 형식 한 벌(BD2, 텍스처 목록, PD2, `.msg`, MIF2)로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로). `-- --convert-official 번호 출력폴더`는 공식 미션 하나, `-- --convert-official all 출력폴더`는 공식 미션 전부, `-- --convert 입력.mif 출력폴더`는 MIF 미션 하나입니다. 출력 폴더를 `addon.json`에 페이지로 등록하면 메뉴에서 고를 수 있습니다.
 - `pd2_check.tscn` — `-- --convert 입력.pd1 출력.pd2`로 PD1 하나를 PD2 로 바꿉니다. 같은 이름의 `.msg`도 복사합니다 (헤드리스 가능, 게임 폴더 기준 경로).
-- `script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 로드·호출하고, 격리(파일, 프로그램 실행, 씬 트리 접근 등 21가지 시도)와 자원 제한, 실패 통지를 확인합니다 (헤드리스 가능). 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe` 로 돌립니다.
+- `script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 로드·호출하고, 격리(파일, 프로그램 실행, 씬 트리 접근 등 21가지 시도)와 자원 제한, 실패 통지를 확인합니다 (헤드리스 가능). 측정값도 출력합니다: 메모리 한도가 듣는 범위, 스크립트 하나의 컴파일 비용, 실행 예산별로 부를 수 있는 API 호출 수. 확장의 버전을 올리거나 샌드박스 연결을 고친 뒤에 돌립니다. 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe` (`dev/event_check` 도 같은 방식).
 - `block_bench.tscn` — 블록 수를 늘려 가며 한 틱에 걸리는 시간과 레이·내부 판정 한 번의 시간을 잽니다 (헤드리스 가능). 점검이 아니라 측정입니다. 인자: `-- [--ticks 수] [--mission 번호]`.
 - `bd2_check.tscn` — `-- --convert 입력.bd1 출력.bd2`로 BD1 하나를 BD2 와 텍스처 목록(`출력_textures.json`)으로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로).
 - `effect_viewer.tscn` — 이펙트 프리셋을 골라 봅니다. 인자: `-- [--effect 번호] [--additive] [--screenshot 경로.png]`. 창에서는 ← →(프리셋), Space(다시 재생), B(가산 미리보기), ↑ ↓(카메라 거리).
@@ -212,7 +216,7 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 | `info` | 디버그 텍스트(플레이어 위치·체력·무기, AI 상태별 인원, 미션 결과)를 켜고 끕니다. 화면 왼쪽 위에 나오고, 콘솔이 열려 있으면 콘솔 상자 뒤로 비쳐 보입니다 |
 | `human` | 사람 수와 팀별 생존자 수 |
 | `result` | 지금까지의 통계 (발사, 명중, 헤드샷, 킬, 시간) |
-| `event` | 이벤트 줄마다 기다리는 포인트와 미션 결과 |
+| `event` | 이벤트 줄마다 기다리는 포인트와 그 이벤트의 이름, 멈춘 줄, 미션 결과 |
 | `nodamage [번호]` | 무적을 켜고 끕니다. 번호가 없으면 플레이어 |
 | `treat [번호]` | 체력을 처음 값으로 되돌립니다. 번호가 없으면 플레이어 |
 | `teleport 번호` | 플레이어를 그 사람의 자리로 옮깁니다 |
@@ -231,6 +235,8 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 | `loadmap 블록파일 포인트파일 [하늘]` | 블록 파일(BD1, BD2)과 포인트 파일(PD1, PD2)을 직접 로드하고 바로 플레이합니다. 경로는 게임 폴더 기준입니다. 하늘 번호를 생략하면 0 입니다. 미션 파일이 없으므로 브리핑이 없고, 추가 충돌 검사와 어두운 화면은 꺼져 있습니다. 파일이 없으면 지금 화면을 그대로 두고, 파일은 있는데 로드에 실패하면 메뉴로 돌아갑니다 |
 | `loadmission 번호 [skipbriefing]` | 공식 미션을 목록의 번호(0 부터, `mission_data.json`의 `officialMissions` 순서)로 로드하고 바로 플레이합니다. `skipbriefing`에 `false`를 주면 브리핑부터 보여 줍니다 (생략하면 `true`) |
 | `loadmissionmif 미션파일 [skipbriefing]` | 미션 파일(MIF 또는 MIF2) 하나를 로드하고 바로 플레이합니다. 미션 목록에 없는 파일도 됩니다. `skipbriefing`은 위와 같습니다. 경로는 게임 폴더 기준입니다 |
+| `hudtext 칸 글꼴 기준점 x y 크기 글자` | 이벤트가 놓는 화면 글자를 직접 놓아 자리를 맞춰 봅니다. 글꼴은 0 이 OS 글꼴, 1 이 `char.dds`. 기준점은 0(왼쪽 위)에서 8(오른쪽 아래) 사이이고 4 가 화면 가운데. x, y 는 기준점에서의 오프셋(화면 높이 480 기준, y 는 위가 양수). 값의 뜻은 [모딩 문서](modding.md#스크립트-이벤트)와 같습니다 |
+| `hudtext clear` | 화면 글자를 전부 지웁니다 |
 | `collider human` / `weapon` / `object` | 판정 범위를 선으로 그립니다. `human`은 사람의 총알 판정 원기둥(초록), `weapon`은 떨어진 무기의 줍기 범위(빨강. 사람의 발이 이 원기둥 안에 들어오면 줍습니다), `object`는 오브젝트의 판정 형상(파랑). 종류마다 따로 켜고 끄고, 벽에 가려지지 않습니다. 1인칭에서는 자기 원기둥을 그리지 않습니다 |
 | `fog` | 안개를 켜고 끕니다 |
 | `sky 번호` | 하늘을 그 번호로 바꿉니다 (0 은 없음). 번호의 범위는 `sky_data.json`의 `skyTexturePath` 개수입니다 |
@@ -241,6 +247,19 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 로그는 `Debugger.LogWarning` / `LogError`로 남깁니다. 메모리에 쌓여 콘솔로 전달되고(익스포트 빌드에서도), 에디터에서는 Godot 출력 창에도 나옵니다. 콘솔에 나오므로 메시지는 영어로 씁니다.
 
 메뉴에서 미션을 눌렀는데 로드에 실패하면, 콘솔이 꺼져 있어도 타이틀 아래에 이유 한 줄이 잠깐 나옵니다 (`Game.LastLoadError`).
+
+## 스크립트 이벤트의 구조
+
+모더가 읽는 설명(등록 파일, API, 기본 제공 이벤트)은 [모딩 문서](modding.md#스크립트-이벤트)에 있습니다. 여기는 코드 쪽입니다.
+
+- `EventManager` 는 처리기 인터페이스 `IEventHandler` 만 압니다. 줄(`EventLine`)이 있는 포인트의 종류로 처리기를 찾아 `Tick` 을 부르고, 돌려받은 출구 번호로 다음 포인트를 구합니다. 원본 이벤트 10 에서 19 사이는 `BuiltinEventHandler`, 20 이상은 `ScriptEventHandler` 입니다.
+- 묶음 하나가 `ScriptEventPack` 하나이고 SafeGDScript 하나를 Godot Sandbox 안에서 돌립니다. **외부에서 받은 스크립트는 이 길로만 실행합니다.** 일반 GDScript 로 컴파일하지 않고, 격리를 걸 수 없으면 로드를 거절합니다.
+- 샌드박스 노드는 씬 트리에 넣지 않습니다. 그래서 스크립트의 `_ready` / `_process` 는 돌지 않고 이벤트 틱(`SimOrder` 300)에서 부를 때만 실행됩니다.
+- 스크립트에는 `EventApi` 의 함수 표(사전에 담은 `Callable`)만 넘깁니다. 값만 주고받고, 노드나 객체를 넘기지 않습니다 (넘긴 객체는 샌드박스의 제한과 무관하게 접근됩니다). 파일 경로를 받는 함수도 두지 않습니다. 화면용 창구 `Game` 은 넘기지 않습니다.
+- API 에 함수를 더할 때는 `EventApi` 생성자의 표에 한 줄을 더하고 [모딩 문서](modding.md#api)의 표도 고칩니다. 스크립트가 넘긴 값(범위, 유한한 수인지, 사전의 형식)은 받는 쪽에서 확인합니다.
+- 실패는 호출 앞뒤로 샌드박스의 예외 횟수를 비교해 알아냅니다 (스크립트 안의 오류, 막힌 호출, 실행 예산 초과가 모두 여기에 잡힙니다). 실패한 줄만 멈춥니다.
+- 스크립트 하나를 컴파일해 처음 올리는 데 약 150 ms 와 32 MB 가 듭니다. 그래서 종류마다가 아니라 묶음마다 스크립트 하나이고, 미션이 쓰는 묶음만 올리며, 컴파일 결과는 파일이 바뀌지 않으면 다시 씁니다.
+- Interact 키는 `PlayerController` 가 `EventManager.QueueInteract()` 로 넘기고 다음 틱 한 번 동안 읽힙니다. 화면 글자는 `EventManager` 가 칸(32개)으로 들고, HUD(`ui/maingame.gd`)가 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽어 다시 그립니다.
 
 ## 원본과 다르게 한 동작
 
@@ -266,6 +285,7 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 | 수류탄을 든 AI 가 전투 중 무기 바꾸기 | 확률로 바꿈 | 다 던진 뒤에 바꿈 |
 | 경로·이벤트의 다음 포인트 찾기 | 종류와 무관하게 같은 번호의 첫 포인트 | 종류별로 찾음 (번호가 겹쳐도 끊기지 않음) |
 | 소리를 듣는 시점 | 다음 프레임 | 같은 틱 |
+| 자동 판정 (적 전멸, 플레이어 사망) | 늘 켜짐 | 스크립트 이벤트가 끌 수 있음 (미션을 시작할 때는 켜져 있음) |
 
 ### 화면
 

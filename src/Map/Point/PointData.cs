@@ -92,6 +92,10 @@ namespace GodotXOPS
         private ShaderMaterial m_untexturedMaterial;
         private Human m_player;
         private int[] m_eventEntryIds = s_legacyEventEntryIds;
+        // 이벤트 포인트로 조회할 종류 번호. 원본의 10~19 에, 확장 형식이면 이 맵이 쓰는 스크립트 이벤트의 종류가 더해진다.
+        private readonly List<int> m_eventPointTypes = new List<int>();
+        // 스크립트가 놓은 것까지 합친 소물 수의 상한. 스크립트가 소물을 끝없이 만드는 것을 막는다.
+        private const int k_maxSmallObjects = 256;
 
         // 종류(param0)별 → 식별번호(param3)별 포인트 목록. 파일 순서를 유지한다.
         private Dictionary<int, Dictionary<int, List<RawPointData>>> m_sortedRawPointData;
@@ -166,6 +170,29 @@ namespace GodotXOPS
                     byId[raw.param3] = list;
                 }
                 list.Add(raw);
+            }
+
+            // 확장 형식에서 20 이상의 종류는 스크립트 이벤트다. 등록되지 않았거나 스크립트를 올리지 못하면 미션을 로드하지 않는다.
+            // 원본 형식(PD1)은 원본대로만 돈다.
+            loader.m_eventPointTypes.Clear();
+            for (int type = PointEventFirst; type <= PointEventLast; type++)
+            {
+                loader.m_eventPointTypes.Add(type);
+            }
+            if (pd2 && EventManager.Loaded)
+            {
+                var scriptTypes = new List<int>();
+                foreach (int type in loader.m_sortedRawPointData.Keys)
+                {
+                    if (type >= EventManager.ScriptEventFirst) scriptTypes.Add(type);
+                }
+                scriptTypes.Sort();
+                if (!EventManager.Instance.LoadScripts(scriptTypes, loader.m_addonEventDataPath))
+                {
+                    UnloadPointData();
+                    return false;
+                }
+                loader.m_eventPointTypes.AddRange(scriptTypes);
             }
 
             // 원본 LoadPointData 는 파일 순서대로 순회하며 HUMAN/HUMAN2 를 스폰한다. 인간 정보(HUMANINFO)는 param1 로 찾고 첫 매치를 쓴다.
@@ -336,7 +363,12 @@ namespace GodotXOPS
             SimClock.Unregister(loader.m_humanCollision);
             SimClock.Unregister(loader.m_aiController);
             SimClock.Unregister(loader.m_stats);
-            if (EventManager.Loaded) EventManager.Instance.StopMission();
+            if (EventManager.Loaded)
+            {
+                EventManager.Instance.StopMission();
+                EventManager.Instance.UnloadScripts();
+            }
+            loader.m_eventPointTypes.Clear();
             if (BulletManager.Loaded) BulletManager.Instance.Clear();
             if (WeaponManager.Loaded) WeaponManager.Instance.Clear();
             if (EffectManager.Loaded) EffectManager.Instance.Clear();
@@ -409,13 +441,13 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 이벤트 포인트를 식별번호로 조회한다. 이벤트 종류(10~19) 전체에서 찾는다. 경로와 마찬가지로 다른 종류의 포인트는 보지 않는다.
+        /// 이벤트 포인트를 식별번호로 조회한다. 이벤트 종류(10~19 와 이 맵이 쓰는 스크립트 이벤트) 전체에서 찾는다. 경로와 마찬가지로 다른 종류의 포인트는 보지 않는다.
         /// </summary>
         /// <param name="id">식별번호.</param>
         /// <returns>첫 매치. 없으면 null (이벤트 줄 끝).</returns>
         public static RawPointData GetEventPoint(int id)
         {
-            for (int type = PointEventFirst; type <= PointEventLast; type++)
+            foreach (int type in Instance.m_eventPointTypes)
             {
                 RawPointData point = GetPoint(type, id);
                 if (point != null) return point;
@@ -493,6 +525,55 @@ namespace GodotXOPS
             human.SetSelectWeapon(source.SelectWeapon);
             loader.m_humans.Add(human);
             return human;
+        }
+
+        /// <summary>
+        /// 이벤트가 미션 도중에 사람을 새로 세운다. 맵을 로드할 때와 같이 사람 정보 포인트(종류 4: 사람 데이터 번호와 팀)를 바탕으로 만든다.
+        /// </summary>
+        /// <param name="infoId">사람 정보 포인트의 식별번호 (사람 포인트의 P2 에 적는 번호).</param>
+        /// <param name="position">위치 (발밑).</param>
+        /// <param name="yaw">방향 (사람 기준 yaw, 도).</param>
+        /// <param name="identifier">식별번호. 이벤트가 이 사람을 가리킬 때 쓴다. 0 이어도 플레이어가 되지는 않는다.</param>
+        /// <param name="pathId">처음 향할 경로 포인트의 식별번호. 없는 번호면 경로가 없는 사람이 된다.</param>
+        /// <returns>새 사람의 인덱스. 맵이 로드돼 있지 않거나, 사람 수가 상한이거나, 그 번호의 사람 정보 포인트가 없으면 −1.</returns>
+        public static int SpawnHuman(int infoId, Vector3 position, float yaw, int identifier, int pathId)
+        {
+            MapLoader loader = Instance;
+            if (loader.m_sortedRawPointData == null || loader.m_humans.Count >= k_maxHumans || !position.IsFinite()) return -1;
+
+            RawPointData info = GetPoint(PointHumanInfo, infoId);
+            if (info == null) return -1;
+
+            var point = new RawPointData { position = position, look = yaw, param0 = PointHuman, param1 = infoId, param2 = pathId, param3 = identifier };
+
+            var human = new Human { Name = $"Human_{loader.m_humans.Count}" };
+            loader.m_humanRoot.AddChild(human);
+            human.CreateHuman(point, info);
+            loader.m_humans.Add(human);
+            return loader.m_humans.Count - 1;
+        }
+
+        /// <summary>
+        /// 이벤트가 미션 도중에 소물을 새로 놓는다.
+        /// </summary>
+        /// <param name="objectIndex">소물 데이터 번호.</param>
+        /// <param name="identifier">식별번호.</param>
+        /// <param name="position">위치.</param>
+        /// <param name="yaw">방향 (사람 기준 yaw, 도. 소물 포인트의 look 과 같다).</param>
+        /// <param name="snap">true 면 바닥에 붙인다.</param>
+        /// <returns>놓았으면 true. 맵이 로드돼 있지 않거나, 소물 수가 상한이거나, 없는 소물 데이터면 false.</returns>
+        public static bool SpawnSmallObject(int objectIndex, int identifier, Vector3 position, float yaw, bool snap)
+        {
+            MapLoader loader = Instance;
+            if (loader.m_sortedRawPointData == null || loader.m_smallObjects.Count >= k_maxSmallObjects) return false;
+            if (!DataManager.Instance.ObjectParameterData.objectData.Has(objectIndex) || !position.IsFinite()) return false;
+
+            var smallObject = new SmallObject { Name = $"Object_{loader.m_smallObjects.Count}" };
+            loader.m_objectRoot.AddChild(smallObject);
+            smallObject.CreateObject(objectIndex, identifier, position, yaw - k_modelYawOffset);
+            if (snap) smallObject.SnapToGround();
+            loader.m_smallObjects.Add(smallObject);
+            return true;
         }
 
         /// <summary>

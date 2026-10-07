@@ -1,0 +1,233 @@
+# GodotXOPS base event pack (event types 20 to 99). Registered in base.json.
+# Each function handles one event type: it is called every tick while an event line is on that point.
+# p = named parameters of the point (plus id, x, y, z, yaw), state = storage of the line (cleared when the line moves on).
+# Return -1 to wait, or the number of the exit to leave through (0 = first exit).
+
+var api
+
+func init(a):
+	api = a
+
+func compare(a, op, b):
+	if op == 0:
+		return a == b
+	if op == 1:
+		return a != b
+	if op == 2:
+		return a < b
+	if op == 3:
+		return a <= b
+	if op == 4:
+		return a > b
+	return a >= b
+
+# ---- wait
+
+func wait_var(p, state):
+	if compare(api["get_var"].call(p["var"]), p["op"], p["value"]):
+		return 0
+	return -1
+
+func wait_team_alive(p, state):
+	if api["team_alive"].call(p["team"]) <= p["count"]:
+		return 0
+	return -1
+
+func wait_area(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		return -1
+	var h = api["human"].call(i)
+	var dx = h["x"] - p["x"]
+	var dy = h["y"] - p["y"]
+	var dz = h["z"] - p["z"]
+	if dx * dx + dy * dy + dz * dz <= p["radius"] * p["radius"]:
+		return 0
+	return -1
+
+func wait_hp(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		return -1
+	if api["human"].call(i)["hp"] <= p["hp"]:
+		return 0
+	return -1
+
+func wait_weapon(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		return -1
+	if api["human"].call(i)["weapon"] == p["weapon"]:
+		return 0
+	return -1
+
+func wait_ticks(p, state):
+	var n = state.get("n", 0) + 1
+	state["n"] = n
+	if n > p["ticks"]:
+		return 0
+	return -1
+
+func wait_interact(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		return -1
+	if i != api["player"].call():
+		return -1
+	var h = api["human"].call(i)
+	if not h["alive"]:
+		return -1
+	var dx = h["x"] - p["x"]
+	var dy = h["y"] - p["y"]
+	var dz = h["z"] - p["z"]
+	if dx * dx + dy * dy + dz * dz > p["radius"] * p["radius"]:
+		return -1
+	if p["angle"] < 180.0:
+		if api["look_angle"].call(i, p["x"], p["y"], p["z"]) > p["angle"]:
+			return -1
+	if api["interact_pressed"].call():
+		api["hud_clear"].call(31)
+		return 0
+	var text = "PRESS " + api["key_name"].call("interact")
+	if p["message"] >= 0:
+		text = api["message_text"].call(p["message"])
+	# Slot 31 is the prompt slot of this pack. The text lasts 0.1 s and is renewed every tick, so it disappears by itself when the condition ends.
+	api["hud_text"].call(31, text, {"font": 1, "anchor": 4, "x": 0.0, "y": -40.0, "size": 16.0, "seconds": 0.1})
+	return -1
+
+# ---- action
+
+func set_var(p, state):
+	api["set_var"].call(p["var"], p["value"])
+	return 0
+
+func add_var(p, state):
+	api["set_var"].call(p["var"], api["get_var"].call(p["var"]) + p["value"])
+	return 0
+
+func spawn_human(p, state):
+	api["spawn_human"].call(p["info"], p["x"], p["y"], p["z"], p["yaw"], p["new_id"], p["path"])
+	return 0
+
+func spawn_weapon(p, state):
+	api["spawn_weapon"].call(p["weapon"], p["bullets"], p["x"], p["y"], p["z"], p["yaw"])
+	return 0
+
+func spawn_object(p, state):
+	api["spawn_object"].call(p["object_data"], p["new_id"], p["x"], p["y"], p["z"], p["yaw"], p["snap"])
+	return 0
+
+func kill_human(p, state):
+	api["kill"].call(api["find_human"].call(p["human"]))
+	return 0
+
+func damage_human(p, state):
+	api["damage"].call(api["find_human"].call(p["human"]), p["amount"])
+	return 0
+
+func move_human(p, state):
+	api["teleport"].call(api["find_human"].call(p["human"]), p["x"], p["y"], p["z"])
+	return 0
+
+func set_team(p, state):
+	api["set_team"].call(api["find_human"].call(p["human"]), p["team"])
+	return 0
+
+func set_path_mode(p, state):
+	api["set_path_mode"].call(p["path"], p["mode"])
+	return 0
+
+func destroy_object(p, state):
+	api["destroy_object"].call(p["object"])
+	return 0
+
+func play_effect(p, state):
+	api["effect"].call(p["effect"], p["x"], p["y"], p["z"])
+	return 0
+
+func set_auto_judge(p, state):
+	api["set_auto_judge"].call(p["enabled"] != 0)
+	return 0
+
+# Slot 1 is the primary slot (held when the mission starts), slot 0 is the secondary slot.
+func give_weapon_primary(p, state):
+	api["give_weapon"].call(api["find_human"].call(p["human"]), 1, p["weapon"], p["bullets"])
+	return 0
+
+func give_weapon_secondary(p, state):
+	api["give_weapon"].call(api["find_human"].call(p["human"]), 0, p["weapon"], p["bullets"])
+	return 0
+
+# ---- flow
+
+func branch_var(p, state):
+	if compare(api["get_var"].call(p["var"]), p["op"], p["value"]):
+		return 0
+	return 1
+
+func branch_random(p, state):
+	if api["random"].call(100) < p["percent"]:
+		return 0
+	return 1
+
+func random_exit(p, state):
+	var count = p["count"]
+	if count < 1:
+		count = 1
+	if count > 4:
+		count = 4
+	return api["random"].call(count)
+
+func start_line(p, state):
+	api["start_line"].call(p["line"], p["target"])
+	return 0
+
+func stop_line(p, state):
+	api["stop_line"].call(p["line"])
+	return 0
+
+# ---- screen text
+
+func text_options(p, seconds):
+	return {"font": p["font"], "anchor": p["anchor"], "x": p["tx"], "y": p["ty"], "size": p["size"], "color": p["color"], "seconds": seconds}
+
+func format_value(value, format):
+	if format != 1:
+		return str(value)
+	if value < 0:
+		value = 0
+	var minutes = value / 60
+	var seconds = value % 60
+	if seconds < 10:
+		return str(minutes) + ":0" + str(seconds)
+	return str(minutes) + ":" + str(seconds)
+
+func show_text(p, state):
+	api["hud_text"].call(p["slot"], api["message_text"].call(p["message"]), text_options(p, p["seconds"]))
+	return 0
+
+func clear_text(p, state):
+	api["hud_clear"].call(p["slot"])
+	return 0
+
+func show_var(p, state):
+	api["hud_text"].call(p["slot"], format_value(api["get_var"].call(p["var"]), p["format"]), text_options(p, p["seconds"]))
+	return 0
+
+# Counts down while its line stays here. One second is 100 / 3 ticks.
+func countdown(p, state):
+	var now = api["tick"].call()
+	var start = state.get("start", -1)
+	if start < 0:
+		start = now
+		state["start"] = start
+	var left = p["seconds"] - ((now - start) * 3) / 100
+	if left < 0:
+		left = 0
+	if p["var"] >= 0:
+		api["set_var"].call(p["var"], left)
+	if left <= 0:
+		api["hud_clear"].call(p["slot"])
+		return 0
+	api["hud_text"].call(p["slot"], format_value(left, p["format"]), text_options(p, 0.1))
+	return -1

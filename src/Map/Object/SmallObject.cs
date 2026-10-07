@@ -173,6 +173,17 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 내구력과 무관하게 바로 부순다 (스크립트 이벤트). 피격음은 내지 않는다.
+        /// </summary>
+        public void Break()
+        {
+            if (m_destroyed) return;
+
+            m_hp = 0f;
+            StartDestruction();
+        }
+
+        /// <summary>
         /// 피격음을 내고 내구력을 깎는다. 0 이하가 되면 부서진다.
         /// </summary>
         /// <param name="amount">데미지.</param>

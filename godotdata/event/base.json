@@ -1,0 +1,879 @@
+{
+  "scriptPath": "godotdata/event/base.sgd",
+  "events": [
+    {
+      "type": 20,
+      "name": "Wait Variable",
+      "function": "wait_var",
+      "parameters": [
+        {
+          "name": "var",
+          "slot": "p2",
+          "kind": "var"
+        },
+        {
+          "name": "op",
+          "slot": "e0",
+          "kind": "compare"
+        },
+        {
+          "name": "value",
+          "slot": "e1",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 21,
+      "name": "Wait Team Alive",
+      "function": "wait_team_alive",
+      "parameters": [
+        {
+          "name": "team",
+          "slot": "p2",
+          "kind": "team"
+        },
+        {
+          "name": "count",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 22,
+      "name": "Wait Area",
+      "function": "wait_area",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "radius",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 23,
+      "name": "Wait HP",
+      "function": "wait_hp",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "hp",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 24,
+      "name": "Wait Weapon",
+      "function": "wait_weapon",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "weapon",
+          "slot": "e0",
+          "kind": "weapon"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 25,
+      "name": "Wait Ticks",
+      "function": "wait_ticks",
+      "parameters": [
+        {
+          "name": "ticks",
+          "slot": "p2",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 26,
+      "name": "Wait Interact",
+      "function": "wait_interact",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "radius",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "angle",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "message",
+          "slot": "e2",
+          "kind": "message"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 40,
+      "name": "Set Variable",
+      "function": "set_var",
+      "parameters": [
+        {
+          "name": "var",
+          "slot": "p2",
+          "kind": "var"
+        },
+        {
+          "name": "value",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 41,
+      "name": "Add Variable",
+      "function": "add_var",
+      "parameters": [
+        {
+          "name": "var",
+          "slot": "p2",
+          "kind": "var"
+        },
+        {
+          "name": "value",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 42,
+      "name": "Spawn Human",
+      "function": "spawn_human",
+      "parameters": [
+        {
+          "name": "info",
+          "slot": "p2",
+          "kind": "humaninfo"
+        },
+        {
+          "name": "new_id",
+          "slot": "e0",
+          "kind": "int"
+        },
+        {
+          "name": "path",
+          "slot": "e1",
+          "kind": "path"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 43,
+      "name": "Spawn Weapon",
+      "function": "spawn_weapon",
+      "parameters": [
+        {
+          "name": "weapon",
+          "slot": "p2",
+          "kind": "weapon"
+        },
+        {
+          "name": "bullets",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 44,
+      "name": "Spawn Object",
+      "function": "spawn_object",
+      "parameters": [
+        {
+          "name": "object_data",
+          "slot": "p2",
+          "kind": "objectdata"
+        },
+        {
+          "name": "new_id",
+          "slot": "e0",
+          "kind": "int"
+        },
+        {
+          "name": "snap",
+          "slot": "e1",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 45,
+      "name": "Kill Human",
+      "function": "kill_human",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 46,
+      "name": "Damage Human",
+      "function": "damage_human",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "amount",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 47,
+      "name": "Move Human",
+      "function": "move_human",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 48,
+      "name": "Set Team",
+      "function": "set_team",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "team",
+          "slot": "e0",
+          "kind": "team"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 49,
+      "name": "Set Path Mode",
+      "function": "set_path_mode",
+      "parameters": [
+        {
+          "name": "path",
+          "slot": "p2",
+          "kind": "path"
+        },
+        {
+          "name": "mode",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 50,
+      "name": "Destroy Object",
+      "function": "destroy_object",
+      "parameters": [
+        {
+          "name": "object",
+          "slot": "p2",
+          "kind": "object"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 51,
+      "name": "Play Effect",
+      "function": "play_effect",
+      "parameters": [
+        {
+          "name": "effect",
+          "slot": "p2",
+          "kind": "effect"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 52,
+      "name": "Set Auto Judge",
+      "function": "set_auto_judge",
+      "parameters": [
+        {
+          "name": "enabled",
+          "slot": "p2",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 53,
+      "name": "Give Weapon Primary",
+      "function": "give_weapon_primary",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "weapon",
+          "slot": "e0",
+          "kind": "weapon"
+        },
+        {
+          "name": "bullets",
+          "slot": "e1",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 54,
+      "name": "Give Weapon Secondary",
+      "function": "give_weapon_secondary",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "weapon",
+          "slot": "e0",
+          "kind": "weapon"
+        },
+        {
+          "name": "bullets",
+          "slot": "e1",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 60,
+      "name": "Branch Variable",
+      "function": "branch_var",
+      "parameters": [
+        {
+          "name": "var",
+          "slot": "p2",
+          "kind": "var"
+        },
+        {
+          "name": "op",
+          "slot": "e0",
+          "kind": "compare"
+        },
+        {
+          "name": "value",
+          "slot": "e1",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "true",
+          "slot": "p3",
+          "kind": "event"
+        },
+        {
+          "name": "false",
+          "slot": "e2",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 61,
+      "name": "Branch Random",
+      "function": "branch_random",
+      "parameters": [
+        {
+          "name": "percent",
+          "slot": "p2",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "hit",
+          "slot": "p3",
+          "kind": "event"
+        },
+        {
+          "name": "miss",
+          "slot": "e0",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 62,
+      "name": "Random Exit",
+      "function": "random_exit",
+      "parameters": [
+        {
+          "name": "count",
+          "slot": "p2",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "exit0",
+          "slot": "p3",
+          "kind": "event"
+        },
+        {
+          "name": "exit1",
+          "slot": "e0",
+          "kind": "event"
+        },
+        {
+          "name": "exit2",
+          "slot": "e1",
+          "kind": "event"
+        },
+        {
+          "name": "exit3",
+          "slot": "e2",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 63,
+      "name": "Start Line",
+      "function": "start_line",
+      "parameters": [
+        {
+          "name": "line",
+          "slot": "p2",
+          "kind": "line"
+        },
+        {
+          "name": "target",
+          "slot": "e0",
+          "kind": "event"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 64,
+      "name": "Stop Line",
+      "function": "stop_line",
+      "parameters": [
+        {
+          "name": "line",
+          "slot": "p2",
+          "kind": "line"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 70,
+      "name": "Show Text",
+      "function": "show_text",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "slot"
+        },
+        {
+          "name": "message",
+          "slot": "e0",
+          "kind": "message"
+        },
+        {
+          "name": "font",
+          "slot": "e1",
+          "kind": "font"
+        },
+        {
+          "name": "anchor",
+          "slot": "e2",
+          "kind": "anchor"
+        },
+        {
+          "name": "tx",
+          "slot": "e3",
+          "kind": "float"
+        },
+        {
+          "name": "ty",
+          "slot": "e4",
+          "kind": "float"
+        },
+        {
+          "name": "size",
+          "slot": "e5",
+          "kind": "float"
+        },
+        {
+          "name": "color",
+          "slot": "e6",
+          "kind": "color"
+        },
+        {
+          "name": "seconds",
+          "slot": "e7",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 71,
+      "name": "Clear Text",
+      "function": "clear_text",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "slot"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 72,
+      "name": "Countdown",
+      "function": "countdown",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "slot"
+        },
+        {
+          "name": "seconds",
+          "slot": "e0",
+          "kind": "int"
+        },
+        {
+          "name": "format",
+          "slot": "e1",
+          "kind": "format"
+        },
+        {
+          "name": "var",
+          "slot": "e2",
+          "kind": "var"
+        },
+        {
+          "name": "font",
+          "slot": "e3",
+          "kind": "font"
+        },
+        {
+          "name": "anchor",
+          "slot": "e4",
+          "kind": "anchor"
+        },
+        {
+          "name": "tx",
+          "slot": "e5",
+          "kind": "float"
+        },
+        {
+          "name": "ty",
+          "slot": "e6",
+          "kind": "float"
+        },
+        {
+          "name": "size",
+          "slot": "e7",
+          "kind": "float"
+        },
+        {
+          "name": "color",
+          "slot": "e8",
+          "kind": "color"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 73,
+      "name": "Show Variable",
+      "function": "show_var",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "slot"
+        },
+        {
+          "name": "var",
+          "slot": "e0",
+          "kind": "var"
+        },
+        {
+          "name": "format",
+          "slot": "e1",
+          "kind": "format"
+        },
+        {
+          "name": "font",
+          "slot": "e2",
+          "kind": "font"
+        },
+        {
+          "name": "anchor",
+          "slot": "e3",
+          "kind": "anchor"
+        },
+        {
+          "name": "tx",
+          "slot": "e4",
+          "kind": "float"
+        },
+        {
+          "name": "ty",
+          "slot": "e5",
+          "kind": "float"
+        },
+        {
+          "name": "size",
+          "slot": "e6",
+          "kind": "float"
+        },
+        {
+          "name": "color",
+          "slot": "e7",
+          "kind": "color"
+        },
+        {
+          "name": "seconds",
+          "slot": "e8",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    }
+  ]
+}

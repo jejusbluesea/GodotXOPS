@@ -93,6 +93,8 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 C# 에서 로드·호출하고, 빠져나가려는 스크립트 21가지와 자원 제한(무한 루프, 재귀, 배열 폭주), 실패 통지를 확인하는 시제품이다 (헤드리스). 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe`. 확장의 버전을 올리거나 샌드박스 연결을 고친 뒤에 돌린다.
 
+- `res://scenes/dev/event_check.tscn` — 스크립트 이벤트를 수치로 확인한다 (헤드리스). 점검용 묶음과 PD2·MIF2 를 `build/event_check/` 에 만들어 로드하고 틱을 직접 돌린다: 파라미터, 출구, 줄의 저장 칸, 미션 변수, API, 화면 글자와 Interact, 실패한 줄만 멈추는지, 로드 때 거절되는 경우, 기본 제공 묶음 전부, 모딩 문서의 예제 스크립트. 이벤트, `EventApi`, 샌드박스 연결, `godotdata/event/` 를 고친 뒤에 돌린다.
+
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 
 게임 자체는 씬을 지정하지 않고 실행한다 (`--path .`만). 화면을 고친 뒤에는 개발용 인자("--" 뒤)로 직접 확인한다:
@@ -172,6 +174,21 @@ dotnet build GodotXOPS.csproj
 - **원본의 제한은 원본 형식(PD1)에만 건다** (사용자 결정으로 푼 것. PD1 까지 풀면 원본과 다른 틱에 이벤트가 일어난다): 메시지 16개와 한 틱에 한 줄이 처리하는 이벤트 6개는 `MapLoader.PointDataExtended` 가 false 일 때만이다. PD2 는 기다리는 이벤트를 만날 때까지 한 틱에 다 처리하고, 이번 틱에 이미 지난 포인트로 돌아오면 다음 틱으로 넘긴다 (바로 넘어가는 이벤트의 고리에서 틱이 끝나지 않는 것을 막는다). 포인트 종류 번호에는 제한이 없다 (종류별 사전).
 - `EventManager`(Autoload, SimOrder 300)가 이벤트 줄들과 자동 판정을 돌린다. `BeginMission()`을 부른 뒤에만 돌고 맵을 내리면 멈춘다. UI(GDScript)는 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`와 프로퍼티 `Result`, `EndTicks`, `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`를 쓴다.
 
+## 스크립트 이벤트
+
+- 포인트 종류 10 에서 19 는 `BuiltinEventHandler`(원본 그대로), **20 이상은 스크립트 이벤트**다 (`ScriptEventHandler`). `EventManager` 는 처리기 인터페이스 `IEventHandler` 만 안다: `Tick` 이 출구 번호를 돌려주고(−1 기다림, −2 실패) `TryGetNext` 가 그 출구의 다음 식별번호를 준다. 실패한 줄만 멈춘다 (`EventLine.Stopped`).
+- **스크립트 이벤트는 PD2 에서만 돈다.** PD2 에 20 이상의 종류가 있는데 등록한 묶음이 없으면 `LoadPointData` 가 실패한다. PD1 은 전과 같다.
+- 묶음 하나 = 등록 JSON(`EventPackData`) 하나 + `.sgd` 하나 = `ScriptEventPack` 하나. 종류마다 그 안의 함수 하나다 (스크립트를 종류마다 따로 컴파일하면 하나에 약 150 ms, 32 MB 가 든다). 설치형은 `godotdata/event/*.json`(번호 20 에서 9999. 기본 제공 묶음 `base.json` 이 20 에서 99 를 쓴다), 미션 전용은 MIF2 의 `addonEventDataPath`(10000 이상). **종류 번호는 항목마다 `type` 으로 적는다** (다른 에드온 데이터처럼 목록의 순서가 번호가 아니다).
+- 계약 (사용자 결정): `init(api)` 한 번, 이벤트마다 `함수(p, state)`. 반환값은 출구 번호. `p` 는 등록 JSON 의 이름으로 채운 파라미터 사전(+ `id`, `x`, `y`, `z`, `yaw`), `state` 는 줄이 그 포인트에 머무는 동안의 저장 칸이다. 칸 표기는 원본 이름이다: `p2`(= `param1`), `p3`(= `param2`, 기본 출구), `e0` 부터 추가 파라미터.
+- 분기는 출구 여러 개로, AND / OR 는 미션 변수(`GetVariable` / `SetVariable`, 정수)로 만든다. 반복은 전용 이벤트 없이 이벤트 체인의 고리로 만든다 (사용자 결정).
+- **외부 스크립트는 `ScriptEventPack` 으로만 돌린다.** 격리(`restrictions`)를 걸 수 없으면 로드를 거절하고, 일반 GDScript 로 대신 돌리지 않는다. 샌드박스 노드는 트리에 넣지 않는다 (`_ready` / `_process` 가 돌지 않게).
+- `EventApi` 는 값만 주고받는다. 노드·객체를 넘기지 않고, 파일 경로 인자를 받지 않고, UI 용 `Game` 을 넘기지 않는다. 스크립트가 준 값은 받는 쪽에서 확인한다. 함수를 더하면 `docs/modding.md` 의 API 표도 고친다.
+- 사람 스폰은 맵 로드와 같이 **사람 정보 포인트(종류 4)를 바탕으로** 한다 (`MapLoader.SpawnHuman(infoId, ...)`. 사용자 결정). 무기 슬롯은 코드의 1 이 주 무기(시작할 때 드는 슬롯), 0 이 보조 무기다.
+- 실행 예산(`execution_timeout`)은 확장의 기본값 200 이다. 스크립트 안의 계산은 거의 들지 않고 API 호출이 예산을 쓴다 (단순한 호출 약 1000번, 사전을 돌려주는 호출 약 300번). `memory_max` 는 배열·문자열을 세지 않는다 (알려진 한계, 받아들이기로 했다).
+- **이벤트가 화면에 놓는 글자는 범용 칸이다** (사용자 결정: UI 에 제약을 걸지 않는다). `EventManager.SetHudText` / `ClearHudText`, 칸 32개, OS 글꼴과 `char.dds` 둘 다, 기준점 3×3 과 오프셋(화면 높이 480 기준, +y 위). 먼저 놓은 것이 뒤에 그려진다. 안내나 타이머를 고정 HUD 요소로 만들지 않는다. HUD 는 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽는다.
+- Interact 키는 사람이 아니라 이벤트가 받는다: `PlayerController` → `EventManager.QueueInteract()` → 다음 틱 한 번 `InteractPressed`.
+- 기본 제공 이벤트를 고치면 `base.json`, `base.sgd`, `docs/modding.md` 의 표, `event_check` 를 함께 고친다. 번호는 20개 단위로 끊는다 (20 대기, 40 동작, 60 흐름, 70 화면 글자. 사용자 결정).
+
 ## 화면 (씬 UI)
 
 - 화면은 `scenes/`의 씬 6개다: `boot` → `opening` → `mainmenu` → `briefing` → `maingame` → `result`. 각 씬은 루트 노드와 `ui/`의 GDScript 하나만 갖고, 화면 요소는 스크립트가 `_ready`에서 코드로 만든다. `maingame`만 `PlayerController`(C#) 노드를 자식으로 둔다.
@@ -216,7 +233,7 @@ dotnet build GodotXOPS.csproj
 
 유저가 읽는 문서는 `README.md`(한국어, 원문), `README.en.md`, `README.ja.md`, `ROADMAP.md`, `docs/modding.md`, `docs/development.md`다. **코드나 데이터를 고치면 같은 작업 안에서 해당 문서도 고친다.** 문서가 실제 동작과 어긋난 채로 커밋하지 않는다.
 
-- `docs/modding.md`를 고쳐야 하는 변경: `godotdata/` JSON 의 키 추가·삭제·이름 변경, 값의 뜻이나 단위 변경, 열거형 값, 파일 추가, 지원하는 파일 형식, 에드온 페이지 방식, 풀 크기 같은 제한.
+- `docs/modding.md`를 고쳐야 하는 변경: 스크립트 이벤트의 API·기본 제공 이벤트·등록 파일의 키, `godotdata/` JSON 의 키 추가·삭제·이름 변경, 값의 뜻이나 단위 변경, 열거형 값, 파일 추가, 지원하는 파일 형식, 에드온 페이지 방식, 풀 크기 같은 제한.
 - `docs/development.md`를 고쳐야 하는 변경: 빌드·익스포트 방법, 폴더 구조, 틱 순서(`SimOrder`)와 프레임 순서, Autoload 순서, 점검 씬과 인자, 개발용 실행 인자, 디버그 콘솔의 명령, 원본과 다르게 하기로 한 동작, 코드 규칙. 버전 규칙은 문서에 넣지 않는다 (사용자 결정. `TODO.md`에만 있다).
 - `ROADMAP.md`(한국어)는 버전별 현황이다: 버전, 이름, 상태(설계 중 → 작업 중 → 릴리즈됨), 항목 체크리스트. 버전에 넣을 것이 정해지거나 항목이 끝나거나 릴리즈하면 고친다. 항목은 유저가 읽는 수준으로만 적고, 설계의 세부 결정은 `TODO.md`에 둔다.
 - `README.md`를 고쳐야 하는 변경: 기능 목록, 설치 방법, 기본 키, 최신 릴리즈 버전, 앞으로 할 것(`ROADMAP.md`와 맞춘다). 고치면 `README.en.md`와 `README.ja.md`도 같은 내용으로 고친다 (두 번역은 맨 위에 AI 번역임을 알린다).
@@ -231,6 +248,7 @@ dotnet build GodotXOPS.csproj
 
 ## 설정과 입력
 
+- `General` / `AllowEventScript`(기본 true)는 `AllowConsole` 처럼 OPTION 화면에 없고 RESET 이 건드리지 않는다. 꺼져 있으면 스크립트 이벤트를 쓰는 미션은 로드하지 않는다.
 - `godotdata/config.json`은 `ConfigManager`가 읽고 쓴다. 파일이 없으면 코드 기본값(`ConfigManagerDefault.cs`)으로 새로 만든다. 새 설정은 기본값 목록에 추가하면 기존 파일에도 자동으로 병합된다.
 - `ConfigManager.ApplyGraphic`이 부팅 때 창 모드와 렌더 해상도를 적용한다(기본: 전체화면, 640×480 렌더, 화면비가 다르면 검은 띠). 도구 씬은 `_Ready`에서 창 설정을 되돌린다(`AssetViewer` 참조).
 - 입력은 `InputManager`를 거쳐 읽는다: `IsPressed` / `WasPressed` / `WasReleased`(버튼), `ReadVector`(move, look), `IsKeyPressed` / `WasKeyPressed`(치트 키 등 바인딩 밖의 키), `IsClickPressed` / `WasClickPressed` / `WasClickReleased`(화면 클릭). Godot `Input`을 직접 부르지 않는다.

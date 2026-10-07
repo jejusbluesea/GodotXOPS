@@ -372,7 +372,7 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
-        /// 원본 형식에만 있는 제한이 확장 형식에는 없는지 확인한다: 포인트 종류 번호, 메시지 16개, 한 틱에 한 줄이 처리하는 이벤트 6개.
+        /// 원본 형식에만 있는 제한이 확장 형식에는 없는지 확인한다: 메시지 16개, 한 틱에 한 줄이 처리하는 이벤트 6개.
         /// 바로 넘어가는 이벤트끼리 고리를 이뤄도 틱이 끝나야 한다.
         /// </summary>
         /// <param name="pd2Path">점검용 PD2 를 쓸 전체 경로.</param>
@@ -392,7 +392,6 @@ namespace GodotXOPS.Dev
             file.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 1, param2 = -1, id = 0, position = new Vector3(0f, 500f, 0f) });
             file.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = 0, param2 = 1, id = 2 });
             file.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 2, param2 = -1, id = 500, position = new Vector3(100f, 500f, 0f) });
-            file.points.Add(new PD2Point { type = farType, param1 = 7, id = 42 });
 
             // 줄 A: 바로 넘어가는 이벤트 열 개 → 메시지 20번 → 시간 대기.
             for (int i = 0; i < chainLength; i++)
@@ -416,7 +415,7 @@ namespace GodotXOPS.Dev
                 return;
             }
 
-            Expect(MapLoader.PointDataExtended && MapLoader.GetPoint(farType, 42)?.param1 == 7, "20 이상의 포인트 종류를 조회하지 못함");
+            Expect(MapLoader.PointDataExtended, "PD2 를 로드했는데 확장 형식으로 표시되지 않음");
 
             EventManager events = EventManager.Instance;
             events.BeginMission();
@@ -426,6 +425,12 @@ namespace GodotXOPS.Dev
             Expect(events.Result == (int)MissionResult.InProgress && (events.LineCursor(1) == lineB || events.LineCursor(1) == lineB + 1), "이벤트 고리가 있는 줄의 상태가 다름");
             for (int tick = 0; tick < 5; tick++) SimClock.Step();
             Expect(events.LineCursor(0) == lineA + chainLength + 1 && events.Result == (int)MissionResult.InProgress, "이벤트 고리가 있는 미션이 계속 돌지 않음");
+
+            // 20 이상의 종류는 스크립트 이벤트다. 어느 묶음에도 등록되지 않은 번호를 쓰는 맵은 로드하지 않는다.
+            file.points.Add(new PD2Point { type = farType, param1 = 7, id = 42 });
+            int errors = Debugger.ErrorCount;
+            Expect(file.Write(pd2Path, out _) && !MapLoader.LoadPointData(pd2Path) && Debugger.FirstErrorSince(errors).StartsWith("A point uses event type"),
+                "등록되지 않은 종류 번호의 포인트가 있는 PD2 가 로드됨");
         }
 
         /// <summary>

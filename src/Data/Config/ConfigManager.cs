@@ -528,10 +528,12 @@ namespace GodotXOPS
         {
             // 옵션 화면에 없는 설정은 RESET 이 건드리지 않는다. 파일을 직접 고쳐 켠 값이 화면의 버튼 때문에 꺼지면 안 된다.
             bool allowConsole = GetBool(SectionGeneral, KeyAllowConsole);
+            bool allowEventScript = GetBool(SectionGeneral, KeyAllowEventScript, true);
 
             RestoreValues(m_defaults);
             RestoreBindings(m_defaultBindings);
             SetBool(SectionGeneral, KeyAllowConsole, allowConsole);
+            SetBool(SectionGeneral, KeyAllowEventScript, allowEventScript);
         }
 
         /// <summary>

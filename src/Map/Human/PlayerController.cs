@@ -188,6 +188,8 @@ namespace GodotXOPS
             if (input.WasPressed(InputManager.Jump)) moveFlag |= HumanMoveFlag.Jump;
 
             HumanWeaponAction weapon = ReadWeaponInput(input);
+            // Interact 는 사람이 아니라 미션 이벤트가 받는다. 다음 틱의 이벤트가 소비한다.
+            if (input.WasPressed(InputManager.Interact) && EventManager.Loaded) EventManager.Instance.QueueInteract();
 
             var frameInput = new HumanInput { moveFlag = moveFlag, yaw = m_yaw, pitch = m_pitch, weapon = weapon };
             m_controller.SetInput(in frameInput);
