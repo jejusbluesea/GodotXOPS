@@ -11,15 +11,15 @@ namespace GodotXOPS
         // 빈 기본 인스턴스로 남아 다운스트림 NullReference를 막는다(OverwriteFromJson 참조).
         public HumanGeneralData humanGeneralData = new HumanGeneralData();
         public HumanControllerData humanControllerData = new HumanControllerData();
-        public List<ControllerSizeData> controllerSizeData = new List<ControllerSizeData>();
-        public List<HumanHitboxSizeData> humanHitboxSizeData = new List<HumanHitboxSizeData>();
+        public DataList<ControllerSizeData> controllerSizeData = new DataList<ControllerSizeData>();
+        public DataList<HumanHitboxSizeData> humanHitboxSizeData = new DataList<HumanHitboxSizeData>();
         public HumanInteractionData humanInteractionData = new HumanInteractionData();
         public HumanAnimationData humanAnimationData = new HumanAnimationData();
-        public List<HumanData> humanData = new List<HumanData>();
-        public List<HumanModelData> humanModelData = new List<HumanModelData>();
-        public List<HumanArmModelData> humanArmModelData = new List<HumanArmModelData>();
-        public List<HumanLegModelData> humanLegModelData = new List<HumanLegModelData>();
-        public List<HumanTypeData> humanTypeData = new List<HumanTypeData>();
+        public DataList<HumanData> humanData = new DataList<HumanData>();
+        public DataList<HumanModelData> humanModelData = new DataList<HumanModelData>();
+        public DataList<HumanArmModelData> humanArmModelData = new DataList<HumanArmModelData>();
+        public DataList<HumanLegModelData> humanLegModelData = new DataList<HumanLegModelData>();
+        public DataList<HumanTypeData> humanTypeData = new DataList<HumanTypeData>();
         public HumanAIParameterData humanAIParameterData = new HumanAIParameterData();
     }
 }

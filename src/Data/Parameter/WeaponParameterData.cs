@@ -12,9 +12,9 @@ namespace GodotXOPS
         public WeaponGeneralData weaponGeneralData = new WeaponGeneralData();
         public WeaponAccuracyData weaponAccuracyData = new WeaponAccuracyData();
         public WeaponDropPhysicsData weaponDropPhysicsData = new WeaponDropPhysicsData();
-        public List<WeaponData> weaponData = new List<WeaponData>();
-        public List<BulletData> bulletData = new List<BulletData>();
-        public List<ScopeData> scopeData = new List<ScopeData>();
-        public List<WeaponModelData> weaponModelData = new List<WeaponModelData>();
+        public DataList<WeaponData> weaponData = new DataList<WeaponData>();
+        public DataList<BulletData> bulletData = new DataList<BulletData>();
+        public DataList<ScopeData> scopeData = new DataList<ScopeData>();
+        public DataList<WeaponModelData> weaponModelData = new DataList<WeaponModelData>();
     }
 }

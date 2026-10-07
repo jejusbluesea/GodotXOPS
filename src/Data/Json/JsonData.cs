@@ -94,7 +94,9 @@ namespace GodotXOPS
                 IncludeFields = true,
                 AllowTrailingCommas = true,
                 ReadCommentHandling = JsonCommentHandling.Skip,
-                WriteIndented = true
+                WriteIndented = true,
+                // 쓸 때 한글이나 꺾쇠 같은 글자를 유니코드 이스케이프로 바꾸지 않는다. 사람이 열어서 고치는 파일이다 (MIF2 의 브리핑, config.json 의 키 바인딩).
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
             };
             options.Converters.Add(new LenientIntConverter());
             options.Converters.Add(new Vector2Converter());

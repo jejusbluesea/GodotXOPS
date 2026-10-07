@@ -26,7 +26,6 @@ namespace GodotXOPS
         private const string k_sceneMenu = "mainmenu";
         private const string k_sceneBriefing = "briefing";
         private const string k_sceneGame = "maingame";
-        private const string k_mif2Extension = ".mif2";
 
         // help 가 한 줄에 늘어놓는 명령 수.
         private const int k_helpNamesPerLine = 8;
@@ -91,7 +90,7 @@ namespace GodotXOPS
             Add("restart", "restart", "Restart what the current screen is playing: the mission, the opening sequence, or the menu background map.", _ => RequestUi(UiActionRestart, string.Empty));
             Add("loadmap", "loadmap <block file> <point file> [sky]", "Load a block file (bd1, bd2) and a point file (pd1, pd2) and start playing. Paths are relative to the game folder; put a path with spaces in double quotes. Sky defaults to 0.", LoadMap);
             Add("loadmission", "loadmission <index> [skipbriefing]", "Load an official mission by its index in the mission list (0 is the first) and start playing. With skipbriefing false, show the briefing first (default true).", LoadMission);
-            Add("loadmissionmif", "loadmissionmif <mif file> [skipbriefing]", "Load a mission file and start playing. Paths are relative to the game folder. With skipbriefing false, show the briefing first (default true).", LoadMissionFile);
+            Add("loadmissionmif", "loadmissionmif <mif file> [skipbriefing]", "Load a mission file (mif or mif2) and start playing. Paths are relative to the game folder. With skipbriefing false, show the briefing first (default true).", LoadMissionFile);
 
             Add("collider", "collider <human|weapon|object>", "Toggle drawing hit ranges: human hitboxes (green), weapon pickup ranges (red), object colliders (blue).", Collider);
             Add("fog", "fog", "Toggle the fog.", _ => ToggleFog());
@@ -422,10 +421,11 @@ namespace GodotXOPS
             Human player = MapLoader.Player;
             if (player == null || !player.Alive) return "There is no living player";
 
-            int count = DataManager.Instance.WeaponParameterData.weaponData.Count;
-            if (args.Length == 0 || !int.TryParse(args[0], out int weaponIndex) || weaponIndex < 0 || weaponIndex >= count)
+            DataList<WeaponData> weapons = DataManager.Instance.WeaponParameterData.weaponData;
+            if (args.Length == 0 || !int.TryParse(args[0], out int weaponIndex) || !weapons.Has(weaponIndex))
             {
-                return $"A weapon index is required (0 to {count - 1})";
+                string addon = weapons.AddonCount > 0 ? $", or {DataList<WeaponData>.AddonBase} to {DataList<WeaponData>.AddonBase + weapons.AddonCount - 1} for the mission add-on weapons" : string.Empty;
+                return $"A weapon index is required (0 to {weapons.Count - 1}{addon})";
             }
 
             // 탄 수를 주면 장탄수만큼 장전하고 나머지를 예비 탄으로 둔다. 주지 않으면 사람 종류의 초기 탄약 배수를 쓴다 (SetWeapon 의 기본).
@@ -589,7 +589,6 @@ namespace GodotXOPS
 
             string path = GamePath.Resolve(args[0]);
             if (path == null || !System.IO.File.Exists(path)) return $"Mission file open failed: {args[0]}";
-            if (path.EndsWith(k_mif2Extension, StringComparison.OrdinalIgnoreCase)) return "MIF2 files are not supported yet";
 
             GameBridge game = GameBridge.Instance;
             if (!game.LoadMissionFile(path))

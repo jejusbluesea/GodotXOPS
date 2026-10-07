@@ -27,8 +27,8 @@ namespace GodotXOPS
                 WeaponData data = CurrentWeapon.Data;
                 if (!data.scope) return null;
 
-                var list = DataManager.Instance.WeaponParameterData.scopeData;
-                return data.scopeIndex >= 0 && data.scopeIndex < list.Count ? list[data.scopeIndex] : null;
+                DataList<ScopeData> list = DataManager.Instance.WeaponParameterData.scopeData;
+                return list.Has(data.scopeIndex) ? list[data.scopeIndex] : null;
             }
         }
 

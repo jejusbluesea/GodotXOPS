@@ -4,9 +4,6 @@ namespace GodotXOPS
 {
     public partial class MapLoader
     {
-        // 재질 번호가 이 값 이상이면 미션이 들고 온 에드온 재질이다. 아직 에드온 재질을 읽는 곳이 없어 빈 재질이 된다.
-        private const int k_addonIndexBase = 10000;
-
         // 목록에 없는 번호가 가리키는 재질. 소리도 이펙트도 없다.
         private static readonly BlockMaterialData s_emptyMaterial = new BlockMaterialData();
 
@@ -28,7 +25,7 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="block">블록.</param>
         /// <param name="face">면 번호 (0 에서 5).</param>
-        /// <returns>재질. null 이 아니다. 재질 번호가 없는 맵(BD1)의 블록은 0번 재질이고, 번호가 목록에 없으면 소리도 이펙트도 없는 빈 재질이다.</returns>
+        /// <returns>재질. null 이 아니다. 재질 번호가 없는 맵(BD1)의 블록은 0번 재질이고, 10000 이상은 미션의 에드온 재질이며, 번호가 목록에 없으면 소리도 이펙트도 없는 빈 재질이다.</returns>
         public static BlockMaterialData GetFaceMaterial(Block block, int face)
         {
             int index = k_legacyMaterialIndex;
@@ -38,8 +35,8 @@ namespace GodotXOPS
                 if (index == -1) index = Instance.m_defaultBlockMaterial;
             }
 
-            List<BlockMaterialData> materials = DataManager.Instance.BlockMaterialParameterData.blockMaterialData;
-            return index >= 0 && index < materials.Count && index < k_addonIndexBase ? materials[index] : s_emptyMaterial;
+            DataList<BlockMaterialData> materials = DataManager.Instance.BlockMaterialParameterData.blockMaterialData;
+            return materials.Has(index) ? materials[index] : s_emptyMaterial;
         }
     }
 }

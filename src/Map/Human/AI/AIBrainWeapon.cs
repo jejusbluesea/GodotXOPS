@@ -94,12 +94,12 @@ namespace GodotXOPS
         {
             HumanWeaponAction action = HumanWeaponAction.SwitchNext;
             int targetIndex = current.Data.nextWeaponIndex;
-            if (targetIndex < 0 || targetIndex >= parameter.weaponData.Count)
+            if (!parameter.weaponData.Has(targetIndex))
             {
                 action = HumanWeaponAction.SwitchPrevious;
                 targetIndex = current.Data.previousWeaponIndex;
             }
-            if (targetIndex < 0 || targetIndex >= parameter.weaponData.Count) return;
+            if (!parameter.weaponData.Has(targetIndex)) return;
 
             bool semiNow = current.Data.burstMode == WeaponBurstMode.SemiAuto;
             bool semiNext = parameter.weaponData[targetIndex].burstMode == WeaponBurstMode.SemiAuto;

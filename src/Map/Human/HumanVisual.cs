@@ -82,7 +82,7 @@ namespace GodotXOPS
             m_leg.Position = new Vector3(0f, general.humanLegHeight, 0f);
             m_leg.Scale = Vector3.One * general.humanLegScale;
 
-            if (data == null || data.modelIndex < 0 || data.modelIndex >= parameter.humanModelData.Count)
+            if (data == null || !parameter.humanModelData.Has(data.modelIndex))
             {
                 return;
             }
@@ -111,7 +111,7 @@ namespace GodotXOPS
 
             // 팔 — 어떤 메시를 쓸지와 고정 여부는 ApplyArmModel 이 무기 모델 데이터로 정한다.
             int armIndex = m_humanModelData.armIndex;
-            if (armIndex >= 0 && armIndex < parameter.humanArmModelData.Count)
+            if (parameter.humanArmModelData.Has(armIndex))
             {
                 m_humanArmModelData = parameter.humanArmModelData[armIndex];
                 foreach (string path in m_humanArmModelData.leftArms) m_leftArmMeshes.Add(LoadMesh(path));
@@ -124,7 +124,7 @@ namespace GodotXOPS
 
             // 다리
             int legIndex = m_humanModelData.legIndex;
-            if (legIndex >= 0 && legIndex < parameter.humanLegModelData.Count)
+            if (parameter.humanLegModelData.Has(legIndex))
             {
                 List<HumanAnimation> animations = parameter.humanAnimationData.humanAnimation;
                 m_idleAnimation = animations.Find(animation => animation.name == k_idleAnimation);

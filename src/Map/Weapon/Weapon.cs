@@ -43,16 +43,16 @@ namespace GodotXOPS
         public void Configure(int weaponIndex, int magazine = -1, int reserve = -1, bool clampMagazine = true)
         {
             WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
-            if (weaponIndex < 0 || weaponIndex >= parameter.weaponData.Count)
+            if (!parameter.weaponData.Has(weaponIndex))
             {
                 weaponIndex = parameter.weaponGeneralData.noneWeaponIndex;
             }
 
             m_weaponIndex = weaponIndex;
-            m_data = weaponIndex >= 0 && weaponIndex < parameter.weaponData.Count ? parameter.weaponData[weaponIndex] : s_emptyData;
+            m_data = parameter.weaponData.Has(weaponIndex) ? parameter.weaponData[weaponIndex] : s_emptyData;
 
             int modelIndex = m_data.modelIndex;
-            m_modelData = modelIndex >= 0 && modelIndex < parameter.weaponModelData.Count ? parameter.weaponModelData[modelIndex] : null;
+            m_modelData = parameter.weaponModelData.Has(modelIndex) ? parameter.weaponModelData[modelIndex] : null;
 
             int magazineSize = m_data.magazineSize;
             if (magazine < 0) magazine = magazineSize;

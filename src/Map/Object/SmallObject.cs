@@ -64,7 +64,7 @@ namespace GodotXOPS
             m_destroyed = false;
 
             int colliderIndex = m_objectData.colliderIndex;
-            m_colliderData = colliderIndex >= 0 && colliderIndex < parameter.objectColliderData.Count ? parameter.objectColliderData[colliderIndex] : null;
+            m_colliderData = parameter.objectColliderData.Has(colliderIndex) ? parameter.objectColliderData[colliderIndex] : null;
 
             Position = position;
             Rotation = Coord.FromUnityEuler(new Vector3(0f, yawDeg, 0f));
@@ -82,7 +82,7 @@ namespace GodotXOPS
             AddChild(m_visualRoot);
 
             int modelIndex = m_objectData.modelIndex;
-            if (modelIndex >= 0 && modelIndex < parameter.objectModelData.Count)
+            if (parameter.objectModelData.Has(modelIndex))
             {
                 ObjectModelData model = parameter.objectModelData[modelIndex];
                 WeaponVisual.BuildModelParts(m_visualRoot, model.textures, model.modelData);

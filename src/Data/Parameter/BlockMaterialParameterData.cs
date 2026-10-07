@@ -8,6 +8,6 @@ namespace GodotXOPS
     public class BlockMaterialParameterData
     {
         public BlockMaterialGeneralData blockMaterialGeneralData = new BlockMaterialGeneralData();
-        public List<BlockMaterialData> blockMaterialData = new List<BlockMaterialData>();
+        public DataList<BlockMaterialData> blockMaterialData = new DataList<BlockMaterialData>();
     }
 }

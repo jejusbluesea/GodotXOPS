@@ -29,15 +29,15 @@ namespace GodotXOPS
         {
             ObjectParameterData data = ObjectParameterData;
             int index = data.objectGeneralData.addonObjectIndex;
-            if (index < 0 || index >= data.objectData.Count)
+            if (!data.objectData.Has(index))
             {
                 Debugger.LogError($"objectGeneralData.addonObjectIndex ({index}) is outside objectData (0 to {data.objectData.Count - 1}). The mission add-on object will not appear.", nameof(DataManager));
                 return;
             }
 
             ObjectData slot = data.objectData[index];
-            if (slot.modelIndex < 0 || slot.modelIndex >= data.objectModelData.Count
-                || slot.colliderIndex < 0 || slot.colliderIndex >= data.objectColliderData.Count)
+            if (!data.objectModelData.Has(slot.modelIndex)
+                || !data.objectColliderData.Has(slot.colliderIndex))
             {
                 Debugger.LogError($"Add-on object slot [{index}] {slot.name} has modelIndex or colliderIndex out of range. The mission add-on object will not appear.", nameof(DataManager));
             }

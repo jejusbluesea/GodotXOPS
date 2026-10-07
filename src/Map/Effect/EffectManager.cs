@@ -167,8 +167,8 @@ namespace GodotXOPS
         /// <param name="triggerValue">개수를 정하는 값.</param>
         private void Spawn(int effectIndex, Vector3 position, Basis orientation, Vector3 fixedPosition, Basis fixedOrientation, float sizeScale, Vector3 extraVelocity, float triggerValue)
         {
-            List<EffectData> all = DataManager.Instance.EffectParameterData.effectData;
-            if (effectIndex < 0 || effectIndex >= all.Count) return;
+            DataList<EffectData> all = DataManager.Instance.EffectParameterData.effectData;
+            if (!all.Has(effectIndex)) return;
 
             List<EffectEmitter> emitters = all[effectIndex].emitters;
             for (int e = 0; e < emitters.Count; e++)
@@ -235,6 +235,19 @@ namespace GodotXOPS
         public void Clear()
         {
             for (int i = 0; i < m_pool.Count; i++) Recycle(m_pool[i]);
+        }
+
+        /// <summary>
+        /// 에드온 텍스처(번호 10000 이상)로 만들어 둔 머티리얼을 버린다. 미션이 바뀌면 같은 번호가 다른 텍스처를 가리킨다.
+        /// </summary>
+        public void ClearAddonMaterials()
+        {
+            var stale = new List<(int texture, EffectBlendMode blend)>();
+            foreach ((int texture, EffectBlendMode blend) key in m_materials.Keys)
+            {
+                if (key.texture >= DataList<EffectTextureData>.AddonBase) stale.Add(key);
+            }
+            foreach ((int texture, EffectBlendMode blend) key in stale) m_materials.Remove(key);
         }
 
         /// <summary>
@@ -361,8 +374,8 @@ namespace GodotXOPS
         {
             if (m_materials.TryGetValue((textureIndex, blendMode), out ShaderMaterial cached)) return cached;
 
-            List<EffectTextureData> textures = DataManager.Instance.EffectParameterData.effectTextureData;
-            if (textureIndex < 0 || textureIndex >= textures.Count) return null;
+            DataList<EffectTextureData> textures = DataManager.Instance.EffectParameterData.effectTextureData;
+            if (!textures.Has(textureIndex)) return null;
 
             string fullPath = GamePath.Resolve(textures[textureIndex].texturePath);
             ImageTexture texture = fullPath != null ? ImageLoader.LoadTexture(fullPath) : null;

@@ -145,6 +145,9 @@ namespace GodotXOPS
             MapLoader loader = Instance;
             loader.m_eventEntryIds = eventEntryIds;
 
+            // 사람·무기·소물을 만들기 전에 미션의 에드온 데이터를 붙인다 (MIF2 가 아닌 미션이면 에드온 없음).
+            LoadAddonData();
+
             loader.m_sortedRawPointData = new List<Dictionary<int, List<RawPointData>>>();
             for (int i = 0; i < k_maxParameterCount; i++)
             {
@@ -170,6 +173,7 @@ namespace GodotXOPS
 
                 RawPointData info = GetPoint(PointHumanInfo, raw.param1);
                 if (info == null) continue;
+                WarnMissingAddon(DataManager.Instance.HumanParameterData.humanData, info.param1, "human");
 
                 var human = new Human { Name = $"Human_{loader.m_humans.Count}" };
                 loader.m_humanRoot.AddChild(human);
@@ -222,11 +226,19 @@ namespace GodotXOPS
                 if (raw.param0 == PointRandomWeapon)
                 {
                     weaponIndex = GameRandom.Gameplay.Range(0, 2) == 0 ? raw.param1 : raw.param2;
-                    if (weaponIndex < 0 || weaponIndex >= parameter.weaponData.Count) continue;
+                    if (!parameter.weaponData.Has(weaponIndex))
+                    {
+                        WarnMissingAddon(parameter.weaponData, weaponIndex, "weapon");
+                        continue;
+                    }
                     totalBullets = parameter.weaponData[weaponIndex].magazineSize * Weapon.DefaultAutoBulletMultiplier;
                 }
 
-                if (weaponIndex < 0 || weaponIndex >= parameter.weaponData.Count) continue;
+                if (!parameter.weaponData.Has(weaponIndex))
+                {
+                    WarnMissingAddon(parameter.weaponData, weaponIndex, "weapon");
+                    continue;
+                }
                 if (weaponIndex == parameter.weaponGeneralData.noneWeaponIndex) continue;
 
                 // 전체 탄 수를 탄창과 예비로 나눈다 (원본은 탄창 0 으로 놓고 RunReload 를 한 번 부른다).
@@ -255,7 +267,11 @@ namespace GodotXOPS
             foreach (RawPointData raw in points)
             {
                 if (raw.param0 != PointSmallObject) continue;
-                if (raw.param1 < 0 || raw.param1 >= parameter.objectData.Count) continue;
+                if (!parameter.objectData.Has(raw.param1))
+                {
+                    WarnMissingAddon(parameter.objectData, raw.param1, "object");
+                    continue;
+                }
 
                 var smallObject = new SmallObject { Name = $"Object_{loader.m_smallObjects.Count}" };
                 loader.m_objectRoot.AddChild(smallObject);
@@ -343,6 +359,24 @@ namespace GodotXOPS
             loader.m_entityMaterialCache.Clear();
             loader.m_sortedRawPointData = null;
             loader.m_eventEntryIds = s_legacyEventEntryIds;
+
+            // 에드온 데이터를 쓰던 것(사람, 무기, 이펙트)을 다 지운 뒤에 뗀다.
+            UnloadAddonData();
+        }
+
+        /// <summary>
+        /// 포인트가 에드온 번호(10000 이상)를 가리키는데 미션이 그 항목을 들고 오지 않았으면 경고를 남긴다. 디버그 콘솔에서 바로 보인다.
+        /// 10000 미만의 없는 번호는 원본 맵에도 있을 수 있어 조용히 건너뛴다.
+        /// </summary>
+        /// <typeparam name="T">항목의 형식.</typeparam>
+        /// <param name="list">데이터 목록.</param>
+        /// <param name="index">포인트가 가리키는 번호.</param>
+        /// <param name="what">무엇의 번호인지 (영어, 로그용).</param>
+        private static void WarnMissingAddon<T>(DataList<T> list, int index, string what)
+        {
+            if (index < DataList<T>.AddonBase || list.Has(index)) return;
+
+            Debugger.LogWarning($"A point refers to add-on {what} {index}, but the mission provides {list.AddonCount} add-on {what} entries", nameof(MapLoader));
         }
 
         /// <summary>

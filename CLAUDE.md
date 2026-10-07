@@ -84,6 +84,8 @@ dotnet build GodotXOPS.csproj
 
 - `res://scenes/dev/bd2_check.tscn` — 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정이 같은지 대조하고, 블록 플래그·그리지 않는 면·재질(착탄, 발소리와 박자)·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.bd1 출력.bd2` 는 파일 하나를 변환한다. 블록 로더나 충돌 조회, `BD2File` 을 고친 뒤에 돌린다. `map_viewer` 의 `--file 경로` 로 BD1 / BD2 파일 하나를 띄워 볼 수 있다.
 
+- `res://scenes/dev/mif2_check.tscn` — 모든 공식 미션을 확장 형식으로 바꿔 미션 정보와 같은 난수 씨앗으로 돌린 100틱의 결과가 원본과 같은지 대조하고, 에드온 데이터와 10000 번호 규칙, MIF2 의 형식 오류, 미션 목록 스캔, MIF 추가 사물의 변환을 확인한다 (헤드리스). `-- --convert-official 번호|all 출력폴더` 와 `-- --convert 입력.mif 출력폴더` 는 원본 미션을 확장 형식 한 벌로 바꾼다. 미션 로드, 에드온 데이터, 데이터 목록을 번호로 쓰는 코드를 고친 뒤에 돌린다.
+
 - `res://scenes/dev/pd2_check.tscn` — 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰 결과가 같은지 대조하고, 넓은 파라미터·추가 파라미터·방향·이벤트 줄 수·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.pd1 출력.pd2` 는 파일 하나를 변환한다. 포인트 로더, `PD2File`, 이벤트 줄을 고친 뒤에 돌린다.
 
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
@@ -227,6 +229,18 @@ dotnet build GodotXOPS.csproj
 - 입력은 `InputManager`를 거쳐 읽는다: `IsPressed` / `WasPressed` / `WasReleased`(버튼), `ReadVector`(move, look), `IsKeyPressed` / `WasKeyPressed`(치트 키 등 바인딩 밖의 키), `IsClickPressed` / `WasClickPressed` / `WasClickReleased`(화면 클릭). Godot `Input`을 직접 부르지 않는다.
 - `ReadVector`는 X 오른쪽 +, Y 위쪽(전진) + 다. look은 마우스 이동량(픽셀)이다.
 - 바인딩 경로는 `<Keyboard>/w`, `<Mouse>/leftButton` 형식이고 `InputPath`가 Godot 이벤트로 변환한다. 키보드는 물리 키 위치 기준이다.
+
+## 확장 미션(MIF2)과 에드온 데이터
+
+- 미션 파일은 확장자로 MIF / MIF2 로더가 갈린다 (`MapLoader.LoadMissionFile`). **MIF2(JSON, `ExtendedMissionData`)는 BD2 와 PD2 만 받는다.** 원본 형식을 적으면 로드 오류다 (사용자 결정. 레거시는 MIF 로 쓴다). 경로는 전부 exe 폴더 기준이다. 미션 목록(`DataManager.ScanAddonMifs`)은 한 폴더의 `.mif` 와 `.mif2` 를 파일 이름 순서로 함께 모은다.
+- **번호로 가리키는 데이터 목록은 `DataList<T>` 다. 10000 미만은 기본 데이터, 10000 이상은 미션의 에드온 데이터의 (번호 − 10000) 번째다** (사용자 결정). 포인트의 번호도 데이터 안의 상호 참조(`modelIndex` 등)도 같은 규칙이라 로드할 때 번호를 옮기지 않는다.
+  - 범위 검사는 `list.Has(번호)` 로 한다. `번호 < list.Count` 로 하면 에드온 번호를 전부 거절한다.
+  - 목록을 `List<T>` 나 `IList<T>` 로 받아 인덱싱하지 않는다. 그러면 에드온 번호에서 예외가 난다 (인덱서를 `new` 로 가렸기 때문에 컴파일러가 잡지 못한다). `DataList<T>` 나 `var` 로 받는다.
+  - 범위를 벗어난 값을 가까운 끝으로 보던 목록(AI 레벨, 몸 크기, 히트박스)은 `GetClamped`, 목록을 도는 것(치트 무기 넘기기)은 `Neighbor` 를 쓴다.
+  - 번호로 캐시하는 것은 에드온이 바뀔 때 비워야 한다 (지금은 `EffectManager` 의 머티리얼 캐시뿐. `ClearAddonMaterials`).
+- 에드온 데이터 파일은 종류마다 하나이고(MIF2 의 `addonHumanDataPath` 등), 기본 데이터의 컨테이너 클래스와 같은 키를 쓰는 JSON 이다. **목록 섹션만 읽고 전역 설정(GeneralData 등)은 쓰지 않는다** (사용자 결정). `MapLoader.LoadAddonData` 가 `LoadPointData` 안에서 붙이고 `UnloadPointData` 가 뗀다. 미션을 다시 시작하면 파일을 다시 읽는다.
+- 원본 MIF 의 추가 사물(예약 자리 `addonObjectIndex` 를 미션마다 덮어쓰는 방식)은 MIF 에만 남는다. MIF2 에서는 에드온 오브젝트 데이터로 적는다. 변환기(`MapLoader.ConvertMissionToExtended`)가 옮기고 소물 포인트의 번호를 10000 으로 바꾼다.
+- JSON 을 쓸 때는 한글 같은 글자를 `\uXXXX` 로 바꾸지 않는다 (`JsonData.Options` 의 Encoder. 사람이 고치는 파일이다).
 
 ## 데이터 JSON
 

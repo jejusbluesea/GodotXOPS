@@ -113,9 +113,8 @@ namespace GodotXOPS
             m_rotationX = yawDeg;
 
             HumanParameterData parameter = DataManager.Instance.HumanParameterData;
-            List<ControllerSizeData> sizes = parameter.controllerSizeData;
             int sizeIndex = human.HumanTypeData != null ? human.HumanTypeData.controllerSizeIndex : 0;
-            m_size = sizes.Count > 0 ? sizes[Mathf.Clamp(sizeIndex, 0, sizes.Count - 1)] : new ControllerSizeData();
+            m_size = parameter.controllerSizeData.GetClamped(sizeIndex) ?? new ControllerSizeData();
 
             // 팔 pitch 초기값 — 원본 armrotation_y 초기값 −30°(아래). 팔 기준(음수=아래) → 시선 pitch 기준(양수=아래)으로 부호 반전.
             m_armRotationY = -parameter.humanGeneralData.armAngleInitial;

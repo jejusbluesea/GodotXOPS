@@ -149,7 +149,7 @@ namespace GodotXOPS
             if (data.fireRate <= 0f) return false;
 
             WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
-            if (data.bulletIndex < 0 || data.bulletIndex >= parameter.bulletData.Count) return false;
+            if (!parameter.bulletData.Has(data.bulletIndex)) return false;
 
             int burstLimit = BurstLimit(data);
             if (burstLimit > 0 && m_burstShots >= burstLimit) return false;
@@ -256,7 +256,7 @@ namespace GodotXOPS
 
             WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
             if (targetIndex == weapon.WeaponIndex) return;
-            if (targetIndex < 0 || targetIndex >= parameter.weaponData.Count) return;
+            if (!parameter.weaponData.Has(targetIndex)) return;
 
             int switchTicks = Mathf.RoundToInt(weapon.Data.switchTime * SimClock.FrameRate);
             if (switchTicks > 0 && m_reloadTicks > 0) return;
@@ -383,8 +383,8 @@ namespace GodotXOPS
             if (reserve < 0)
             {
                 // 원본 AddVisualWeaponIndex: 전체 탄 = 장탄수 × TOTAL_WEAPON_AUTOBULLET, 그중 장탄수만큼이 장전돼 있다.
-                var list = DataManager.Instance.WeaponParameterData.weaponData;
-                int magazineSize = weaponIndex >= 0 && weaponIndex < list.Count ? list[weaponIndex].magazineSize : 0;
+                DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
+                int magazineSize = list.Has(weaponIndex) ? list[weaponIndex].magazineSize : 0;
                 int multiplier = m_humanTypeData != null ? m_humanTypeData.autoBulletMultiplier : Weapon.DefaultAutoBulletMultiplier;
                 reserve = magazineSize * Mathf.Max(0, multiplier - 1);
             }
@@ -410,11 +410,11 @@ namespace GodotXOPS
         public void CheatCycleWeapon(int direction)
         {
             WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
-            int count = parameter.weaponData.Count;
-            if (count == 0) return;
+            if (parameter.weaponData.Count == 0) return;
 
+            // 기본 무기 끝에서 미션의 에드온 무기로 넘어가고, 에드온 끝에서 처음으로 돈다.
             Weapon weapon = CurrentWeapon;
-            int next = ((weapon.WeaponIndex + direction) % count + count) % count;
+            int next = parameter.weaponData.Neighbor(weapon.WeaponIndex, direction);
             SetWeapon(m_selectWeapon, next, weapon.Magazine, weapon.Reserve, false);
 
             if (CurrentWeapon.IsNone) DisableScope();

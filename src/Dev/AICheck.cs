@@ -117,13 +117,13 @@ namespace GodotXOPS.Dev
             for (int i = 0; i < human.humanData.Count; i++)
             {
                 HumanData data = human.humanData[i];
-                if (data.typeIndex < 0 || data.typeIndex >= human.humanTypeData.Count) continue;
+                if (!human.humanTypeData.Has(data.typeIndex)) continue;
 
                 bool zombie = human.humanTypeData[data.typeIndex].zombie;
                 if (zombie && m_zombieHuman < 0) m_zombieHuman = i;
 
                 int main = data.weaponIndex1;
-                bool gun = main >= 0 && main < weapon.weaponData.Count
+                bool gun = weapon.weaponData.Has(main)
                     && main != weapon.weaponGeneralData.noneWeaponIndex
                     && main != weapon.weaponGeneralData.grenadeWeaponIndex
                     && !weapon.weaponGeneralData.caseWeaponIndex.Contains(main)

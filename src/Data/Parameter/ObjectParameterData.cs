@@ -10,8 +10,8 @@ namespace GodotXOPS
         // 각 필드는 기본값으로 초기화한다. 섹션 파일 로드가 실패(부재/빈/깨짐)해도 해당 필드는
         // 빈 기본 인스턴스로 남아 다운스트림 NullReference를 막는다(OverwriteFromJson 참조).
         public ObjectGeneralData objectGeneralData = new ObjectGeneralData();
-        public List<ObjectData> objectData = new List<ObjectData>();
-        public List<ObjectModelData> objectModelData = new List<ObjectModelData>();
-        public List<ObjectColliderData> objectColliderData = new List<ObjectColliderData>();
+        public DataList<ObjectData> objectData = new DataList<ObjectData>();
+        public DataList<ObjectModelData> objectModelData = new DataList<ObjectModelData>();
+        public DataList<ObjectColliderData> objectColliderData = new DataList<ObjectColliderData>();
     }
 }

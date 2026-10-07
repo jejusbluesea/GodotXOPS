@@ -167,7 +167,7 @@ namespace GodotXOPS.Dev
 
             // 스코프가 있는 무기를 쥐여 주고 켠다.
             WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
-            int scoped = parameter.weaponData.FindIndex(data => data.scope && data.scopeIndex >= 0 && data.scopeIndex < parameter.scopeData.Count);
+            int scoped = parameter.weaponData.FindIndex(data => data.scope && parameter.scopeData.Has(data.scopeIndex));
             if (scoped >= 0)
             {
                 player.SetWeapon(player.SelectWeapon, scoped);

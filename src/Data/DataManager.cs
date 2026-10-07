@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using Godot;
+using GodotXOPS.IO;
 
 namespace GodotXOPS
 {
@@ -28,6 +29,42 @@ namespace GodotXOPS
             LoadSkyData();
             LoadMissionData();
             LoadGlobalData();
+            ValidateListSizes();
+        }
+
+        /// <summary>
+        /// 기본 데이터 목록이 에드온 번호(10000 부터)와 겹칠 만큼 큰지 확인한다. 겹치는 뒷부분은 번호로 가리킬 수 없다.
+        /// </summary>
+        private void ValidateListSizes()
+        {
+            CheckListSize(HumanParameterData.humanData, nameof(HumanParameterData.humanData));
+            CheckListSize(HumanParameterData.humanModelData, nameof(HumanParameterData.humanModelData));
+            CheckListSize(HumanParameterData.humanArmModelData, nameof(HumanParameterData.humanArmModelData));
+            CheckListSize(HumanParameterData.humanLegModelData, nameof(HumanParameterData.humanLegModelData));
+            CheckListSize(HumanParameterData.humanTypeData, nameof(HumanParameterData.humanTypeData));
+            CheckListSize(WeaponParameterData.weaponData, nameof(WeaponParameterData.weaponData));
+            CheckListSize(WeaponParameterData.bulletData, nameof(WeaponParameterData.bulletData));
+            CheckListSize(WeaponParameterData.scopeData, nameof(WeaponParameterData.scopeData));
+            CheckListSize(WeaponParameterData.weaponModelData, nameof(WeaponParameterData.weaponModelData));
+            CheckListSize(ObjectParameterData.objectData, nameof(ObjectParameterData.objectData));
+            CheckListSize(ObjectParameterData.objectModelData, nameof(ObjectParameterData.objectModelData));
+            CheckListSize(ObjectParameterData.objectColliderData, nameof(ObjectParameterData.objectColliderData));
+            CheckListSize(EffectParameterData.effectData, nameof(EffectParameterData.effectData));
+            CheckListSize(EffectParameterData.effectTextureData, nameof(EffectParameterData.effectTextureData));
+            CheckListSize(BlockMaterialParameterData.blockMaterialData, nameof(BlockMaterialParameterData.blockMaterialData));
+        }
+
+        /// <summary>
+        /// 목록 하나의 크기를 확인하고 너무 크면 에러 로그를 남긴다.
+        /// </summary>
+        /// <typeparam name="T">항목의 형식.</typeparam>
+        /// <param name="list">목록.</param>
+        /// <param name="name">목록의 JSON 키 (로그용).</param>
+        private static void CheckListSize<T>(DataList<T> list, string name)
+        {
+            if (list.Count <= DataList<T>.AddonBase) return;
+
+            Debugger.LogError($"{name} has {list.Count} entries. Entries from {DataList<T>.AddonBase} on cannot be used: those numbers belong to mission add-on data.", nameof(DataManager));
         }
 
         /// <summary>
@@ -173,11 +210,12 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 지정한 디렉터리에서 .mif 파일을 스캔해 어드온 미션 목록을 만든다. 파일 순서는 파일명 자연 정렬(숫자 값 비교).
+        /// 지정한 디렉터리에서 미션 파일(.mif 와 .mif2)을 스캔해 어드온 미션 목록을 만든다. 두 형식을 섞어 파일명 자연 정렬(숫자 값 비교)로 늘어놓는다.
+        /// 목록에 나오는 이름은 MIF 는 첫 줄, MIF2 는 name 키다. 읽지 못한 MIF2 는 목록에 넣지 않는다.
         /// </summary>
         /// <param name="directory">스캔할 맵 팩 디렉터리(전체 경로).</param>
         /// <returns>해당 디렉터리의 어드온 미션 목록. 디렉터리가 없으면 빈 목록.</returns>
-        private static List<AddonMissionData> ScanAddonMifs(string directory)
+        public static List<AddonMissionData> ScanAddonMifs(string directory)
         {
             var page = new List<AddonMissionData>();
             if (directory == null || !Directory.Exists(directory))
@@ -186,16 +224,38 @@ namespace GodotXOPS
             }
 
             // Directory.GetFiles는 순서를 보장하지 않으므로 파일명 기준으로 자연 정렬한다(gates2 < gates10처럼 숫자를 값으로 비교).
-            string[] mifPaths = Directory.GetFiles(directory, "*.mif");
-            System.Array.Sort(mifPaths, (a, b) => CompareNatural(Path.GetFileName(a), Path.GetFileName(b)));
+            // 검색 패턴 "*.mif" 는 환경에 따라 .mif2 까지 잡을 수 있어서, 전부 받아 확장자로 직접 가른다.
+            var mifPaths = new List<string>();
+            foreach (string path in Directory.GetFiles(directory))
+            {
+                string extension = Path.GetExtension(path);
+                if (string.Equals(extension, k_mifExtension, System.StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(extension, MIF2File.Extension, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    mifPaths.Add(path);
+                }
+            }
+            mifPaths.Sort((a, b) => CompareNatural(Path.GetFileName(a), Path.GetFileName(b)));
+
             foreach (string path in mifPaths)
             {
-                string[] lines = EncodingHelper.ReadAllLines(path);
-                page.Add(new AddonMissionData
+                string name;
+                if (string.Equals(Path.GetExtension(path), MIF2File.Extension, System.StringComparison.OrdinalIgnoreCase))
                 {
-                    mifPath = path,
-                    name = lines.Length > 0 ? lines[0] : string.Empty
-                });
+                    if (!MIF2File.Read(path, out ExtendedMissionData data, out string error))
+                    {
+                        Debugger.LogError($"Mission file read failed: {Path.GetRelativePath(GamePath.Root, path)} ({error})", nameof(DataManager));
+                        continue;
+                    }
+                    name = data.name ?? string.Empty;
+                }
+                else
+                {
+                    string[] lines = EncodingHelper.ReadAllLines(path);
+                    name = lines.Length > 0 ? lines[0] : string.Empty;
+                }
+
+                page.Add(new AddonMissionData { mifPath = path, name = name });
             }
             return page;
         }

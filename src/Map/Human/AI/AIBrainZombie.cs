@@ -44,9 +44,9 @@ namespace GodotXOPS
             Weapon weapon = m_self.CurrentWeapon;
             if (weapon.IsNone) return k_zombieAttackRadius;
 
-            var bullets = DataManager.Instance.WeaponParameterData.bulletData;
+            DataList<BulletData> bullets = DataManager.Instance.WeaponParameterData.bulletData;
             int bulletIndex = weapon.Data.bulletIndex;
-            if (bulletIndex < 0 || bulletIndex >= bullets.Count) return k_zombieAttackRadius;
+            if (!bullets.Has(bulletIndex)) return k_zombieAttackRadius;
 
             float bulletRange = bullets[bulletIndex].lifetime * weapon.Data.bulletSpeed;
             float cap = m_self.HumanTypeData.zombieMaxMeleeRange;

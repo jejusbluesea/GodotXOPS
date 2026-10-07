@@ -386,22 +386,20 @@ namespace GodotXOPS
         /// <returns>AI 레벨 데이터. 데이터가 비어 있으면 null.</returns>
         private HumanAIData LevelData()
         {
-            List<HumanAIData> list = AIData.aiData;
-            return list.Count > 0 ? list[Mathf.Clamp(m_self.AILevel, 0, list.Count - 1)] : null;
+            return AIData.aiData.GetClamped(m_self.AILevel);
         }
 
         /// <summary>
         /// 무기의 스코프 종류에 해당하는 AI 파라미터를 얻는다. 스코프가 없는 무기와 맨손은 0 번, 스코프 무기는 scopeIndex + 1 번이다 (원본 scopemode).
+        /// 에드온 스코프(10000 이상)는 같은 번호의 에드온 항목을 쓴다 (에드온 쪽에는 "스코프 없음" 항목이 없으므로 1 을 더하지 않는다).
         /// </summary>
         /// <param name="weapon">무기.</param>
         /// <returns>스코프별 AI 데이터. 데이터가 비어 있으면 null.</returns>
         private static HumanAIScopeData ScopeData(Weapon weapon)
         {
-            List<HumanAIScopeData> list = AIData.aiScopeData;
-            if (list.Count == 0) return null;
-
-            int index = weapon.Data.scope ? weapon.Data.scopeIndex + 1 : 0;
-            return list[Mathf.Clamp(index, 0, list.Count - 1)];
+            int scopeIndex = weapon.Data.scopeIndex;
+            int index = !weapon.Data.scope ? 0 : (scopeIndex >= DataList<HumanAIScopeData>.AddonBase ? scopeIndex : scopeIndex + 1);
+            return AIData.aiScopeData.GetClamped(index);
         }
 
         private static bool IsValidHuman(Human human)

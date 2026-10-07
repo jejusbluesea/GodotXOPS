@@ -7,8 +7,8 @@ namespace GodotXOPS
     /// </summary>
     public class HumanAIParameterData
     {
-        public List<HumanAIData> aiData = new List<HumanAIData>();
-        public List<HumanAIScopeData> aiScopeData = new List<HumanAIScopeData>();
+        public DataList<HumanAIData> aiData = new DataList<HumanAIData>();
+        public DataList<HumanAIScopeData> aiScopeData = new DataList<HumanAIScopeData>();
 
         // === AI 전역 상수 (전투 코어) — 원본 OpenXOPS ai.h #define + SearchEnemy/Action 하드코딩의 데이터화. ===
         // 시야각 (deg, 전체 각도 → 코드에서 ½씩 좌우 적용). near=근거리(A) / long=원거리(B) / Caution=경계 상태 확장각.

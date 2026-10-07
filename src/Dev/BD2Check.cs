@@ -309,7 +309,7 @@ namespace GodotXOPS.Dev
         /// <param name="halfSize">각 축의 절반 크기.</param>
         /// <param name="flags">블록 플래그.</param>
         /// <returns>만든 블록. 텍스처와 재질 번호는 전부 0 이다.</returns>
-        private static BD2Block MakeBox(Vector3 center, Vector3 halfSize, int flags)
+        internal static BD2Block MakeBox(Vector3 center, Vector3 halfSize, int flags)
         {
             // 면 법선이 바깥을 향하는 정점 순서다 (점검이 위와 옆에서 쏜 레이로 확인한다).
             float x = halfSize.X, y = halfSize.Y, z = halfSize.Z;

@@ -298,7 +298,7 @@ namespace GodotXOPS.Dev
                 foreach (EffectEmitter emitter in data.effectData[i].emitters)
                 {
                     // 텍스처를 읽지 못하는 emitter 는 아무것도 내지 않는다 (헤드리스에서도 이미지 로더는 동작한다).
-                    if (emitter.textureIndex < 0 || emitter.textureIndex >= data.effectTextureData.Count) continue;
+                    if (!data.effectTextureData.Has(emitter.textureIndex)) continue;
                     expected += emitter.countPerTrigger > 0f
                         ? Mathf.FloorToInt(trigger * emitter.countPerTrigger)
                         : emitter.spawnCount;
@@ -442,7 +442,7 @@ namespace GodotXOPS.Dev
             EffectGeneralData general = data.effectGeneralData;
 
             int index = general.wallBloodEffectIndex;
-            bool usable = index >= 0 && index < data.effectData.Count && data.effectData[index].emitters.Count == 1;
+            bool usable = data.effectData.Has(index) && data.effectData[index].emitters.Count == 1;
             Expect(usable, "벽 혈흔 프리셋이 emitter 하나가 아니어서 면 재생을 확인할 수 없음");
             if (!usable) return;
 

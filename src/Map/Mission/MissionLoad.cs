@@ -1,6 +1,8 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using Godot;
+using GodotXOPS.IO;
 
 namespace GodotXOPS
 {
@@ -22,6 +24,12 @@ namespace GodotXOPS
         private int m_skyIndex;
         private bool m_adjustCollision;
         private bool m_darkScreen;
+        private bool m_extendedMission;
+        private string m_addonHumanDataPath = string.Empty;
+        private string m_addonWeaponDataPath = string.Empty;
+        private string m_addonObjectDataPath = string.Empty;
+        private string m_addonEffectDataPath = string.Empty;
+        private string m_addonBlockMaterialDataPath = string.Empty;
 
         // 경로는 모두 전체 경로다. 해당 항목이 없으면 빈 문자열.
         public string MissionName => m_missionName;
@@ -35,6 +43,8 @@ namespace GodotXOPS
         public int SkyIndex => m_skyIndex;
         public bool AdjustCollision => m_adjustCollision;
         public bool DarkScreen => m_darkScreen;
+        // 확장 미션 파일(MIF2)에서 읽은 미션인지.
+        public bool ExtendedMission => m_extendedMission;
 
         /// <summary>
         /// 지정된 미션의 정보(이름, 맵 경로, 하늘 번호, 브리핑 등)를 읽어 MapLoader 에 세팅한다. 맵 자체는 로드하지 않는다.
@@ -94,10 +104,11 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 미션 파일(.mif) 하나를 읽어 미션 정보를 MapLoader 에 세팅한다. 맵 자체는 로드하지 않는다.
-        /// 미션 목록에 없는 파일도 읽을 수 있다 (디버그 콘솔의 loadmission).
+        /// 미션 파일 하나를 읽어 미션 정보를 MapLoader 에 세팅한다. 맵 자체는 로드하지 않는다.
+        /// 확장자가 .mif2 이면 확장 미션 파일(JSON)로, 그 밖에는 원본 MIF 로 읽는다.
+        /// 미션 목록에 없는 파일도 읽을 수 있다 (디버그 콘솔의 loadmissionmif).
         /// </summary>
-        /// <param name="mifPath">.mif 파일 전체 경로.</param>
+        /// <param name="mifPath">미션 파일 전체 경로.</param>
         /// <returns>읽기에 성공했으면 true. 파일이 없거나 형식이 잘못됐으면 false.</returns>
         public static bool LoadMissionFile(string mifPath)
         {
@@ -108,6 +119,8 @@ namespace GodotXOPS
                 Debugger.LogError($"Mission file open failed: {mifPath}", nameof(MapLoader));
                 return false;
             }
+
+            if (HasExtension(mifPath, MIF2File.Extension)) return LoadExtendedMissionFile(mifPath);
 
             // .mif: 0 이름 / 1 정식 이름 / 2 BD1 / 3 PD1 / 4 하늘 번호 / 5 화면 플래그 / 6 추가 사물 / 7 이미지1 / 8 이미지2 / 9~ 브리핑
             string[] lines = EncodingHelper.ReadAllLines(mifPath);
@@ -133,6 +146,63 @@ namespace GodotXOPS
             loader.m_missionImage1 = ResolveMissionPath(lines[8]);
             loader.m_missionBriefing = string.Join("\n", lines, 9, lines.Length - 9);
             return true;
+        }
+
+        /// <summary>
+        /// 확장 미션 파일(MIF2)을 읽어 미션 정보를 세팅한다. 경로는 모두 exe 폴더 기준이다.
+        /// 블록과 포인트는 확장 형식(BD2, PD2)이어야 한다. 원본 형식(BD1, PD1)은 원본 MIF 로 쓴다.
+        /// </summary>
+        /// <param name="path">MIF2 파일 전체 경로.</param>
+        /// <returns>읽기에 성공했으면 true.</returns>
+        private static bool LoadExtendedMissionFile(string path)
+        {
+            string label = Path.GetRelativePath(GamePath.Root, path);
+            if (!MIF2File.Read(path, out ExtendedMissionData data, out string error))
+            {
+                Debugger.LogError($"Mission file read failed: {label} ({error})", nameof(MapLoader));
+                return false;
+            }
+            if (!HasExtension(data.blockPath, BD2File.Extension))
+            {
+                Debugger.LogError($"MIF2 needs a BD2 block file, but blockPath is \"{data.blockPath}\": {label}", nameof(MapLoader));
+                return false;
+            }
+            if (!HasExtension(data.pointPath, PD2File.Extension))
+            {
+                Debugger.LogError($"MIF2 needs a PD2 point file, but pointPath is \"{data.pointPath}\": {label}", nameof(MapLoader));
+                return false;
+            }
+
+            MapLoader loader = Instance;
+            loader.m_extendedMission = true;
+            loader.m_missionName = data.name ?? string.Empty;
+            loader.m_missionFullname = data.fullname ?? string.Empty;
+            loader.m_missionBD1Path = GamePath.Resolve(data.blockPath) ?? string.Empty;
+            loader.m_missionPD1Path = GamePath.Resolve(data.pointPath) ?? string.Empty;
+            loader.m_skyIndex = data.skyIndex;
+            loader.m_adjustCollision = data.adjustCollision;
+            loader.m_darkScreen = data.darkScreen;
+            loader.m_missionImage0 = GamePath.Resolve(data.image0) ?? string.Empty;
+            loader.m_missionImage1 = GamePath.Resolve(data.image1) ?? string.Empty;
+            loader.m_missionBriefing = string.Join("\n", data.briefing);
+            loader.m_defaultBlockMaterial = data.defaultBlockMaterial;
+            loader.m_addonHumanDataPath = data.addonHumanDataPath ?? string.Empty;
+            loader.m_addonWeaponDataPath = data.addonWeaponDataPath ?? string.Empty;
+            loader.m_addonObjectDataPath = data.addonObjectDataPath ?? string.Empty;
+            loader.m_addonEffectDataPath = data.addonEffectDataPath ?? string.Empty;
+            loader.m_addonBlockMaterialDataPath = data.addonBlockMaterialDataPath ?? string.Empty;
+            return true;
+        }
+
+        /// <summary>
+        /// 경로의 확장자가 주어진 것과 같은지 본다. 대소문자는 가리지 않는다.
+        /// </summary>
+        /// <param name="path">경로. null 이면 false.</param>
+        /// <param name="extension">점을 포함한 확장자.</param>
+        /// <returns>같으면 true.</returns>
+        private static bool HasExtension(string path, string extension)
+        {
+            return !string.IsNullOrEmpty(path) && string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -171,6 +241,13 @@ namespace GodotXOPS
             loader.m_skyIndex = 0;
             loader.m_adjustCollision = false;
             loader.m_darkScreen = false;
+            loader.m_extendedMission = false;
+            loader.m_defaultBlockMaterial = 0;
+            loader.m_addonHumanDataPath = string.Empty;
+            loader.m_addonWeaponDataPath = string.Empty;
+            loader.m_addonObjectDataPath = string.Empty;
+            loader.m_addonEffectDataPath = string.Empty;
+            loader.m_addonBlockMaterialDataPath = string.Empty;
         }
 
         /// <summary>
@@ -182,12 +259,12 @@ namespace GodotXOPS
         {
             ObjectParameterData op = DataManager.Instance.ObjectParameterData;
             int index = op.objectGeneralData.addonObjectIndex;
-            if (index < 0 || index >= op.objectData.Count) return;
+            if (!op.objectData.Has(index)) return;
 
             // 아래에서 모델/콜라이더 슬롯에 인덱스로 대입하므로 두 리스트 범위도 함께 확인한다.
             ObjectData data = op.objectData[index];
-            if (data.modelIndex < 0 || data.modelIndex >= op.objectModelData.Count) return;
-            if (data.colliderIndex < 0 || data.colliderIndex >= op.objectColliderData.Count) return;
+            if (!op.objectModelData.Has(data.modelIndex)) return;
+            if (!op.objectColliderData.Has(data.colliderIndex)) return;
 
             if (!ParseAddonObjectFile(Instance.m_missionAddonObjectPath, out AddonObjectFileData addon))
             {

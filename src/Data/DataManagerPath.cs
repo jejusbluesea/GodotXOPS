@@ -30,5 +30,6 @@ namespace GodotXOPS
         private const string k_missionDataPath = "godotdata/mission_data.json";
         private const string k_globalDataPath = "godotdata/global.json";
         private const string k_addonPathDataPath = "addon.json";
+        private const string k_mifExtension = ".mif";
     }
 }

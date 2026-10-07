@@ -71,11 +71,11 @@ namespace GodotXOPS
 
             HumanParameterData parameter = DataManager.Instance.HumanParameterData;
             int humanIndex = humanDataParam.param1;
-            if (humanIndex >= 0 && humanIndex < parameter.humanData.Count)
+            if (parameter.humanData.Has(humanIndex))
             {
                 m_humanData = parameter.humanData[humanIndex];
                 int typeIndex = m_humanData.typeIndex;
-                if (typeIndex >= 0 && typeIndex < parameter.humanTypeData.Count)
+                if (parameter.humanTypeData.Has(typeIndex))
                 {
                     m_humanTypeData = parameter.humanTypeData[typeIndex];
                 }
@@ -90,9 +90,8 @@ namespace GodotXOPS
             AddChild(m_humanVisual);
             m_humanVisual.CreateHumanVisual(this, m_humanData);
 
-            var hitboxSizes = parameter.humanHitboxSizeData;
             int hitboxIndex = m_humanTypeData != null ? m_humanTypeData.hitboxSizeIndex : 0;
-            m_hitboxSize = hitboxSizes.Count > 0 ? hitboxSizes[Mathf.Clamp(hitboxIndex, 0, hitboxSizes.Count - 1)] : null;
+            m_hitboxSize = parameter.humanHitboxSizeData.GetClamped(hitboxIndex);
 
             m_hp = m_humanData != null ? m_humanData.hp : 0f;
             m_team = humanDataParam.param2;
