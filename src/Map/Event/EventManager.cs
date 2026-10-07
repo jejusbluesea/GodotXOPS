@@ -6,7 +6,7 @@ namespace GodotXOPS
     /// <summary>
     /// 미션 이벤트와 클리어·실패 판정. 원본 OpenXOPS EventControl (event.cpp) 과 maingame::Process 의 판정·이벤트 부분 (gamemain.cpp:2559-2616),
     /// ObjectManager::CheckGameOverorComplete (objectmanager.cpp:2561-2602) 에 해당한다.
-    /// 이벤트는 세 줄이 따로 진행된다. 줄마다 지금 처리할 포인트의 식별번호를 들고, 포인트의 param2(원본 p3)가 가리키는 번호로 넘어간다.
+    /// 이벤트는 여러 줄이 따로 진행된다 (PD1 은 세 줄, PD2 는 파일이 정한 만큼). 줄마다 지금 처리할 포인트의 식별번호를 들고, 포인트의 param2(원본 p3)가 가리키는 번호로 넘어간다.
     /// UI(GDScript)가 쓰는 창구이기도 하다. 메시지와 미션 종료를 시그널로 알리고, 현재 값은 프로퍼티로 읽는다.
     /// BeginMission 을 부른 뒤에만 돌고, 맵을 내리면 멈춘다.
     /// </summary>
@@ -20,8 +20,6 @@ namespace GodotXOPS
         [Signal]
         public delegate void MissionEndedEventHandler(bool complete);
 
-        // 이벤트 줄 수와 시작 식별번호. 원본은 −100, −110, −120 인데 PD1 의 파라미터를 부호 없는 바이트로 읽으므로 156, 146, 136 이다.
-        private static readonly int[] s_lineEntryIds = { 156, 146, 136 };
         // 한 틱에 한 줄이 처리하는 최대 포인트 수 (원본 TOTAL_EVENTFRAMESTEP).
         private const int k_maxFrameSteps = 6;
         // 도착 판정 거리 (m). 원본 DISTANCE_CHECKPOINT 25.0.
@@ -34,8 +32,9 @@ namespace GodotXOPS
         // 시간 대기 이벤트의 1초에 해당하는 틱 수. 원본 (int)GAMEFPS.
         private const int k_ticksPerSecond = (int)SimClock.FrameRate;
 
-        private readonly int[] m_cursor = new int[s_lineEntryIds.Length];
-        private readonly int[] m_waitCnt = new int[s_lineEntryIds.Length];
+        // 줄마다 지금 처리할 포인트의 식별번호와 시간 대기 카운터. 줄 수는 미션을 시작할 때 포인트 데이터에서 받는다.
+        private int[] m_cursor = System.Array.Empty<int>();
+        private int[] m_waitCnt = System.Array.Empty<int>();
 
         private bool m_running;
         private MissionResult m_result = MissionResult.InProgress;
@@ -54,7 +53,7 @@ namespace GodotXOPS
         // 표시 중인 메시지 번호. 없으면 −1.
         public int MessageId => m_messageId;
         public string MessageText => m_messageId >= 0 ? MapLoader.GetMessageText(m_messageId) : string.Empty;
-        // 이벤트 세 줄을 멈출지 (디버그 콘솔의 estop, 원본 gamemain.cpp:4598-4608). 자동 판정과 메시지 시간은 계속 돈다. 미션을 시작하면 풀린다.
+        // 이벤트 줄들을 멈출지 (디버그 콘솔의 estop, 원본 gamemain.cpp:4598-4608). 자동 판정과 메시지 시간은 계속 돈다. 미션을 시작하면 풀린다.
         public bool LinesPaused
         {
             get => m_linesPaused;
@@ -93,14 +92,16 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 미션을 처음부터 시작한다. 세 줄을 시작 번호로 되돌리고 결과와 메시지를 비운다. 맵과 사람을 로드한 뒤 부른다.
+        /// 미션을 처음부터 시작한다. 이벤트 줄들을 포인트 데이터의 시작 번호(MapLoader.EventEntryIds)로 되돌리고 결과와 메시지를 비운다. 맵과 사람을 로드한 뒤 부른다.
         /// </summary>
         public void BeginMission()
         {
+            IReadOnlyList<int> entryIds = MapLoader.EventEntryIds;
+            m_cursor = new int[entryIds.Count];
+            m_waitCnt = new int[entryIds.Count];
             for (int i = 0; i < m_cursor.Length; i++)
             {
-                m_cursor[i] = s_lineEntryIds[i];
-                m_waitCnt[i] = 0;
+                m_cursor[i] = entryIds[i];
             }
             m_result = MissionResult.InProgress;
             m_endTicks = 0;
@@ -120,7 +121,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 한 틱 진행. 원본 순서와 같다: 자동 판정 → 이벤트 세 줄 → 메시지 시간.
+        /// 한 틱 진행. 원본 순서와 같다: 자동 판정 → 이벤트 줄들 → 메시지 시간.
         /// 미션이 끝난 뒤에는 판정과 이벤트를 멈추고 메시지 시간과 종료 후 틱만 센다.
         /// </summary>
         public void SimTick()

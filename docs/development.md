@@ -53,7 +53,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 |---|---|
 | `src/` | C# 코드. 게임플레이, 데이터, 로더, 매니저 |
 | `src/Utility/` | 공용 도구 (`Coord` 좌표 변환, `Singleton<T>`, `GamePath` 등) |
-| `src/IO/` | 파일 로더 (이미지, 모델 `.x`, 소리)와 확장 형식의 읽기·쓰기 (`BD2File`). 게임 싱글톤과 무관해서 다른 도구에서도 쓸 수 있습니다 |
+| `src/IO/` | 파일 로더 (이미지, 모델 `.x`, 소리)와 확장 형식의 읽기·쓰기 (`BD2File`, `PD2File`). 게임 싱글톤과 무관해서 다른 도구에서도 쓸 수 있습니다 |
 | `src/Data/` | 데이터 클래스와 `DataManager`, 설정, 입력 |
 | `src/Map/` | 맵, 사람, 무기, 총알, 오브젝트, 이펙트, 소리, AI, 이벤트 |
 | `src/Scene/` | 화면이 쓰는 창구 `GameBridge`(Autoload `Game`) |
@@ -80,6 +80,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 
 - 블록 충돌: `MapLoader.RaycastBlock` / `IsInsideBlock`. 첫 인자로 판정 종류(`BlockLayer`)를 받습니다: `Human`(이동, 발밑, 카메라, 떨어진 무기와 오브젝트의 바닥), `Bullet`(총알, 수류탄, 혈흔 입자), `Sight`(AI 시야·사선, 폭발 가림). BD2 의 블록 플래그로 판정별 충돌 여부가 갈리고, BD1 블록은 세 판정이 항상 같습니다. 기본값이 없으므로 새 호출 지점은 어느 판정인지 정해서 넘깁니다.
 - 블록 면의 재질은 `MapLoader.GetFaceMaterial(블록, 면)`으로 얻습니다. BD1 블록은 면 재질 번호가 없고 모든 면이 0번 재질입니다 (원본의 착탄 연기와 착탄음이 0번에 들어 있습니다). 블록에 맞은 탄의 이펙트와 소리는 탄환이 아니라 재질이 정합니다.
+- 포인트 데이터도 PD1 과 PD2 를 확장자로 가려 읽고 같은 구조(`RawPointData`)가 됩니다. 이벤트 줄 수는 포인트 데이터가 정합니다 (`MapLoader.EventEntryIds`. PD1 은 세 줄).
 - 블록 데이터는 BD1 과 BD2 를 확장자로 가려 읽고, 읽은 뒤에는 같은 구조(`RawBlockData` → `Block`)가 됩니다. BD2 의 구조는 [모딩 문서](modding.md)에 있습니다.
 - 총알: 한 틱의 경로를 0.25 m 간격 점으로 나눠 점마다 사람 → 오브젝트 → 맵 순으로 검사 (원본 `ObjectManager::CollideBullet`)
 
@@ -143,12 +144,14 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
 | `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름 |
 | `bd2_check.tscn` | — | 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정 결과가 같은지, 블록 플래그(판정별 통과), 그리지 않는 면, 재질(착탄 이펙트와 소리, 발소리와 박자), 깨진 파일 |
+| `pd2_check.tscn` | — | 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰된 사람·무기·오브젝트가 같은지, 255 를 넘는 번호, 추가 파라미터, 방향, 이벤트 줄 수, 깨진 파일 |
 | `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠, 면 위 재생(데칼의 방향과 띄우는 거리) |
 
 눈으로 확인하는 도구 (`--headless` 없이 실행):
 
 - `asset_viewer.tscn` — 에셋 뷰어.
 - `map_viewer.tscn` — 미션을 골라 자유 카메라로 봅니다. `-- --mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]`로 화면을 저장하고 종료합니다. `-- --file 경로`는 미션 대신 블록 데이터 파일(BD1, BD2) 하나를 띄웁니다 (게임 폴더 기준 경로).
+- `pd2_check.tscn` — `-- --convert 입력.pd1 출력.pd2`로 PD1 하나를 PD2 로 바꿉니다. 같은 이름의 `.msg`도 복사합니다 (헤드리스 가능, 게임 폴더 기준 경로).
 - `bd2_check.tscn` — `-- --convert 입력.bd1 출력.bd2`로 BD1 하나를 BD2 와 텍스처 목록(`출력_textures.json`)으로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로).
 - `effect_viewer.tscn` — 이펙트 프리셋을 골라 봅니다. 인자: `-- [--effect 번호] [--additive] [--screenshot 경로.png]`. 창에서는 ← →(프리셋), Space(다시 재생), B(가산 미리보기), ↑ ↓(카메라 거리).
 - `play_test.tscn` — 미션을 로드해 플레이어를 직접 조작합니다. 인자: `--mission 번호 [--addon] [--third] [--weapon 번호] [--fire] [--hitbox] [--look yaw,pitch] [--pos x,y,z] [--noai] [--invincible] --screenshot 경로.png`. 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), Insert(플레이어 무적), Home(디버그 텍스트).

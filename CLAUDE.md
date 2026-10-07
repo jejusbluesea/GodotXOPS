@@ -39,7 +39,8 @@
 - UnityXOPS → Godot: `(x, y, -z)` (`Coord.FromUnity`). `godotdata` JSON의 위치·오프셋과 `.x` 정점이 여기에 해당한다.
 - UnityXOPS 오일러 각(도) → Godot: `(-x, -y, z)` 라디안, YXZ 순서 (`Coord.FromUnityEuler`)
 - 삼각형 와인딩과 UV는 뒤집지 않는다.
-- PD1 포인트의 `look`은 사람 기준 yaw 다 (원본 방향 + 180°). 원본은 사람만 방향에 π 를 더해 그리므로, 소물처럼 원본 방향 그대로 그리는 것에는 `look − 180`을 쓴다 (UnityXOPS 는 소물에도 `look`을 그대로 써서 반대로 놓인다).
+- 포인트(`RawPointData`)의 `look`은 사람 기준 yaw 다 (원본 방향 + 180°). 원본은 사람만 방향에 π 를 더해 그리므로 (object.cpp:2158), 원본 방향 그대로 그리는 소물에는 `look − 180`을 쓴다 (object.cpp:2765. UnityXOPS 는 소물에도 `look`을 그대로 써서 반대로 놓인다). **무기는 맵에 놓인 것도 사람이 버린 것도 `look`(사람 기준 yaw) 그대로다.** 원본 코드만 보면 맵에 놓인 무기도 소물처럼 180° 를 빼야 할 것 같지만, 그렇게 하면 화면에서 원본과 반대로 놓인다 (사용자가 원본과 대조해 확인, 2026-10-07. 무기 모델을 놓는 회전이 사람 기준 yaw 에 맞춰져 있다). 다시 "고치지" 않는다.
+- PD2 의 방향은 "그 자리에 놓이는 것의 yaw"다. 사람과 무기는 `look`과 같고 소물은 `look − 180`이다. PD2 로더가 종류별로 `look`으로 맞춘다 (`MapLoader.LookOffset`).
 - `godotdata` JSON 값은 UnityXOPS 공간 그대로 둔다. 로드해서 쓰는 지점에서 변환한다.
 
 ## 빌드와 실행
@@ -82,6 +83,8 @@ dotnet build GodotXOPS.csproj
 - `res://scenes/dev/effect_viewer.tscn` — 이펙트 프리셋을 골라 눈으로 보고(`--effect 번호`, `--additive`, `--screenshot 경로.png`), `--selftest` 로 재생 수·풀 증가·블렌드 모드·발광 감쇠·면 위 재생을 수치로 확인한다 (헤드리스 가능). 이펙트 데이터나 `EffectManager` 를 고친 뒤에 돌린다.
 
 - `res://scenes/dev/bd2_check.tscn` — 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정이 같은지 대조하고, 블록 플래그·그리지 않는 면·재질(착탄, 발소리와 박자)·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.bd1 출력.bd2` 는 파일 하나를 변환한다. 블록 로더나 충돌 조회, `BD2File` 을 고친 뒤에 돌린다. `map_viewer` 의 `--file 경로` 로 BD1 / BD2 파일 하나를 띄워 볼 수 있다.
+
+- `res://scenes/dev/pd2_check.tscn` — 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰 결과가 같은지 대조하고, 넓은 파라미터·추가 파라미터·방향·이벤트 줄 수·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.pd1 출력.pd2` 는 파일 하나를 변환한다. 포인트 로더, `PD2File`, 이벤트 줄을 고친 뒤에 돌린다.
 
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 
@@ -157,7 +160,9 @@ dotnet build GodotXOPS.csproj
 - 경로와 이벤트의 다음 포인트는 **종류별로** 찾는다 (`MapLoader.GetPathPoint`, `GetEventPoint`). 원본 `SearchPointdata`는 종류와 무관하게 같은 번호의 첫 포인트를 찾아서 번호가 겹치면 줄이 끊기는데, 원본의 버그로 보고 따르지 않는다 (사용자 결정).
 - 소리 신호(`Human.NotifyThreatHeard`)는 `AIController`가 매 틱 비운다. 원본보다 한 틱 빨리 듣는다 (원본은 이중 버퍼라 다음 프레임에 듣는다).
 - 발소리는 `HumanController`가 매 틱 `WorldSound.EmitFootstep(사람, 종류)`로 다른 팀 AI 에게 알린다 (달리는 소리만. 원본도 WAV 를 재생하지 않는다). 들리는 소리는 따로 `WorldSound.PlayFootstep`이 낸다: 다리 애니메이션이 `footstepPhase`를 지나는 틱(`HumanVisual.FootstepDue`)과 착지한 틱에, 발밑 면의 재질에서 소리를 골라 재생한다. 기본 데이터의 0번 재질에는 발소리가 없어서 BD1 맵에서는 나지 않는다. AI 청각과 판정에는 영향이 없다.
-- `EventManager`(Autoload, SimOrder 300)가 이벤트 세 줄과 자동 판정을 돌린다. `BeginMission()`을 부른 뒤에만 돌고 맵을 내리면 멈춘다. UI(GDScript)는 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`와 프로퍼티 `Result`, `EndTicks`, `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`를 쓴다.
+- 포인트 데이터는 확장자로 PD1 / PD2 로더가 갈리고 읽은 뒤에는 같은 구조다 (`RawPointData`). PD2 는 파라미터가 int32 이고 포인트마다 추가 파라미터(`extra`, 4바이트 칸)를 갖는다. 칸은 `GetExtraInt` / `GetExtraFloat` / `GetExtraBool`(0 이면 거짓)로 읽고, 없는 칸은 기본값이다. PD2 의 읽기·쓰기는 `src/IO/PD2File.cs`, 구조는 `docs/modding.md` 에 있다.
+- 이벤트 줄 수와 시작 식별번호는 포인트 데이터가 정한다 (`MapLoader.EventEntryIds`). PD1 은 항상 156, 146, 136 세 줄이고 PD2 는 파일에 적힌 만큼이다. `EventManager.BeginMission`이 그 목록으로 줄을 만든다.
+- `EventManager`(Autoload, SimOrder 300)가 이벤트 줄들과 자동 판정을 돌린다. `BeginMission()`을 부른 뒤에만 돌고 맵을 내리면 멈춘다. UI(GDScript)는 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`와 프로퍼티 `Result`, `EndTicks`, `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`를 쓴다.
 
 ## 화면 (씬 UI)
 

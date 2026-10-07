@@ -7,8 +7,9 @@ using GodotXOPS.IO;
 namespace GodotXOPS
 {
     /// <summary>
-    /// PD1 파일에서 파싱된 포인트 하나. position 은 Godot 좌표, look 은 UnityXOPS 규약 yaw(도)다.
-    /// param0~3 은 원본의 P1~P4 에 해당한다 (param0 = 종류, param3 = 식별번호).
+    /// PD1 이나 PD2 파일에서 파싱된 포인트 하나. 어느 형식에서 읽었든 같은 모양이다. position 은 Godot 좌표, look 은 UnityXOPS 규약 yaw(도)다.
+    /// param0~3 은 원본의 P1~P4 에 해당한다 (param0 = 종류, param3 = 식별번호). PD1 은 0 에서 255 사이이고 PD2 는 int32 전체다.
+    /// look 은 사람 기준 yaw 다 (원본 방향 + 180°). 사람과 무기는 look 을 그대로 쓰고, 소물에는 look − 180 을 쓴다.
     /// </summary>
     public class RawPointData
     {
@@ -18,6 +19,41 @@ namespace GodotXOPS
         public int param1;
         public int param2;
         public int param3;
+        // 추가 파라미터 (PD2). PD1 은 빈 배열이다. 4바이트 칸이고 포인트 종류에 따라 정수, 실수, 불로 읽는다.
+        public int[] extra = Array.Empty<int>();
+
+        /// <summary>
+        /// 추가 파라미터 한 칸을 정수로 읽는다.
+        /// </summary>
+        /// <param name="index">칸 번호 (0 부터).</param>
+        /// <param name="fallback">칸이 없을 때의 값. 옛 파일에는 나중에 더해진 칸이 없다.</param>
+        /// <returns>칸의 값.</returns>
+        public int GetExtraInt(int index, int fallback = 0)
+        {
+            return index >= 0 && index < extra.Length ? extra[index] : fallback;
+        }
+
+        /// <summary>
+        /// 추가 파라미터 한 칸을 실수(float32)로 읽는다.
+        /// </summary>
+        /// <param name="index">칸 번호 (0 부터).</param>
+        /// <param name="fallback">칸이 없을 때의 값.</param>
+        /// <returns>칸의 값.</returns>
+        public float GetExtraFloat(int index, float fallback = 0f)
+        {
+            return index >= 0 && index < extra.Length ? BitConverter.Int32BitsToSingle(extra[index]) : fallback;
+        }
+
+        /// <summary>
+        /// 추가 파라미터 한 칸을 불로 읽는다. 0 이면 거짓, 그 밖은 참이다.
+        /// </summary>
+        /// <param name="index">칸 번호 (0 부터).</param>
+        /// <param name="fallback">칸이 없을 때의 값.</param>
+        /// <returns>칸의 값.</returns>
+        public bool GetExtraBool(int index, bool fallback = false)
+        {
+            return index >= 0 && index < extra.Length ? extra[index] != 0 : fallback;
+        }
     }
 
     public partial class MapLoader
@@ -35,6 +71,10 @@ namespace GodotXOPS
         public const int PointEventLast = 19;
 
         private const int k_maxParameterCount = 20;
+        // 소물은 원본이 방향을 그대로 그린다. 사람 기준 yaw 인 look 과 180° 차이가 난다 (원본 object.cpp:2158 사람은 +π, :2765 소물은 그대로).
+        private const float k_modelYawOffset = 180f;
+        // PD1 의 이벤트 세 줄의 시작 식별번호. 원본은 −100, −110, −120 인데 PD1 의 파라미터를 부호 없는 바이트로 읽으므로 156, 146, 136 이다.
+        private static readonly int[] s_legacyEventEntryIds = { 156, 146, 136 };
         // 한 맵에 둘 수 있는 사람 수 (원본 MAX_HUMAN). 치트로 사람을 추가할 때의 상한이다.
         private const int k_maxHumans = 96;
         // 복제한 사람을 놓는 자리: 원본 사람의 정면 1 m, 위로 0.5 m (원본 gamemain.cpp:2436-2438 — 10.0, 5.0).
@@ -52,6 +92,7 @@ namespace GodotXOPS
         private readonly AIController m_aiController = new AIController();
         private ShaderMaterial m_untexturedMaterial;
         private Human m_player;
+        private int[] m_eventEntryIds = s_legacyEventEntryIds;
 
         // 종류(param0)별 → 식별번호(param3)별 포인트 목록. 파일 순서를 유지한다.
         private List<Dictionary<int, List<RawPointData>>> m_sortedRawPointData;
@@ -65,15 +106,17 @@ namespace GodotXOPS
         // 플레이어의 미션 통계.
         public static MissionStats Stats => Instance.m_stats;
         public static int MessageCount => Instance.m_messages.Count;
+        // 이벤트 줄마다의 시작 식별번호. 개수가 이벤트 줄 수다. PD1 은 항상 세 줄이고, PD2 는 파일이 정한다.
+        public static IReadOnlyList<int> EventEntryIds => Instance.m_eventEntryIds;
 
         // m_humans 내 플레이어 인덱스. 플레이어가 없으면 -1.
         public static int PlayerIndex => Instance.m_player != null ? Instance.m_humans.IndexOf(Instance.m_player) : -1;
 
         /// <summary>
-        /// PD1 파일을 읽어 포인트를 정리하고 사람·무기·소물을 스폰한다. 이전에 로드된 것은 먼저 제거한다.
-        /// 같은 이름의 .msg 파일이 있으면 메시지도 읽는다.
+        /// 포인트 데이터 파일을 읽어 포인트를 정리하고 사람·무기·소물을 스폰한다. 이전에 로드된 것은 먼저 제거한다.
+        /// 확장자가 .pd2 이면 PD2 로, 그 밖에는 PD1 로 읽는다. 읽은 뒤의 구조는 같다. 같은 이름의 .msg 파일이 있으면 메시지도 읽는다.
         /// </summary>
-        /// <param name="filepath">PD1 파일 전체 경로.</param>
+        /// <param name="filepath">PD1 또는 PD2 파일 전체 경로.</param>
         /// <returns>로드에 성공했으면 true.</returns>
         public static bool LoadPointData(string filepath)
         {
@@ -81,22 +124,26 @@ namespace GodotXOPS
 
             if (string.IsNullOrEmpty(filepath))
             {
-                Debugger.LogError("PD1 path is empty.", nameof(MapLoader));
+                Debugger.LogError("Point data path is empty.", nameof(MapLoader));
                 return false;
             }
 
             if (!File.Exists(filepath))
             {
-                Debugger.LogError($"PD1 file not exists: {filepath}", nameof(MapLoader));
+                Debugger.LogError($"Point data file not exists: {filepath}", nameof(MapLoader));
                 return false;
             }
 
-            if (!LoadPD1File(filepath, out RawPointData[] points))
+            bool pd2 = string.Equals(Path.GetExtension(filepath), PD2File.Extension, StringComparison.OrdinalIgnoreCase);
+            RawPointData[] points;
+            int[] eventEntryIds = s_legacyEventEntryIds;
+            if (pd2 ? !LoadPD2File(filepath, out points, out eventEntryIds) : !LoadPD1File(filepath, out points))
             {
                 return false;
             }
 
             MapLoader loader = Instance;
+            loader.m_eventEntryIds = eventEntryIds;
 
             loader.m_sortedRawPointData = new List<Dictionary<int, List<RawPointData>>>();
             for (int i = 0; i < k_maxParameterCount; i++)
@@ -187,6 +234,7 @@ namespace GodotXOPS
                 int magazine = Mathf.Min(totalBullets, magazineSize);
                 int reserve = Mathf.Max(0, totalBullets - magazineSize);
 
+                // 무기는 사람 기준 yaw(look)를 그대로 쓴다. 소물처럼 180° 를 빼면 원본과 반대로 놓인다 (화면으로 원본과 대조해 확인했다).
                 WeaponManager.Instance.Spawn(weaponIndex, magazine, reserve, raw.position, raw.look, Vector3.Zero);
             }
         }
@@ -212,7 +260,7 @@ namespace GodotXOPS
                 var smallObject = new SmallObject { Name = $"Object_{loader.m_smallObjects.Count}" };
                 loader.m_objectRoot.AddChild(smallObject);
                 // look 은 사람 기준 yaw 다 (원본 방향 + 180°). 원본은 사람만 방향에 π 를 더해 그리고 (object.cpp:2158) 소물은 그대로 그리므로 (object.cpp:2765) 도로 뺀다.
-                smallObject.CreateObject(raw.param1, raw.param3, raw.position, raw.look - 180f);
+                smallObject.CreateObject(raw.param1, raw.param3, raw.position, raw.look - k_modelYawOffset);
                 if (raw.param2 != 0) smallObject.SnapToGround();
                 loader.m_smallObjects.Add(smallObject);
             }
@@ -294,6 +342,7 @@ namespace GodotXOPS
             loader.m_messages.Clear();
             loader.m_entityMaterialCache.Clear();
             loader.m_sortedRawPointData = null;
+            loader.m_eventEntryIds = s_legacyEventEntryIds;
         }
 
         /// <summary>
