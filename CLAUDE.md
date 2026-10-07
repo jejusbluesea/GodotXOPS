@@ -93,7 +93,7 @@ dotnet build GodotXOPS.csproj
 - `--window 너비x높이` — 설정 파일의 전체화면 대신 그 크기의 창으로 띄운다.
 - `--scene 이름 [--mission 번호 [--addon] [--page 번호]]` — 그 화면에서 시작한다 (`mainmenu`, `briefing`, `maingame`, `result`).
 - `--ui-shot 경로.png [--ui-time 초]` — 화면을 PNG 로 저장하고 종료한다.
-- `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` / `console` 상태로 시작한다. `console`은 설정 파일과 무관하게 디버그 콘솔을 허용한다 (콘솔을 화면으로 확인할 때 `--ui-click "key:F11 text:help key:Enter"`와 함께 쓴다).
+- `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` / `console` 상태로 시작한다. `console`은 어느 화면에서든 설정 파일과 무관하게 디버그 콘솔을 허용한다 (콘솔을 화면으로 확인할 때 `--ui-click "key:F11 text:help key:Enter"`와 함께 쓴다).
 - `--ui-click "목록"` — 가짜 입력을 차례로 넣는다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 친다. 띄어쓰기는 `key:Space`). 좌표는 창 픽셀이고 실제 커서를 옮긴다. 버튼을 눌러 본 결과를 `--ui-shot`으로 볼 때 쓴다 (`--window 640x480`과 함께).
 - `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다.
 
@@ -172,7 +172,8 @@ dotnet build GodotXOPS.csproj
 - **배치 좌표는 UnityXOPS 화면 좌표 그대로다**: 기준점(화면이나 부모 안의 한 점)에서의 오프셋, +x 오른쪽, +y **위쪽**. `XopsUI`가 Godot 좌표로 바꾼다. 화면 스크립트에서 y 부호를 직접 뒤집지 않는다.
 - **층의 배율은 두 가지다** (`XopsUI.layer(parent, order, scaled)`): `scaled = true`는 화면 높이를 480으로 보고 확대하고, `false`는 픽셀 1:1에 설정의 `UIScale`을 곱한다. 어느 요소가 어느 쪽인지는 Lua 를 따른다 (HUD·메뉴는 픽셀, 스코프·중앙 문구·암전은 확대).
 - **GDScript 는 창구 Autoload 만 부른다**: `Game`(`GameBridge`), `EventManager`, `ConfigManager`, `InputManager`. 게임플레이 노드를 직접 만지지 않는다. 창구의 좌표·각도 인자는 UnityXOPS 공간이다 (카메라 위치, 무기 표시 자리).
-- `Game`이 하는 일: 화면 전환(`ChangeScene`), 맵 로드(`LoadOpening`, `LoadDemo`, `LoadMission`, `BeginMission`, `RestartMission`, `ReloadMission`, `UnloadMap`, `UnloadMission`), 장면 카메라, 벽 블라인드 판정, 미션 목록·브리핑·통계 조회, HUD 가 읽는 플레이어 값, 3D 무기 표시(`HudWeaponView`), 밝기·감마 사각형.
+- 미션 로드가 실패한 이유는 `Game.LastLoadError()`(영어 한 줄, 로드 중 처음 남은 에러 로그)로 읽는다. 메뉴는 미션을 눌렀는데 실패하면 타이틀 아래에 그 문구를 잠깐 띄운다 (`LOAD_ERROR` 상수. 원본의 "block data open failed" 에 해당).
+- `Game`이 하는 일: 화면 전환(`ChangeScene`), 맵 로드(`LoadOpening`, `LoadDemo`, `ReloadBackground`, `LoadMission`, `LoadMissionFile`, `LoadMapFiles`, `BeginMission`, `RestartMission`, `ReloadMission`, `UnloadMap`, `UnloadMission`), 장면 카메라, 벽 블라인드 판정, 미션 목록·브리핑·통계 조회, HUD 가 읽는 플레이어 값, 3D 무기 표시(`HudWeaponView`), 밝기·감마 사각형.
 - 오프닝과 메뉴 배경은 `AIController.DrivePlayer = true`로 플레이어까지 AI 가 움직이고 이벤트는 돌지 않는다. 메인게임이 들어올 때 `Game.BeginMission()`이 되돌린다.
 - 시점 전환(F1)과 스코프 입력은 `PlayerController`가 처리한다. HUD 는 상태를 읽어 그리기만 한다.
 - OS 글꼴 글상자(`XopsUI.label`: 브리핑 본문, 이벤트 메시지, 크레딧)는 자기가 속한 층의 글꼴(`XopsLayer.os_font()`)을 쓴다. 층이 배율만큼 `oversampling`을 맞춰 두므로 확대돼도 흐려지지 않는다. 공용 `XopsUI.os_font()`를 글상자에 직접 넣으면 높은 해상도에서 흐려진다.
@@ -181,7 +182,7 @@ dotnet build GodotXOPS.csproj
 - `PlayerController`는 입력을 넣은 직후 `Controller.ApplyVisual()`을 한 번 더 부른다. 사람 노드의 회전·팔 각도가 `PlayerController`보다 먼저 갱신되므로, 다시 맞추지 않으면 1인칭 팔이 카메라보다 한 프레임 늦게 돈다.
 - 3D 무기 표시는 자기만의 3D 공간을 가진 뷰포트다. 무기 모델이 맵과 같은 안개 셰이더를 쓰므로 공간 전체를 1/100로 줄여 카메라 바로 앞에 둔다. 뷰포트는 표시 크기 × UIScale 로 렌더링한다 (표시 크기 그대로면 확대될 때 계단이 진다).
 - 메뉴의 OPTION(설정 화면)은 `ui/mainmenu_option.gd`(`MenuOption`)가 만든다. 구성과 수치는 UnityXOPS 0.4의 `mainmenu.lua`다. 탭은 General / Input / Graphic / Sound. 값은 바꾸는 즉시 `ConfigManager`에 들어가 화면에 반영되고(밝기·감마, 음량, 키 바인딩), SAVE 가 파일에 쓰고 `ApplyGraphic`을 부른다. UIScale 은 SAVE 때 적용한다 (바로 적용하면 누르고 있던 화살표가 움직인다. 사용자 결정). BACK 과 ESC 는 `RevertToSaved`로 되돌린다. playerName 은 쓰는 곳이 없어 화면에 넣지 않았다 (사용자 결정).
-- 디버그 콘솔(원본의 F11 콘솔)은 `config.json`의 `General` / `AllowConsole`이 true 일 때만 메인게임이 만든다 (사용자 결정. 실행 인자가 아니라 설정이다). 이 설정은 OPTION 화면에 넣지 않고 유저가 파일을 직접 고친다. OPTION 의 RESET 도 이 값은 건드리지 않는다 (`ConfigManager.ResetToDefaults`). 화면과 글자 입력은 `ui/common/xops_console.gd`(`XopsConsole`), 명령 표와 실행은 `src/Scene/DebugConsole.cs`(순수 클래스)이고 `Game.ConsoleExecute`로 잇는다. 명령을 추가할 때는 `DebugConsole` 생성자의 표에 한 줄을 더하고 `docs/development.md`의 명령 표도 고친다. 화면이 해야 하는 일(지우기, 닫기, 재시작, 화면 저장)은 명령이 `Game.ConsoleTakeAction`으로 넘긴다. 글자는 OS 글꼴이다 (사용자 결정. `char.dds`는 글자 크기 문제가 있다). **콘솔의 입력과 출력(사용법, 설명, 결과, 디버그 텍스트)은 영어만 쓴다** (사용자 결정). `ui_check`가 출력에 영어가 아닌 글자가 있는지 본다. 사람은 `MapLoader.Humans`의 인덱스로 가리킨다. 좌표를 받는 명령(`teleport x y z`)은 `info`가 보여 주는 것과 같은 Godot 공간의 미터 값을 받는다 (사용자 결정. 맵을 만드는 사람은 원본 XOPS 좌표를 잘 쓰지 않는다).
+- 디버그 콘솔(원본의 F11 콘솔)은 `config.json`의 `General` / `AllowConsole`이 true 일 때만 Autoload `Dev`가 만든다 (사용자 결정. 실행 인자가 아니라 설정이다). **씬에 속하지 않아서 오프닝·메뉴·브리핑·메인게임·결과 어디서든 열리고, 명령은 그때 로드돼 있는 맵(배경 맵 포함)에 그대로 적용된다** (사용자 결정. 메뉴에서도 AI 가 돌고 있으므로 `kill` 같은 명령이 먹어야 한다). 콘솔에는 `Debugger` 의 로그도 나온다 (경고 주황, 에러 빨강. `Game.ConsoleTakeLogs`). 이 설정은 OPTION 화면에 넣지 않고 유저가 파일을 직접 고친다. OPTION 의 RESET 도 이 값은 건드리지 않는다 (`ConfigManager.ResetToDefaults`). 화면과 글자 입력은 `ui/common/xops_console.gd`(`XopsConsole`), 명령 표와 실행은 `src/Scene/DebugConsole.cs`(순수 클래스)이고 `Game.ConsoleExecute`로 잇는다. 명령을 추가할 때는 `DebugConsole` 생성자의 표에 한 줄을 더하고 `docs/development.md`의 명령 표도 고친다. 화면이 해야 하는 일(지우기, 재시작, 화면 저장, 씬 전환 `scene:이름`)은 명령이 `Game.ConsoleTakeAction`으로 넘긴다. `restart`는 지금 씬의 `console_restart()`를 부른다 (메인게임은 미션, 오프닝은 연출 전체, 메뉴는 배경 맵. 그 함수가 없는 씬은 다시 시작할 것이 없다). `loadmap 블록 포인트 [하늘]`, `loadmission 번호 [skipbriefing]`(공식 미션의 목록 인덱스), `loadmissionmif 미션파일 [skipbriefing]`은 맵을 로드해 메인게임(또는 브리핑)으로 넘어간다 (`Game.LoadMapFiles`, `LoadMission`, `LoadMissionFile`). skipbriefing 의 기본값은 true 다. 명령 이름만 소문자로 바꾸고 인자는 대소문자를 그대로 넘긴다 (파일 경로). 큰따옴표로 묶으면 띄어쓰기가 있어도 인자 하나다. 글자는 OS 글꼴이다 (사용자 결정. `char.dds`는 글자 크기 문제가 있다). **콘솔의 입력과 출력(사용법, 설명, 결과, 디버그 텍스트)은 영어만 쓴다** (사용자 결정). `ui_check`가 출력에 영어가 아닌 글자가 있는지 본다. 사람은 `MapLoader.Humans`의 인덱스로 가리킨다. 좌표를 받는 명령(`teleport x y z`)은 `info`가 보여 주는 것과 같은 Godot 공간의 미터 값을 받는다 (사용자 결정. 맵을 만드는 사람은 원본 XOPS 좌표를 잘 쓰지 않는다).
 - 콘솔의 `flight`(비행 모드)는 `HumanController.SetFlight`로 켠다. 원본에 없는 기능이고, 켜져 있고 살아 있는 동안 `Tick`이 평소의 이동·충돌 대신 `TickFlight`만 돈다 (기존 이동 코드는 건드리지 않는다). 시선 방향으로 움직이고 점프는 무시하며, `HumanCollision`도 그 사람을 건너뛴다. 총알 판정은 그대로다. 날고 있는 동안은 접지한 것으로 친다 (`Grounded` = true, 공중 조준 오차 없음. 사용자 결정). 끄면 그 자리에서 공중 상태가 되고 평소의 이동이 접지 여부를 다시 구한다.
 - 콘솔의 `collider`는 `src/Scene/ColliderView.cs`(`Game`의 자식 노드)가 그린다. 판정 코드와 같은 식으로 자리를 구해서 그리므로, 판정 계산(`HumanHitbox.Contains`, `WeaponManager.TickPickup`, `SmallObject.Contains`)을 고치면 이 표시도 같이 고친다.
 - 글자를 입력받는 화면은 열려 있는 동안 `InputManager.InputBlocked`를 켠다. 켜져 있으면 `InputManager`의 모든 조회가 "안 눌림"을 돌려준다. 끌 때는 키 이벤트를 받는 도중이 아니라 `_process`에서 끈다 (도중에 끄면 콘솔을 닫은 Esc 가 게임 쪽에서 "메뉴로 나가기"로 읽힌다).
@@ -243,7 +244,7 @@ dotnet build GodotXOPS.csproj
   - Godot 가상 함수(`_Ready`, `_Process` 등)에는 주석을 달지 않는다.
   - 그 외 위치에는 이해하기 어려운 부분에만.
 - `partial class`로 관심사별 파일 분리. Godot 노드 클래스는 `partial`이 필수다.
-- 에디터 전용 로그는 `Debugger`를 쓴다 (`[Conditional("TOOLS")]`로 익스포트 빌드에서 제거됨).
+- 로그는 `Debugger`(`LogWarning`, `LogError`)를 쓴다. 메모리에 쌓여 디버그 콘솔에 색으로 나오고(익스포트 빌드에서도), 에디터에서는 Godot 출력 창에도 찍힌다. **콘솔에 나오므로 메시지는 영어로 쓴다** (콘솔의 글자는 영어만 쓴다는 사용자 결정). 매 틱 불리는 자리에는 넣지 않는다 (빌드에서도 문자열을 만든다).
 - Godot 4.7 기준 deprecated API 사용 금지. 빌드 경고 0개를 유지한다.
 - 주석 형식: 클래스와 함수는 `/// <summary>`, 인자는 `/// <param>`, 반환 값은 `/// <returns>`. 한 줄짜리 프로퍼티·필드 설명은 `//` 한 줄.
 - 주석에는 "무엇이고 왜 그런지"를 쓴다. 원본에서 온 값이나 로직에는 출처를 적는다 (예: `원본 object.cpp:1607-1644`, `HUMAN_MAPCOLLISION_CLIMBHEIGHT`). UnityXOPS에서 옮겼다는 사실 자체는 적지 않는다.

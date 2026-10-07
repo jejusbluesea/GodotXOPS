@@ -8,7 +8,8 @@ namespace GodotXOPS
 {
     /// <summary>
     /// 디버그 콘솔의 명령 표와 실행. 원본 OpenXOPS 의 디버그 콘솔(gamemain.cpp:3552-4750)에 해당한다.
-    /// 화면(GDScript)은 한 줄을 GameBridge 에 넘기고 결과 글자를 받는다. 화면이 해야 하는 일(지우기, 닫기, 재시작, 화면 저장)은 TakeUiAction 으로 알린다.
+    /// 화면(GDScript)은 한 줄을 GameBridge 에 넘기고 결과 글자를 받는다. 화면이 해야 하는 일(지우기, 재시작, 화면 저장, 화면 전환)은 TakeUiAction 으로 알린다.
+    /// 콘솔은 어느 화면에서든 열린다. 명령은 그때 로드돼 있는 맵(오프닝·메뉴의 배경 맵 포함)에 그대로 적용된다.
     /// 사람은 MapLoader.Humans 의 인덱스로 가리킨다 (info 에 나오는 # 번호).
     /// 콘솔에 나오는 글자(사용법, 설명, 결과)는 모두 영어로 쓴다 (사용자 결정).
     /// 명령을 추가할 때는 생성자의 표에 한 줄을 더한다.
@@ -17,9 +18,15 @@ namespace GodotXOPS
     {
         // 화면이 처리할 일의 이름.
         public const string UiActionClear = "clear";
-        public const string UiActionExit = "exit";
         public const string UiActionRestart = "restart";
         public const string UiActionScreenshot = "screenshot";
+        // 뒤에 씬 이름이 붙는다 (예: "scene:maingame"). 화면이 그 씬으로 바꾼다.
+        public const string UiActionScenePrefix = "scene:";
+
+        private const string k_sceneMenu = "mainmenu";
+        private const string k_sceneBriefing = "briefing";
+        private const string k_sceneGame = "maingame";
+        private const string k_mif2Extension = ".mif2";
 
         // help 가 한 줄에 늘어놓는 명령 수.
         private const int k_helpNamesPerLine = 8;
@@ -59,7 +66,6 @@ namespace GodotXOPS
             Add("help", "help [command]", "List all commands. With a command name, show how to use it.", Help);
             Add("ver", "ver", "Show the game version.", _ => $"{DataManager.Instance.GlobalData.productName} {DataManager.Instance.GlobalData.Version}");
             Add("clear", "clear", "Clear the console text.", _ => RequestUi(UiActionClear, string.Empty));
-            Add("exit", "exit", "Close the console.", _ => RequestUi(UiActionExit, string.Empty));
 
             Add("info", "info", "Toggle the debug text.", _ => Toggle(ref m_infoVisible, "Debug text"));
             Add("human", "human", "Show the number of humans and the survivors of each team.", _ => HumanSummary());
@@ -82,33 +88,74 @@ namespace GodotXOPS
             Add("comp", "comp", "End the mission as complete.", _ => ForceEnd(true));
             Add("fail", "fail", "End the mission as failed.", _ => ForceEnd(false));
             Add("estop", "estop", "Toggle stopping the mission events.", _ => ToggleEventStop());
-            Add("f12", "f12", "Restart the mission.", _ => RequestUi(UiActionRestart, "Mission restarted"));
+            Add("restart", "restart", "Restart what the current screen is playing: the mission, the opening sequence, or the menu background map.", _ => RequestUi(UiActionRestart, string.Empty));
+            Add("loadmap", "loadmap <block file> <point file> [sky]", "Load a block file (bd1, bd2) and a point file (pd1, pd2) and start playing. Paths are relative to the game folder; put a path with spaces in double quotes. Sky defaults to 0.", LoadMap);
+            Add("loadmission", "loadmission <index> [skipbriefing]", "Load an official mission by its index in the mission list (0 is the first) and start playing. With skipbriefing false, show the briefing first (default true).", LoadMission);
+            Add("loadmissionmif", "loadmissionmif <mif file> [skipbriefing]", "Load a mission file and start playing. Paths are relative to the game folder. With skipbriefing false, show the briefing first (default true).", LoadMissionFile);
 
             Add("collider", "collider <human|weapon|object>", "Toggle drawing hit ranges: human hitboxes (green), weapon pickup ranges (red), object colliders (blue).", Collider);
             Add("fog", "fog", "Toggle the fog.", _ => ToggleFog());
             Add("sky", "sky <index>", "Change the sky (0 is none).", Sky);
-            Add("ss", "ss", "Save a screenshot as PNG.", _ => RequestUi(UiActionScreenshot, string.Empty));
+            Add("ss", "ss", "Save a screenshot as PNG (same as screenshot).", _ => RequestUi(UiActionScreenshot, string.Empty));
+            Add("screenshot", "screenshot", "Save a screenshot as PNG (same as ss).", _ => RequestUi(UiActionScreenshot, string.Empty));
         }
 
         /// <summary>
-        /// 명령 한 줄을 실행한다. 대소문자는 가리지 않고, 띄어쓰기로 명령과 인자를 나눈다.
+        /// 명령 한 줄을 실행한다. 명령 이름은 대소문자를 가리지 않고, 띄어쓰기로 명령과 인자를 나눈다. 큰따옴표로 묶은 부분은 띄어쓰기가 있어도 인자 하나다.
+        /// 인자는 파일 경로일 수 있어 대소문자를 그대로 넘긴다. 낱말을 받는 명령은 스스로 대소문자를 무시한다.
         /// </summary>
         /// <param name="line">입력한 줄.</param>
         /// <returns>콘솔에 보여 줄 글자 (여러 줄일 수 있다). 보여 줄 것이 없으면 빈 문자열.</returns>
         public string Execute(string line)
         {
-            string[] parts = (line ?? string.Empty).Trim().ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length == 0) return string.Empty;
+            List<string> parts = Tokenize(line ?? string.Empty);
+            if (parts.Count == 0) return string.Empty;
 
+            string name = parts[0].ToLowerInvariant();
             foreach (Command command in m_commands)
             {
-                if (command.name != parts[0]) continue;
+                if (command.name != name) continue;
 
-                var args = new string[parts.Length - 1];
-                Array.Copy(parts, 1, args, 0, args.Length);
-                return command.handler(args);
+                return command.handler(parts.GetRange(1, parts.Count - 1).ToArray());
             }
-            return $"Unknown command: {parts[0]} (type help for the list)";
+            return $"Unknown command: {name} (type help for the list)";
+        }
+
+        /// <summary>
+        /// 한 줄을 띄어쓰기로 나눈다. 큰따옴표 안의 띄어쓰기는 나누지 않고, 따옴표 자체는 뺀다.
+        /// </summary>
+        /// <param name="line">입력한 줄.</param>
+        /// <returns>나눈 낱말들. 빈 낱말은 없다.</returns>
+        private static List<string> Tokenize(string line)
+        {
+            var parts = new List<string>();
+            var current = new StringBuilder();
+            bool quoted = false;
+            bool started = false;
+
+            foreach (char c in line)
+            {
+                if (c == '"')
+                {
+                    quoted = !quoted;
+                    started = true;
+                }
+                else if (c == ' ' && !quoted)
+                {
+                    if (started) parts.Add(current.ToString());
+                    current.Clear();
+                    started = false;
+                }
+                else
+                {
+                    current.Append(c);
+                    started = true;
+                }
+            }
+            if (started) parts.Add(current.ToString());
+
+            parts.RemoveAll(part => part.Length == 0);
+            return parts;
         }
 
         /// <summary>
@@ -189,11 +236,12 @@ namespace GodotXOPS
         {
             if (args.Length > 0)
             {
+                string name = args[0].ToLowerInvariant();
                 foreach (Command command in m_commands)
                 {
-                    if (command.name == args[0]) return $"{command.usage} - {command.help}";
+                    if (command.name == name) return $"{command.usage} - {command.help}";
                 }
-                return $"Unknown command: {args[0]}";
+                return $"Unknown command: {name}";
             }
 
             var text = new StringBuilder("Commands (type help <command> for details)");
@@ -420,7 +468,7 @@ namespace GodotXOPS
         private static string Collider(string[] args)
         {
             ColliderView view = GameBridge.Instance.ColliderView;
-            switch (args.Length > 0 ? args[0] : string.Empty)
+            switch (args.Length > 0 ? args[0].ToLowerInvariant() : string.Empty)
             {
                 case "human": view.ShowHuman = !view.ShowHuman; break;
                 case "weapon": view.ShowWeapon = !view.ShowWeapon; break;
@@ -474,6 +522,105 @@ namespace GodotXOPS
             if (m_fogOff) MapLoader.ClearFog();
             else MapLoader.ApplySkyFog(m_skyIndex >= 0 ? m_skyIndex : MapLoader.Instance.SkyIndex);
             return $"Fog {(m_fogOff ? "off" : "on")}";
+        }
+
+        /// <summary>
+        /// loadmap — 블록 파일과 포인트 파일을 직접 로드하고 메인게임으로 들어간다. 미션 파일이 없으므로 브리핑은 없다.
+        /// 파일이 없으면 지금 화면을 그대로 둔다. 파일은 있는데 로드에 실패하면 맵이 내려간 상태라 메뉴로 돌아간다.
+        /// </summary>
+        /// <param name="args">블록 파일, 포인트 파일, 하늘 번호(생략하면 0). 경로는 exe 폴더 기준.</param>
+        /// <returns>콘솔에 보여 줄 글자.</returns>
+        private string LoadMap(string[] args)
+        {
+            if (args.Length < 2) return "Usage: loadmap <block file> <point file> [sky]";
+
+            int skyIndex = 0;
+            if (args.Length > 2 && !int.TryParse(args[2], out skyIndex)) return $"The sky must be a number: {args[2]}";
+
+            string blockPath = GamePath.Resolve(args[0]);
+            if (blockPath == null || !System.IO.File.Exists(blockPath)) return $"Block data open failed: {args[0]}";
+            string pointPath = GamePath.Resolve(args[1]);
+            if (pointPath == null || !System.IO.File.Exists(pointPath)) return $"Point data open failed: {args[1]}";
+
+            GameBridge game = GameBridge.Instance;
+            if (!game.LoadMapFiles(blockPath, pointPath, skyIndex))
+            {
+                return RequestUi(UiActionScenePrefix + k_sceneMenu, $"Map load failed: {game.LastLoadError()}");
+            }
+            return RequestUi(UiActionScenePrefix + k_sceneGame, $"Map loaded: {args[0]}, {args[1]}, sky {skyIndex}");
+        }
+
+        /// <summary>
+        /// loadmission — 공식 미션을 목록의 인덱스로 로드하고 메인게임(또는 브리핑)으로 들어간다.
+        /// 인덱스가 범위 밖이면 지금 화면을 그대로 둔다. 범위 안인데 로드에 실패하면 맵이 내려간 상태라 메뉴로 돌아간다.
+        /// </summary>
+        /// <param name="args">미션 인덱스, 브리핑을 건너뛸지(생략하면 true).</param>
+        /// <returns>콘솔에 보여 줄 글자.</returns>
+        private string LoadMission(string[] args)
+        {
+            int count = DataManager.Instance.MissionData.officialMissions.Count;
+            if (args.Length < 1 || !int.TryParse(args[0], out int index) || index < 0 || index >= count)
+            {
+                return $"A mission index is required (0 to {count - 1}): loadmission <index> [skipbriefing]";
+            }
+
+            bool skipBriefing = true;
+            if (args.Length > 1 && !TryParseBool(args[1], out skipBriefing)) return $"skipbriefing must be true or false: {args[1]}";
+
+            GameBridge game = GameBridge.Instance;
+            if (!game.LoadMission(index, false, 0))
+            {
+                return RequestUi(UiActionScenePrefix + k_sceneMenu, $"Mission load failed: {game.LastLoadError()}");
+            }
+            return RequestUi(UiActionScenePrefix + (skipBriefing ? k_sceneGame : k_sceneBriefing), $"Mission loaded: {index} {MapLoader.Instance.MissionName}");
+        }
+
+        /// <summary>
+        /// loadmissionmif — 미션 파일 하나를 로드하고 메인게임(또는 브리핑)으로 들어간다. 미션 목록에 없는 파일도 된다.
+        /// </summary>
+        /// <param name="args">미션 파일, 브리핑을 건너뛸지(생략하면 true). 경로는 exe 폴더 기준.</param>
+        /// <returns>콘솔에 보여 줄 글자.</returns>
+        private string LoadMissionFile(string[] args)
+        {
+            if (args.Length < 1) return "Usage: loadmissionmif <mif file> [skipbriefing]";
+
+            bool skipBriefing = true;
+            if (args.Length > 1 && !TryParseBool(args[1], out skipBriefing)) return $"skipbriefing must be true or false: {args[1]}";
+
+            string path = GamePath.Resolve(args[0]);
+            if (path == null || !System.IO.File.Exists(path)) return $"Mission file open failed: {args[0]}";
+            if (path.EndsWith(k_mif2Extension, StringComparison.OrdinalIgnoreCase)) return "MIF2 files are not supported yet";
+
+            GameBridge game = GameBridge.Instance;
+            if (!game.LoadMissionFile(path))
+            {
+                return RequestUi(UiActionScenePrefix + k_sceneMenu, $"Mission load failed: {game.LastLoadError()}");
+            }
+            return RequestUi(UiActionScenePrefix + (skipBriefing ? k_sceneGame : k_sceneBriefing), $"Mission loaded: {MapLoader.Instance.MissionName}");
+        }
+
+        /// <summary>
+        /// 참·거짓 인자를 읽는다. true / false 와 1 / 0 을 받고 대소문자는 가리지 않는다.
+        /// </summary>
+        /// <param name="text">인자.</param>
+        /// <param name="value">읽은 값.</param>
+        /// <returns>읽었으면 true.</returns>
+        private static bool TryParseBool(string text, out bool value)
+        {
+            switch (text.ToLowerInvariant())
+            {
+                case "true":
+                case "1":
+                    value = true;
+                    return true;
+                case "false":
+                case "0":
+                    value = false;
+                    return true;
+                default:
+                    value = false;
+                    return false;
+            }
         }
 
         private string Sky(string[] args)

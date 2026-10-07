@@ -427,7 +427,7 @@ namespace GodotXOPS
             InputEvent inputEvent = InputPath.Parse(path);
             if (inputEvent == null)
             {
-                Debugger.LogWarning($"알 수 없는 바인딩 경로 \"{path}\" 를 무시합니다 (액션 {actionName}).", nameof(InputManager));
+                Debugger.LogWarning($"Unknown binding path \"{path}\" ignored (action {actionName}).", nameof(InputManager));
                 return;
             }
             InputMap.ActionAddEvent(mapAction, inputEvent);

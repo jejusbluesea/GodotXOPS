@@ -114,6 +114,19 @@ func _process(delta: float) -> void:
 		_finish()
 
 
+## 디버그 콘솔의 restart: 배경 맵과 카메라 이동, 암전, 글자를 처음으로 되돌린다.
+func console_restart() -> void:
+	if _finished:
+		return
+	_time = 0.0
+	_cam_position = CAM_POSITION
+	_cam_euler = CAM_EULER
+	_position_speed = Vector3.ZERO
+	_rotation_speed = Vector3.ZERO
+	Game.ReloadBackground()
+	Game.SetSceneCamera(_cam_position, _cam_euler, CAM_FOV)
+
+
 ## 속도를 연출 설정에 따라 갱신한다: 가속 → 등속 → 감쇠.
 func _update_speed(speed: Vector3, anim: Dictionary, delta: float) -> Vector3:
 	var decay := clampf(pow(anim["smooth"], delta * REFERENCE_FPS), 0.0, 1.0)

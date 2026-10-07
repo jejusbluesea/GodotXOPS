@@ -31,7 +31,7 @@ namespace GodotXOPS
             int index = data.objectGeneralData.addonObjectIndex;
             if (index < 0 || index >= data.objectData.Count)
             {
-                Debugger.LogError($"objectGeneralData.addonObjectIndex({index}) 가 objectData 범위(0~{data.objectData.Count - 1}) 밖입니다. 맵 추가 오브젝트가 표시되지 않습니다.", nameof(DataManager));
+                Debugger.LogError($"objectGeneralData.addonObjectIndex ({index}) is outside objectData (0 to {data.objectData.Count - 1}). The mission add-on object will not appear.", nameof(DataManager));
                 return;
             }
 
@@ -39,7 +39,7 @@ namespace GodotXOPS
             if (slot.modelIndex < 0 || slot.modelIndex >= data.objectModelData.Count
                 || slot.colliderIndex < 0 || slot.colliderIndex >= data.objectColliderData.Count)
             {
-                Debugger.LogError($"어드온 예약 슬롯 [{index}] {slot.name} 의 modelIndex/colliderIndex 가 범위 밖입니다. 맵 추가 오브젝트가 표시되지 않습니다.", nameof(DataManager));
+                Debugger.LogError($"Add-on object slot [{index}] {slot.name} has modelIndex or colliderIndex out of range. The mission add-on object will not appear.", nameof(DataManager));
             }
         }
     }

@@ -4,13 +4,17 @@ extends Node
 ##   --scene 이름         오프닝 대신 그 화면에서 시작한다 (mainmenu, briefing, maingame, result).
 ##   --mission 번호 [--addon] [--page 번호]   시작하기 전에 그 미션을 로드한다.
 ##   --ui-shot 경로.png   화면을 PNG 로 저장하고 종료한다. --ui-time 초 로 찍는 시각을 정한다 (기본 1.5).
-##   --ui-state 값        화면마다 정해 둔 상태로 시작한다 (메뉴: credit / exit / addon / option / option-input / option-graphic / option-sound, 메인게임: simple / off / console(설정과 무관하게 디버그 콘솔을 허용)).
+##   --ui-state 값        화면마다 정해 둔 상태로 시작한다 (메뉴: credit / exit / addon / option / option-input / option-graphic / option-sound, 메인게임: simple / off).
+##                        console 은 어느 화면에서든 설정과 무관하게 디버그 콘솔을 허용한다.
+## 디버그 콘솔(XopsConsole)도 여기서 만든다. 화면(씬)이 바뀌어도 남아 있어야 해서 Autoload 아래에 둔다.
 ##   --ui-quit 초         그 시간이 지나면 종료한다. 헤드리스로 화면 스크립트에 오류가 없는지 볼 때 쓴다.
 ##   --ui-click "목록"    가짜 입력을 차례로 넣는다. 띄어쓰기로 나눈 항목마다 "x,y"(그 자리를 클릭), "x,y,초"(그 시간 동안 누르고 있기),
 ##                        "key:이름"(키 한 번. 이름은 Godot 키 이름, 예: key:Q), "text:글자"(글자를 차례로 친다. 띄어쓰기는 key:Space 로 넣는다. 콘솔에 명령을 칠 때 쓴다).
 ##                        좌표는 창 픽셀이다 (실제 마우스 커서를 옮기므로 도는 동안 마우스를 건드리지 않는다). 화면의 버튼을 눌러 본 결과를 --ui-shot 으로 볼 때 쓴다.
 
 const DEFAULT_SHOT_TIME := 1.5
+# 콘솔을 담는 CanvasLayer 의 순서. 화면 요소와 밝기·감마 사각형(100)보다 위다.
+const CONSOLE_LAYER := 110
 # 가짜 입력: 첫 항목을 넣는 시각, 누르기 전에 마우스를 옮겨 두는 시간, 기본으로 누르고 있는 시간, 항목 사이 간격 (초).
 const CLICK_START := 0.6
 const CLICK_MOVE_LEAD := 0.1
@@ -39,6 +43,13 @@ func _ready() -> void:
 	_shot_time = float(value("--ui-time", str(DEFAULT_SHOT_TIME)))
 	_quit_time = float(value("--ui-quit", "-1"))
 	_build_fake_events(value("--ui-click", ""))
+
+	# 콘솔은 설정 파일의 AllowConsole 로 허용한다. --ui-state console 은 설정 파일을 고치지 않고 화면을 확인할 때 쓴다.
+	if ConfigManager.GetBool("General", "AllowConsole", false) or value("--ui-state", "") == "console":
+		var console_layer := CanvasLayer.new()
+		console_layer.layer = CONSOLE_LAYER
+		add_child(console_layer)
+		XopsConsole.create(console_layer)
 	set_process(not _shot_path.is_empty() or _quit_time >= 0.0 or not _fake_events.is_empty())
 
 

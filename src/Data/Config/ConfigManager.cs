@@ -95,7 +95,7 @@ namespace GodotXOPS
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                Debugger.LogWarning($"config.json 을 읽을 수 없어 기본값으로 대체합니다: {e.Message}", nameof(ConfigManager));
+                Debugger.LogWarning($"config.json could not be read, using defaults: {e.Message}", nameof(ConfigManager));
             }
 
             Config = ok ? loaded : BuildDefaultConfig();
@@ -586,7 +586,7 @@ namespace GodotXOPS
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                Debugger.LogWarning($"config.json 저장 실패: {e.Message}", nameof(ConfigManager));
+                Debugger.LogWarning($"config.json save failed: {e.Message}", nameof(ConfigManager));
             }
         }
 

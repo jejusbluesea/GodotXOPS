@@ -10,6 +10,8 @@ namespace GodotXOPS
 
         private readonly DebugConsole m_console = new DebugConsole();
         private ColliderView m_colliderView;
+        // 콘솔이 가져간 로그의 누계 번호.
+        private int m_logCursor;
 
         // 판정 범위 표시 (디버그 콘솔의 collider 가 켜고 끈다).
         public ColliderView ColliderView => m_colliderView;
@@ -25,12 +27,31 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 직전 명령이 화면에 맡긴 일을 꺼낸다 ("clear", "exit", "restart", "screenshot"). 꺼내면 비워진다.
+        /// 직전 명령이 화면에 맡긴 일을 꺼낸다 ("clear", "restart", "screenshot", "scene:씬이름"). 꺼내면 비워진다.
         /// </summary>
         /// <returns>일의 이름. 없으면 빈 문자열.</returns>
         public string ConsoleTakeAction()
         {
             return m_console.TakeUiAction();
+        }
+
+        /// <summary>
+        /// 콘솔이 아직 가져가지 않은 로그(Debugger 의 경고·에러 등)를 꺼낸다. 콘솔이 매 프레임 불러 화면에 찍는다.
+        /// 줄마다 첫 글자가 수준이다: "0" 일반, "1" 경고, "2" 에러. 그 뒤가 내용이다.
+        /// </summary>
+        /// <returns>새 로그 줄들. 없으면 빈 배열.</returns>
+        public string[] ConsoleTakeLogs()
+        {
+            if (Debugger.TotalCount == m_logCursor) return Array.Empty<string>();
+
+            var levels = new System.Collections.Generic.List<LogLevel>();
+            var texts = new System.Collections.Generic.List<string>();
+            Debugger.GetSince(m_logCursor, levels, texts);
+            m_logCursor = Debugger.TotalCount;
+
+            var lines = new string[texts.Count];
+            for (int i = 0; i < lines.Length; i++) lines[i] = $"{(int)levels[i]}{texts[i]}";
+            return lines;
         }
 
         /// <summary>

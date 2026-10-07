@@ -72,7 +72,7 @@ namespace GodotXOPS
 
             if (!File.Exists(filepath))
             {
-                Debugger.LogError($"Block data file not exists: {filepath}", nameof(MapLoader));
+                Debugger.LogError($"Block data open failed: {Path.GetRelativePath(GamePath.Root, filepath)}", nameof(MapLoader));
                 return false;
             }
 

@@ -164,7 +164,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 |---|---|
 | `--window 너비x높이` | 설정의 전체화면 대신 그 크기의 창으로 띄웁니다 |
 | `--scene 이름 [--mission 번호 [--addon] [--page 번호]]` | 그 화면에서 시작합니다 (`mainmenu`, `briefing`, `maingame`, `result`) |
-| `--ui-state 값` | 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` / `console`(설정과 무관하게 디버그 콘솔 허용) 상태로 시작합니다 |
+| `--ui-state 값` | 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` 상태로 시작합니다. `console`은 어느 화면에서든 설정과 무관하게 디버그 콘솔을 허용합니다 |
 | `--ui-click "목록"` | 가짜 입력을 차례로 넣습니다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 침) |
 | `--ui-shot 경로.png [--ui-time 초]` | 화면을 PNG 로 저장하고 종료합니다 |
 | `--ui-quit 초` | 그 시간 뒤 종료합니다 |
@@ -175,7 +175,7 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 
 ## 디버그 콘솔
 
-원본 OpenXOPS 의 F11 콘솔에 해당합니다. `godotdata/config.json`의 `General` 섹션에 있는 `AllowConsole`의 `value`를 `"true"`로 바꾸면 메인게임에서 F11 로 열고 닫습니다. 기본값은 `"false"`이고, 그때 F11 은 아무 일도 하지 않습니다.
+원본 OpenXOPS 의 F11 콘솔에 해당합니다. `godotdata/config.json`의 `General` 섹션에 있는 `AllowConsole`의 `value`를 `"true"`로 바꾸면 F11 로 열고 닫습니다. 오프닝, 메뉴, 브리핑, 메인게임, 결과 어느 화면에서든 열리고, 화면이 바뀌어도 내용이 남습니다. 기본값은 `"false"`이고, 그때 F11 은 아무 일도 하지 않습니다.
 
 ```json
 {
@@ -190,8 +190,11 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 이 설정은 메뉴의 OPTION 에 나오지 않습니다. 파일을 직접 고쳐야 하고, OPTION 의 RESET 도 이 값은 바꾸지 않습니다.
 
 - 입력과 출력은 영어만 씁니다.
-- 명령을 치고 Enter 로 실행합니다. 대소문자는 가리지 않습니다. 위·아래 화살표로 전에 친 명령을 불러오고, Esc 나 F11 로 닫습니다.
-- 콘솔이 열려 있는 동안 게임 조작은 막히고 게임은 계속 진행됩니다.
+- 명령을 치고 Enter 로 실행합니다. 명령 이름은 대소문자를 가리지 않습니다. 위·아래 화살표로 전에 친 명령을 불러오고, Esc 나 F11 로 닫습니다.
+- 띄어쓰기가 있는 인자(파일 경로)는 큰따옴표로 묶습니다.
+- 콘솔이 열려 있는 동안 게임 조작과 메뉴 클릭은 막히고 게임은 계속 진행됩니다.
+- 명령은 그때 로드돼 있는 맵에 적용됩니다. 오프닝과 메뉴에서는 배경으로 돌고 있는 맵이 대상입니다 (예: 메뉴에서 `kill 1`).
+- 게임이 남긴 로그도 콘솔에 나옵니다. 경고는 주황색, 에러는 빨간색입니다. 파일을 찾지 못했거나 데이터 파일이 잘못됐을 때 여기서 이유를 볼 수 있습니다. 콘솔을 닫아 둔 동안의 로그도 쌓였다가 열면 보입니다.
 - 사람 번호는 사람 목록의 순서입니다 (0 부터). `info`의 디버그 텍스트에 플레이어의 번호가 `#번호`로 나옵니다.
 - 켜고 끄는 명령은 한 번 더 치면 되돌아갑니다. 미션을 다시 시작하면 AI 정지, 비전투, 이벤트 멈춤, 안개, 하늘이 처음 상태로 돌아갑니다.
 
@@ -200,11 +203,10 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 | `help [명령]` | 명령 목록. 명령 이름을 주면 그 명령의 사용법과 설명 (영어) |
 | `ver` | 게임 버전 |
 | `clear` | 콘솔의 글자를 지웁니다 |
-| `exit` | 콘솔을 닫습니다 |
 | `info` | 디버그 텍스트(플레이어 위치·체력·무기, AI 상태별 인원, 미션 결과)를 켜고 끕니다. 화면 왼쪽 위에 나오고, 콘솔이 열려 있으면 콘솔 상자 뒤로 비쳐 보입니다 |
 | `human` | 사람 수와 팀별 생존자 수 |
 | `result` | 지금까지의 통계 (발사, 명중, 헤드샷, 킬, 시간) |
-| `event` | 이벤트 세 줄이 기다리는 포인트와 미션 결과 |
+| `event` | 이벤트 줄마다 기다리는 포인트와 미션 결과 |
 | `nodamage [번호]` | 무적을 켜고 끕니다. 번호가 없으면 플레이어 |
 | `treat [번호]` | 체력을 처음 값으로 되돌립니다. 번호가 없으면 플레이어 |
 | `teleport 번호` | 플레이어를 그 사람의 자리로 옮깁니다 |
@@ -219,13 +221,20 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 | `stop` | 모든 AI 를 멈춥니다 |
 | `comp` / `fail` | 미션을 클리어 / 실패로 끝냅니다 |
 | `estop` | 이벤트 진행을 멈춥니다 (자동 판정은 계속 돕니다) |
-| `f12` | 미션을 처음부터 다시 시작합니다 |
+| `restart` | 지금 화면이 돌리고 있는 것을 처음부터 다시 시작합니다. 메인게임은 미션, 오프닝은 배경 맵과 카메라 이동·암전·글자, 메뉴는 배경 맵입니다. 브리핑과 결과 화면에서는 다시 시작할 것이 없습니다 |
+| `loadmap 블록파일 포인트파일 [하늘]` | 블록 파일(BD1, BD2)과 포인트 파일(PD1, PD2)을 직접 로드하고 바로 플레이합니다. 경로는 게임 폴더 기준입니다. 하늘 번호를 생략하면 0 입니다. 미션 파일이 없으므로 브리핑이 없고, 추가 충돌 검사와 어두운 화면은 꺼져 있습니다. 파일이 없으면 지금 화면을 그대로 두고, 파일은 있는데 로드에 실패하면 메뉴로 돌아갑니다 |
+| `loadmission 번호 [skipbriefing]` | 공식 미션을 목록의 번호(0 부터, `mission_data.json`의 `officialMissions` 순서)로 로드하고 바로 플레이합니다. `skipbriefing`에 `false`를 주면 브리핑부터 보여 줍니다 (생략하면 `true`) |
+| `loadmissionmif 미션파일 [skipbriefing]` | 미션 파일(MIF) 하나를 로드하고 바로 플레이합니다. 미션 목록에 없는 파일도 됩니다. `skipbriefing`은 위와 같습니다. 경로는 게임 폴더 기준입니다 |
 | `collider human` / `weapon` / `object` | 판정 범위를 선으로 그립니다. `human`은 사람의 총알 판정 원기둥(초록), `weapon`은 떨어진 무기의 줍기 범위(빨강. 사람의 발이 이 원기둥 안에 들어오면 줍습니다), `object`는 오브젝트의 판정 형상(파랑). 종류마다 따로 켜고 끄고, 벽에 가려지지 않습니다. 1인칭에서는 자기 원기둥을 그리지 않습니다 |
 | `fog` | 안개를 켜고 끕니다 |
 | `sky 번호` | 하늘을 그 번호로 바꿉니다 (0 은 없음). 번호의 범위는 `sky_data.json`의 `skyTexturePath` 개수입니다 |
-| `ss` | 콘솔을 뺀 화면을 게임 폴더의 `screenshot/`에 PNG 로 저장합니다 |
+| `ss` / `screenshot` | 콘솔을 뺀 화면을 게임 폴더의 `screenshot/`에 PNG 로 저장합니다 |
 
-명령은 `src/Scene/DebugConsole.cs`의 표에 한 줄씩 등록합니다. 화면과 글자 입력은 `ui/common/xops_console.gd`가 맡습니다.
+명령은 `src/Scene/DebugConsole.cs`의 표에 한 줄씩 등록합니다. 화면과 글자 입력은 `ui/common/xops_console.gd`가 맡고, Autoload `Dev`가 만들어서 화면(씬)이 바뀌어도 남습니다. `restart`는 지금 씬의 `console_restart()`를 부르므로, 다시 시작할 것이 있는 화면은 그 함수를 둡니다.
+
+로그는 `Debugger.LogWarning` / `LogError`로 남깁니다. 메모리에 쌓여 콘솔로 전달되고(익스포트 빌드에서도), 에디터에서는 Godot 출력 창에도 나옵니다. 콘솔에 나오므로 메시지는 영어로 씁니다.
+
+메뉴에서 미션을 눌렀는데 로드에 실패하면, 콘솔이 꺼져 있어도 타이틀 아래에 이유 한 줄이 잠깐 나옵니다 (`Game.LastLoadError`).
 
 ## 원본과 다르게 한 동작
 

@@ -15,6 +15,11 @@ namespace GodotXOPS
         // 밝기·감마 사각형은 모든 화면 요소보다 위에 그린다.
         private const int k_colorAdjustLayer = 100;
 
+        // 마지막으로 시도한 미션 로드가 실패한 이유. 성공했으면 빈 문자열.
+        private string m_lastLoadError = string.Empty;
+        // 마지막에 로드한 배경 맵 (오프닝, 메뉴 데모). 디버그 콘솔의 restart 가 같은 맵을 다시 올린다.
+        private DemoData m_lastBackground;
+
         // 벽 블라인드 결과의 비트.
         public const int BlindTop = 1;
         public const int BlindBottom = 2;
@@ -134,9 +139,76 @@ namespace GodotXOPS
         public bool LoadMission(int index, bool addon, int page)
         {
             UnloadMission();
-            if (!MapLoader.LoadMissionData(index, addon, page)) return false;
+            int errors = Debugger.ErrorCount;
+            bool loaded = MapLoader.LoadMissionData(index, addon, page) && LoadCurrentMissionMap();
+            RecordLoadResult(loaded, errors);
+            return loaded;
+        }
 
-            return LoadCurrentMissionMap();
+        /// <summary>
+        /// 미션 목록에 없는 미션 파일(.mif) 하나를 로드한다 (디버그 콘솔의 loadmission). 시뮬레이션은 멈춘 채로 둔다.
+        /// </summary>
+        /// <param name="mifPath">.mif 파일 전체 경로.</param>
+        /// <returns>로드에 성공했으면 true.</returns>
+        public bool LoadMissionFile(string mifPath)
+        {
+            UnloadMission();
+            int errors = Debugger.ErrorCount;
+            bool loaded = MapLoader.LoadMissionFile(mifPath) && LoadCurrentMissionMap();
+            RecordLoadResult(loaded, errors);
+            return loaded;
+        }
+
+        /// <summary>
+        /// 미션 파일 없이 블록 파일과 포인트 파일을 직접 로드한다 (디버그 콘솔의 loadmap). 시뮬레이션은 멈춘 채로 둔다.
+        /// </summary>
+        /// <param name="blockPath">블록 데이터 파일 전체 경로.</param>
+        /// <param name="pointPath">포인트 데이터 파일 전체 경로.</param>
+        /// <param name="skyIndex">하늘 번호.</param>
+        /// <returns>로드에 성공했으면 true.</returns>
+        public bool LoadMapFiles(string blockPath, string pointPath, int skyIndex)
+        {
+            UnloadMission();
+            int errors = Debugger.ErrorCount;
+            MapLoader.SetDirectMission(blockPath, pointPath, skyIndex);
+            bool loaded = LoadCurrentMissionMap();
+            RecordLoadResult(loaded, errors);
+            return loaded;
+        }
+
+        /// <summary>
+        /// 마지막으로 시도한 미션 로드가 실패한 이유 (영어 한 줄). 성공했으면 빈 문자열이다. 메뉴가 화면에 보여 준다.
+        /// </summary>
+        /// <returns>실패 이유.</returns>
+        public string LastLoadError()
+        {
+            return m_lastLoadError;
+        }
+
+        /// <summary>
+        /// 미션 로드의 결과를 남긴다. 실패했으면 로드하는 동안 처음 남은 에러 로그를 이유로 삼는다 (뒤의 에러는 대개 그 여파다).
+        /// </summary>
+        /// <param name="loaded">로드에 성공했는지.</param>
+        /// <param name="errorsBefore">로드를 시작하기 전의 Debugger.ErrorCount.</param>
+        private void RecordLoadResult(bool loaded, int errorsBefore)
+        {
+            if (loaded)
+            {
+                m_lastLoadError = string.Empty;
+                return;
+            }
+
+            string reason = Debugger.FirstErrorSince(errorsBefore).Split('\n')[0];
+            m_lastLoadError = reason.Length > 0 ? reason : "Mission load failed";
+        }
+
+        /// <summary>
+        /// 오프닝이나 메뉴의 배경 맵을 처음부터 다시 로드한다 (디버그 콘솔의 restart). 마지막에 로드한 배경 맵과 같은 맵이다.
+        /// </summary>
+        /// <returns>다시 로드하는 데 성공했으면 true. 배경 맵을 로드한 적이 없으면 false.</returns>
+        public bool ReloadBackground()
+        {
+            return m_lastBackground != null && LoadBackgroundMap(m_lastBackground);
         }
 
         /// <summary>
@@ -254,6 +326,7 @@ namespace GodotXOPS
         /// <returns>블록과 포인트 로드에 성공했으면 true.</returns>
         private bool LoadBackgroundMap(DemoData data)
         {
+            m_lastBackground = data;
             UnloadMission();
             GameRandom.ReseedEntropy();
 

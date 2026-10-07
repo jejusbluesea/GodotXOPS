@@ -155,9 +155,6 @@ func _ready() -> void:
 	_build_scope()
 	_build_crosshair()
 	_build_overlays()
-	# 콘솔은 설정 파일의 AllowConsole 로 허용한다. 개발용 인자 --ui-state console 은 설정 파일을 고치지 않고 화면을 확인할 때 쓴다.
-	if ConfigManager.GetBool("General", "AllowConsole", false) or Dev.value("--ui-state", "") == "console":
-		XopsConsole.create(_ui)
 
 	var start_mode := Dev.value("--ui-state", "normal")
 	if start_mode in MODES:
@@ -643,6 +640,12 @@ func _update_fps(delta: float) -> void:
 		_fps.text = "%d FPS (%d ms)" % [roundi(1.0 / frame), roundi(frame * 1000.0)]
 		_fps_time = 0.0
 		_fps_frames = 0
+
+
+## 디버그 콘솔의 restart: 미션을 처음부터 다시 시작한다 (F12 와 같다).
+func console_restart() -> void:
+	if not _left:
+		Game.RestartMission()
 
 
 ## 나가기와 재시작 입력을 처리한다. 반환: 화면을 떠났으면 true.

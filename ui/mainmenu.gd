@@ -92,6 +92,11 @@ const EXIT_NO := "< ABORT >"
 const EXIT_PANEL := {"font": Vector2(14, 19), "h": 130, "color": Color(0, 0, 0, 0.5)}
 const EXIT_BUTTON_GAP := 20
 
+# ----- 미션 로드 실패 문구 -----
+# 미션을 눌렀는데 로드에 실패했을 때 타이틀 아래에 띠로 잠깐 띄운다 (원본의 "block data open failed" 에 해당). 원본에 없는 배치라 값은 임의로 정했다.
+# y 는 화면 위에서 띠의 윗변까지의 거리(아래쪽이 −), show 는 보이는 시간, fade 는 사라지는 데 걸리는 시간 (초).
+const LOAD_ERROR := {"order": 8, "font": 13, "y": -112, "h": 22, "color": Color(1.0, 0.35, 0.35), "background": Color(0, 0, 0, 0.7), "show": 5.0, "fade": 0.5}
+
 # 화면을 다녀와도 유지되는 메뉴 상태.
 static var s_is_addon := false
 static var s_page := 0
@@ -100,6 +105,9 @@ static var s_addon_scroll := 0
 
 var _time := 0.0
 var _left := false
+var _load_error_panel: ColorRect
+var _load_error: Label
+var _load_error_time := 0.0
 var _screen := "main"
 var _is_addon := false
 var _addon_exists := false
@@ -175,6 +183,15 @@ func _ready() -> void:
 	_pointer_h = XopsUI.panel_stretch(_pointer_layer, XopsUI.Stretch.TOP, 0, 0, 0, 1, POINTER_COLOR)
 	_pointer_v = XopsUI.panel_stretch(_pointer_layer, XopsUI.Stretch.LEFT, 0, 0, 1, 0, POINTER_COLOR)
 
+	var error_layer := XopsUI.layer(ui, LOAD_ERROR["order"], true)
+	_load_error_panel = XopsUI.panel_stretch(error_layer, XopsUI.Stretch.TOP, 0, LOAD_ERROR["y"], 0, LOAD_ERROR["h"], LOAD_ERROR["background"])
+	_load_error = XopsUI.label(_load_error_panel, "", LOAD_ERROR["font"], LOAD_ERROR["color"])
+	_load_error.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_load_error.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_load_error.clip_text = true
+	_load_error.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_load_error_panel.visible = false
+
 	var fade_layer := XopsUI.layer(ui, FADE_ORDER, true)
 	_fade = XopsUI.panel_stretch(fade_layer, XopsUI.Stretch.FULL, 0, 0, 0, 0, Color.BLACK)
 
@@ -199,6 +216,7 @@ func _process(delta: float) -> void:
 		Game.SetSceneCamera(Game.PlayerPosition() + CAM_OFFSET, CAM_EULER, CAM_FOV)
 
 	_fade.color.a = maxf(0.0, 1.0 - _time / FADE_TIME)
+	_update_load_error(delta)
 
 	var mouse := _pointer_layer.get_local_mouse_position()
 	_pointer_h.position.y = mouse.y
@@ -586,5 +604,25 @@ func _load_mission(index: int) -> void:
 		_left = true
 		Game.ChangeScene(BRIEFING_SCENE)
 	else:
-		# 로드에 실패하면 배경 맵이 내려가 있으므로 다시 올린다.
+		# 로드에 실패하면 배경 맵이 내려가 있으므로 다시 올린다. 이유는 데모를 올리기 전에 읽어 둔다.
+		var reason: String = Game.LastLoadError()
 		Game.LoadDemo()
+		_load_error.text = reason
+		_load_error_panel.visible = true
+		_load_error_time = LOAD_ERROR["show"]
+
+
+## 미션 로드 실패 문구를 시간이 지나면 흐리게 해서 지운다.
+func _update_load_error(delta: float) -> void:
+	if not _load_error_panel.visible:
+		return
+	_load_error_time -= delta
+	_load_error_panel.modulate.a = clampf(_load_error_time / LOAD_ERROR["fade"], 0.0, 1.0)
+	if _load_error_time <= 0.0:
+		_load_error_panel.visible = false
+
+
+## 디버그 콘솔의 restart: 배경 맵을 처음부터 다시 돌린다. 카메라는 플레이어를 따라가므로 따로 되돌릴 것이 없다.
+func console_restart() -> void:
+	if not _left:
+		Game.ReloadBackground()

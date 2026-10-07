@@ -39,11 +39,11 @@ namespace GodotXOPS
 
                 if (m.fixLeftArm && Mathf.IsZeroApprox(m.fixedLeftArmAngle))
                 {
-                    Debugger.LogError($"무기 모델 [{i}] {m.name}: fixLeftArm 이 true 인데 fixedLeftArmAngle 이 0 입니다(누락 의심). 기본값은 -70 입니다.", nameof(DataManager));
+                    Debugger.LogError($"Weapon model [{i}] {m.name}: fixLeftArm is true but fixedLeftArmAngle is 0 (possibly missing). The usual value is -70.", nameof(DataManager));
                 }
                 if (m.fixRightArm && Mathf.IsZeroApprox(m.fixedRightArmAngle))
                 {
-                    Debugger.LogError($"무기 모델 [{i}] {m.name}: fixRightArm 이 true 인데 fixedRightArmAngle 이 0 입니다(누락 의심). 기본값은 -70 입니다.", nameof(DataManager));
+                    Debugger.LogError($"Weapon model [{i}] {m.name}: fixRightArm is true but fixedRightArmAngle is 0 (possibly missing). The usual value is -70.", nameof(DataManager));
                 }
             }
         }

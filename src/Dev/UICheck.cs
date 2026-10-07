@@ -23,6 +23,7 @@ namespace GodotXOPS.Dev
             CheckMissionFlow(game);
             CheckPlayerValues(game);
             CheckConsole(game);
+            CheckConsoleLoading(game);
 
             game.UnloadMission();
             GD.Print($"UI 창구 점검 {m_checks}항목 — 문제 {m_problems.Count}건");
@@ -275,6 +276,67 @@ namespace GodotXOPS.Dev
         /// 디버그 콘솔: 명령이 게임 상태를 바꾸고, 틀린 입력은 상태를 바꾸지 않고, 화면에 맡기는 일이 한 번만 나오고, 입력 차단이 조회를 막는다.
         /// </summary>
         /// <param name="game">창구.</param>
+        /// <summary>
+        /// 콘솔의 맵 로드 명령과 로그 전달, 배경 맵 다시 올리기. 로드된 맵을 바꾸므로 다른 점검이 끝난 뒤에 돈다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        private void CheckConsoleLoading(GameBridge game)
+        {
+            DemoData demo = DataManager.Instance.MissionData.openingData;
+
+            // 파일이 없으면 지금 화면을 그대로 둔다 (화면에 맡기는 일이 없다).
+            Expect(game.ConsoleExecute("loadmap").StartsWith("Usage:"), "인자 없는 loadmap 이 사용법을 보여 주지 않음");
+            Expect(game.ConsoleExecute("loadmap no/such.bd1 no/such.pd1") == "Block data open failed: no/such.bd1" && game.ConsoleTakeAction() == string.Empty,
+                "없는 블록 파일의 loadmap 결과가 다름");
+            Expect(game.ConsoleExecute($"loadmap {demo.bd1Path} no/such.pd1") == "Point data open failed: no/such.pd1" && game.ConsoleTakeAction() == string.Empty,
+                "없는 포인트 파일의 loadmap 결과가 다름");
+            Expect(game.ConsoleExecute($"loadmap {demo.bd1Path} {demo.pd1Path} x").Contains("must be a number"), "숫자가 아닌 하늘 번호를 받음");
+            Expect(game.ConsoleExecute("loadmissionmif no/such.mif") == "Mission file open failed: no/such.mif", "없는 미션 파일의 loadmissionmif 결과가 다름");
+            Expect(game.ConsoleExecute("loadmissionmif no/such.mif maybe").Contains("true or false"), "참·거짓이 아닌 skipbriefing 을 받음");
+            Expect(game.ConsoleExecute("loadmission").Contains("index is required") && game.ConsoleExecute("loadmission 9999").Contains("index is required")
+                && game.ConsoleExecute("loadmission x").Contains("index is required") && game.ConsoleTakeAction() == string.Empty,
+                "인덱스가 없거나 범위 밖인 loadmission 결과가 다름");
+            Expect(game.ConsoleExecute("loadmission 0 maybe").Contains("true or false"), "참·거짓이 아닌 skipbriefing 을 받음 (loadmission)");
+
+            // 공식 미션을 인덱스로 로드한다. 브리핑을 건너뛰면 메인게임, 아니면 브리핑으로 넘긴다.
+            string official = DataManager.Instance.MissionData.officialMissions[1].name;
+            Expect(game.ConsoleExecute("loadmission 1") == $"Mission loaded: 1 {official}" && game.ConsoleTakeAction() == DebugConsole.UiActionScenePrefix + "maingame"
+                && MapLoader.Instance.MissionName == official && MapLoader.HumanCount > 0, "loadmission 이 공식 미션을 로드해 메인게임으로 넘기지 않음");
+            Expect(game.ConsoleExecute("loadmission 1 false").StartsWith("Mission loaded:") && game.ConsoleTakeAction() == DebugConsole.UiActionScenePrefix + "briefing",
+                "skipbriefing false 가 브리핑으로 넘기지 않음");
+
+            // 큰따옴표로 묶은 경로는 인자 하나다. 경로의 대소문자는 그대로 전달된다.
+            Expect(game.ConsoleExecute("loadmap \"No Such/Map File.bd1\" x.pd1") == "Block data open failed: No Such/Map File.bd1", "따옴표로 묶은 경로가 인자 하나로 전달되지 않음");
+
+            // 파일 둘을 직접 로드한다. 미션 정보는 파일 이름과 하늘 번호만 있다.
+            string result = game.ConsoleExecute($"loadmap {demo.bd1Path} {demo.pd1Path} 3");
+            Expect(result.StartsWith("Map loaded:") && game.ConsoleTakeAction() == DebugConsole.UiActionScenePrefix + "maingame", "loadmap 이 메인게임으로 넘기지 않음");
+            Expect(MapLoader.Blocks.Count > 0 && MapLoader.HumanCount > 0 && MapLoader.Instance.SkyIndex == 3 && !SimClock.TickEnabled
+                && MapLoader.Instance.MissionName == System.IO.Path.GetFileName(demo.bd1Path) && game.LastLoadError() == string.Empty,
+                "loadmap 으로 로드한 맵의 상태가 다름");
+            game.BeginMission();
+            Expect(game.RestartMission() && MapLoader.HumanCount > 0 && MapLoader.Instance.SkyIndex == 3, "loadmap 으로 로드한 맵을 다시 시작하지 못함");
+
+            // 미션 로드가 실패하면 이유가 남고, 그 이유는 콘솔로 가는 로그에도 있다.
+            game.ConsoleTakeLogs();
+            Expect(!game.LoadMission(9999, false, 0) && game.LastLoadError() == "Mission load failed", "범위 밖 미션의 실패 이유가 다름");
+            Expect(!game.LoadMapFiles(GamePath.Resolve("no/such.bd1"), GamePath.Resolve("no/such.pd1"), 0)
+                && game.LastLoadError().Replace('\\', '/') == "Block data open failed: no/such.bd1", "없는 블록 파일의 실패 이유가 다름");
+            string[] logs = game.ConsoleTakeLogs();
+            Expect(logs.Length > 0 && logs[0].StartsWith("2[MapLoader] Block data open failed") && game.ConsoleTakeLogs().Length == 0,
+                "에러 로그가 콘솔로 한 번만 전달되지 않음");
+            Debugger.LogWarning("check warning", "UICheck");
+            logs = game.ConsoleTakeLogs();
+            Expect(logs.Length == 1 && logs[0] == "1[UICheck] check warning", "경고 로그의 수준 표시가 다름");
+
+            // 배경 맵을 다시 올린다 (오프닝과 메뉴에서의 restart).
+            Expect(game.LoadOpening() && MapLoader.HumanCount > 0, "오프닝 맵 로드 실패");
+            int humans = MapLoader.HumanCount;
+            SimClock.Step();
+            Expect(game.ReloadBackground() && MapLoader.HumanCount == humans && SimClock.TickEnabled && AIController.DrivePlayer, "배경 맵을 다시 올리지 못함");
+            game.UnloadMission();
+        }
+
         private void CheckConsole(GameBridge game)
         {
             if (!game.LoadMission(2, false, 0))
@@ -404,8 +466,11 @@ namespace GodotXOPS.Dev
             Expect(game.ConsoleTakeAction() == DebugConsole.UiActionClear && game.ConsoleTakeAction() == string.Empty, "clear 가 화면에 한 번만 전달되지 않음");
             game.ConsoleExecute("ss");
             Expect(game.ConsoleTakeAction() == DebugConsole.UiActionScreenshot, "ss 가 화면에 전달되지 않음");
-            game.ConsoleExecute("f12");
-            Expect(game.ConsoleTakeAction() == DebugConsole.UiActionRestart, "f12 가 화면에 전달되지 않음");
+            game.ConsoleExecute("screenshot");
+            Expect(game.ConsoleTakeAction() == DebugConsole.UiActionScreenshot, "screenshot 이 화면에 전달되지 않음");
+            game.ConsoleExecute("RESTART");
+            Expect(game.ConsoleTakeAction() == DebugConsole.UiActionRestart, "restart 가 화면에 전달되지 않음 (명령 이름은 대소문자를 가리지 않는다)");
+            Expect(game.ConsoleExecute("exit").Contains("Unknown command") && game.ConsoleExecute("f12").Contains("Unknown command"), "없앤 명령(exit, f12)이 남아 있음");
 
             Expect(game.ConsoleExecute("comp") == "Mission complete" && EventManager.Instance.Result == (int)MissionResult.Complete, "comp 로 미션이 끝나지 않음");
             Expect(game.ConsoleExecute("fail").Contains("No mission") && EventManager.Instance.Result == (int)MissionResult.Complete, "끝난 미션이 fail 로 다시 바뀜");

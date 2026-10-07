@@ -16,7 +16,7 @@ namespace GodotXOPS
         {
             if (Instance != null && Instance != this)
             {
-                Debugger.LogWarning($"중복 싱글톤이 감지되어 제거합니다: {typeof(T).Name}");
+                Debugger.LogWarning($"Duplicate singleton removed: {typeof(T).Name}");
                 QueueFree();
                 return;
             }

@@ -58,29 +58,7 @@ namespace GodotXOPS
                     return false;
                 }
 
-                // .mif: 0 이름 / 1 정식 이름 / 2 BD1 / 3 PD1 / 4 하늘 번호 / 5 화면 플래그 / 6 추가 사물 / 7 이미지1 / 8 이미지2 / 9~ 브리핑
-                string[] lines = EncodingHelper.ReadAllLines(missionData.addonMissions[page][index].mifPath);
-                if (lines.Length < 9)
-                {
-                    Debugger.LogError($"MIF 파일의 줄 수가 모자랍니다: {missionData.addonMissions[page][index].mifPath}", nameof(MapLoader));
-                    return false;
-                }
-
-                loader.m_missionName = lines[0];
-                loader.m_missionFullname = lines[1];
-                loader.m_missionBD1Path = ResolveMissionPath(lines[2]);
-                loader.m_missionPD1Path = ResolveMissionPath(lines[3]);
-                loader.m_skyIndex = int.TryParse(lines[4].Trim(), out int skyIndex) ? skyIndex : 0;
-                if (int.TryParse(lines[5].Trim(), out int screenFlag))
-                {
-                    loader.m_adjustCollision = (screenFlag & 1) != 0;
-                    loader.m_darkScreen = (screenFlag & 2) != 0;
-                }
-                loader.m_missionAddonObjectPath = ResolveMissionPath(lines[6]);
-                loader.m_missionImage0 = ResolveMissionPath(lines[7]);
-                loader.m_missionImage1 = ResolveMissionPath(lines[8]);
-                loader.m_missionBriefing = string.Join("\n", lines, 9, lines.Length - 9);
-                return true;
+                return LoadMissionFile(missionData.addonMissions[page][index].mifPath);
             }
 
             if (index < 0 || index >= missionData.officialMissions.Count)
@@ -113,6 +91,67 @@ namespace GodotXOPS
                 }
             }
             return true;
+        }
+
+        /// <summary>
+        /// 미션 파일(.mif) 하나를 읽어 미션 정보를 MapLoader 에 세팅한다. 맵 자체는 로드하지 않는다.
+        /// 미션 목록에 없는 파일도 읽을 수 있다 (디버그 콘솔의 loadmission).
+        /// </summary>
+        /// <param name="mifPath">.mif 파일 전체 경로.</param>
+        /// <returns>읽기에 성공했으면 true. 파일이 없거나 형식이 잘못됐으면 false.</returns>
+        public static bool LoadMissionFile(string mifPath)
+        {
+            UnloadMissionData();
+
+            if (string.IsNullOrEmpty(mifPath) || !File.Exists(mifPath))
+            {
+                Debugger.LogError($"Mission file open failed: {mifPath}", nameof(MapLoader));
+                return false;
+            }
+
+            // .mif: 0 이름 / 1 정식 이름 / 2 BD1 / 3 PD1 / 4 하늘 번호 / 5 화면 플래그 / 6 추가 사물 / 7 이미지1 / 8 이미지2 / 9~ 브리핑
+            string[] lines = EncodingHelper.ReadAllLines(mifPath);
+            if (lines.Length < 9)
+            {
+                Debugger.LogError($"Mission file has too few lines: {mifPath}", nameof(MapLoader));
+                return false;
+            }
+
+            MapLoader loader = Instance;
+            loader.m_missionName = lines[0];
+            loader.m_missionFullname = lines[1];
+            loader.m_missionBD1Path = ResolveMissionPath(lines[2]);
+            loader.m_missionPD1Path = ResolveMissionPath(lines[3]);
+            loader.m_skyIndex = int.TryParse(lines[4].Trim(), out int skyIndex) ? skyIndex : 0;
+            if (int.TryParse(lines[5].Trim(), out int screenFlag))
+            {
+                loader.m_adjustCollision = (screenFlag & 1) != 0;
+                loader.m_darkScreen = (screenFlag & 2) != 0;
+            }
+            loader.m_missionAddonObjectPath = ResolveMissionPath(lines[6]);
+            loader.m_missionImage0 = ResolveMissionPath(lines[7]);
+            loader.m_missionImage1 = ResolveMissionPath(lines[8]);
+            loader.m_missionBriefing = string.Join("\n", lines, 9, lines.Length - 9);
+            return true;
+        }
+
+        /// <summary>
+        /// 미션 파일 없이 블록 파일과 포인트 파일을 직접 지정해 미션 정보를 세팅한다 (디버그 콘솔의 loadmap). 맵 자체는 로드하지 않는다.
+        /// 이름은 블록 파일 이름이고, 브리핑과 이미지는 없으며, 추가 충돌과 어두운 화면은 꺼져 있다.
+        /// </summary>
+        /// <param name="blockPath">블록 데이터 파일 전체 경로.</param>
+        /// <param name="pointPath">포인트 데이터 파일 전체 경로.</param>
+        /// <param name="skyIndex">하늘 번호.</param>
+        public static void SetDirectMission(string blockPath, string pointPath, int skyIndex)
+        {
+            UnloadMissionData();
+
+            MapLoader loader = Instance;
+            loader.m_missionName = Path.GetFileName(blockPath ?? string.Empty);
+            loader.m_missionFullname = loader.m_missionName;
+            loader.m_missionBD1Path = blockPath ?? string.Empty;
+            loader.m_missionPD1Path = pointPath ?? string.Empty;
+            loader.m_skyIndex = skyIndex;
         }
 
         /// <summary>

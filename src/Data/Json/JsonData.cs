@@ -35,7 +35,7 @@ namespace GodotXOPS
             }
             catch (JsonException e)
             {
-                Debugger.LogError($"데이터 파일의 JSON 형식이 올바르지 않습니다(기본값 사용): {sourceName}\n{e.Message}", nameof(JsonData));
+                Debugger.LogError($"Data file is not valid JSON (using defaults): {sourceName}\n{e.Message}", nameof(JsonData));
                 return false;
             }
 
@@ -43,7 +43,7 @@ namespace GodotXOPS
             {
                 if (document.RootElement.ValueKind != JsonValueKind.Object)
                 {
-                    Debugger.LogError($"데이터 파일의 루트가 오브젝트가 아닙니다(기본값 사용): {sourceName}", nameof(JsonData));
+                    Debugger.LogError($"Data file root is not an object (using defaults): {sourceName}", nameof(JsonData));
                     return false;
                 }
 
@@ -53,7 +53,7 @@ namespace GodotXOPS
                     FieldInfo field = type.GetField(property.Name, BindingFlags.Public | BindingFlags.Instance);
                     if (field == null || field.IsDefined(typeof(JsonIgnoreAttribute)))
                     {
-                        Debugger.LogWarning($"알 수 없는 키 \"{property.Name}\" 를 무시합니다: {sourceName}", nameof(JsonData));
+                        Debugger.LogWarning($"Unknown key \"{property.Name}\" ignored: {sourceName}", nameof(JsonData));
                         continue;
                     }
 
@@ -69,7 +69,7 @@ namespace GodotXOPS
                     }
                     catch (Exception e) when (e is JsonException or InvalidOperationException or FormatException or NotSupportedException)
                     {
-                        Debugger.LogError($"\"{property.Name}\" 값을 읽을 수 없습니다(기본값 사용): {sourceName}\n{e.Message}", nameof(JsonData));
+                        Debugger.LogError($"Value of \"{property.Name}\" could not be read (using default): {sourceName}\n{e.Message}", nameof(JsonData));
                     }
                 }
             }

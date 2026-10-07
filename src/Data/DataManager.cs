@@ -44,7 +44,7 @@ namespace GodotXOPS
             string fullPath = GamePath.Resolve(relativePath);
             if (fullPath == null || !File.Exists(fullPath))
             {
-                Debugger.LogError($"데이터 파일을 찾을 수 없습니다(기본값 사용): {relativePath}", nameof(DataManager));
+                Debugger.LogError($"Data file not found (using defaults): {relativePath}", nameof(DataManager));
                 return false;
             }
 
@@ -56,18 +56,18 @@ namespace GodotXOPS
             catch (IOException e)
             {
                 // 파일 잠김·네트워크 드라이브 등 읽기 자체의 실패. 여기서 막지 않으면 예외가 _Ready로 올라가 뒤따르는 도메인 로드가 전부 중단된다.
-                Debugger.LogError($"데이터 파일을 읽을 수 없습니다(기본값 사용): {relativePath}\n{e.Message}", nameof(DataManager));
+                Debugger.LogError($"Data file read failed (using defaults): {relativePath}\n{e.Message}", nameof(DataManager));
                 return false;
             }
             catch (System.UnauthorizedAccessException e)
             {
-                Debugger.LogError($"데이터 파일에 접근할 수 없습니다(기본값 사용): {relativePath}\n{e.Message}", nameof(DataManager));
+                Debugger.LogError($"Data file access denied (using defaults): {relativePath}\n{e.Message}", nameof(DataManager));
                 return false;
             }
 
             if (string.IsNullOrWhiteSpace(text))
             {
-                Debugger.LogError($"데이터 파일이 비어 있습니다(기본값 사용): {relativePath}", nameof(DataManager));
+                Debugger.LogError($"Data file is empty (using defaults): {relativePath}", nameof(DataManager));
                 return false;
             }
 
@@ -259,11 +259,11 @@ namespace GodotXOPS
             }
             catch (IOException e)
             {
-                Debugger.LogError($"전역 데이터 파일을 만들 수 없습니다: {k_globalDataPath}\n{e.Message}", nameof(DataManager));
+                Debugger.LogError($"Global data file could not be created: {k_globalDataPath}\n{e.Message}", nameof(DataManager));
             }
             catch (System.UnauthorizedAccessException e)
             {
-                Debugger.LogError($"전역 데이터 파일을 만들 권한이 없습니다: {k_globalDataPath}\n{e.Message}", nameof(DataManager));
+                Debugger.LogError($"No permission to create the global data file: {k_globalDataPath}\n{e.Message}", nameof(DataManager));
             }
         }
 
