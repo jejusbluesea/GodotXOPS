@@ -619,7 +619,7 @@ namespace GodotXOPS.Dev
                 if (!grenade.IsActive) break;
 
                 Vector3 position = grenade.Position;
-                if (MapLoader.IsInsideBlock(position)) embedded = true;
+                if (MapLoader.IsInsideBlock(BlockLayer.Bullet, position)) embedded = true;
                 lowest = Mathf.Min(lowest, position.Y);
                 if (position.Y < previousY - 1e-5f) falling = true;
                 else if (falling && position.Y > previousY + 1e-5f)
@@ -661,19 +661,19 @@ namespace GodotXOPS.Dev
                 foreach (Human human in MapLoader.Humans)
                 {
                     Vector3 origin = human.Controller.Position + Vector3.Up * human.CameraHeight;
-                    if (MapLoader.IsInsideBlock(origin)) continue;
+                    if (MapLoader.IsInsideBlock(BlockLayer.Bullet, origin)) continue;
 
                     for (float yaw = 0f; yaw < 360f && !(thickDone && thinDone); yaw += 3f)
                     {
                         for (float pitch = -30f; pitch <= 70f && !(thickDone && thinDone); pitch += 10f)
                         {
                             Vector3 direction = Coord.AimDirection(yaw, pitch);
-                            if (!MapLoader.RaycastBlock(origin, direction, speed, out _)) continue;
+                            if (!MapLoader.RaycastBlock(BlockLayer.Bullet, origin, direction, speed, out _)) continue;
 
                             int inside = 0;
                             for (int step = 1; step <= steps; step++)
                             {
-                                if (MapLoader.IsInsideBlock(origin + direction * (k_substep * step))) inside++;
+                                if (MapLoader.IsInsideBlock(BlockLayer.Bullet, origin + direction * (k_substep * step))) inside++;
                             }
 
                             if (inside >= 1 && !thickDone)
@@ -764,8 +764,8 @@ namespace GodotXOPS.Dev
             }
 
             float margin = DataManager.Instance.WeaponParameterData.weaponDropPhysicsData.groundCollisionMargin;
-            bool grounded = MapLoader.RaycastBlock(landed, Vector3.Down, 1f, out float groundDist);
-            Expect(!falling && grounded && Mathf.Abs(groundDist - margin) < 1e-3f && !MapLoader.IsInsideBlock(landed),
+            bool grounded = MapLoader.RaycastBlock(BlockLayer.Human, landed, Vector3.Down, 1f, out float groundDist);
+            Expect(!falling && grounded && Mathf.Abs(groundDist - margin) < 1e-3f && !MapLoader.IsInsideBlock(BlockLayer.Human, landed),
                 $"버린 무기가 {ticks}틱 뒤 바닥 위 {groundDist:0.000} m 에 멈춤 (기대 {margin})");
             float thrown = new Vector2(landed.X - start.X, landed.Z - start.Z).Length();
             Expect(thrown > 0.5f, $"버린 무기가 앞으로 날아가지 않음 (수평 {thrown:0.00} m)");
@@ -822,7 +822,7 @@ namespace GodotXOPS.Dev
                     {
                         Vector3 direction = Coord.AimDirection(tryYaw, 0f);
                         Vector3 from = candidate.LogicPosition - direction * 0.5f;
-                        if (MapLoader.IsInsideBlock(from) || MapLoader.RaycastBlock(from, direction, 1.5f, out _)) continue;
+                        if (MapLoader.IsInsideBlock(BlockLayer.Bullet, from) || MapLoader.RaycastBlock(BlockLayer.Bullet, from, direction, 1.5f, out _)) continue;
                         if (!candidate.Contains(candidate.LogicPosition)) continue;
 
                         target = candidate;

@@ -13,6 +13,7 @@ namespace GodotXOPS
         public WeaponParameterData WeaponParameterData { get; private set; } = new WeaponParameterData();
         public ObjectParameterData ObjectParameterData { get; private set; } = new ObjectParameterData();
         public EffectParameterData EffectParameterData { get; private set; } = new EffectParameterData();
+        public BlockMaterialParameterData BlockMaterialParameterData { get; private set; } = new BlockMaterialParameterData();
         public SkyData SkyData { get; private set; } = new SkyData();
         public MissionData MissionData { get; private set; } = new MissionData();
         public GlobalData GlobalData { get; private set; } = new GlobalData();
@@ -23,6 +24,7 @@ namespace GodotXOPS
             LoadWeaponParameterData();
             LoadObjectParameterData();
             LoadEffectParameterData();
+            LoadBlockMaterialParameterData();
             LoadSkyData();
             LoadMissionData();
             LoadGlobalData();
@@ -108,6 +110,11 @@ namespace GodotXOPS
         private void LoadEffectParameterData()
         {
             EffectParameterData = LoadOrDefault<EffectParameterData>(k_effectDataPath);
+        }
+
+        private void LoadBlockMaterialParameterData()
+        {
+            BlockMaterialParameterData = LoadOrDefault<BlockMaterialParameterData>(k_blockMaterialDataPath);
         }
 
         private void LoadSkyData()

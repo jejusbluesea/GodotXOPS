@@ -23,7 +23,7 @@
 
 ## 폴더
 
-- `src/` — C#. `Utility/`(공용), `IO/`(파일 로더), `Data/`(데이터 클래스와 `DataManager`), `Dev/`(점검 도구). 이후 `Map/` 등이 UnityXOPS `Runtime/` 구조를 따라 추가된다.
+- `src/` — C#. `Utility/`(공용), `IO/`(파일 로더와 확장 형식의 읽기·쓰기), `Data/`(데이터 클래스와 `DataManager`), `Dev/`(점검 도구). 이후 `Map/` 등이 UnityXOPS `Runtime/` 구조를 따라 추가된다.
 - `scenes/` — `.tscn`. 화면은 씬 파일 단위로 나눈다.
 - `ui/` — GDScript UI. 화면별 스크립트와 `ui/common/`의 공용 도우미.
 - `shaders/` — `.gdshader`.
@@ -80,6 +80,8 @@ dotnet build GodotXOPS.csproj
 - `res://scenes/dev/ai_check.tscn` — AI(시야·청각·경계·조준 예측·무기 운용·좀비·경로·복제)와 미션 이벤트·판정을 수치로 확인한다 (헤드리스). 점검용 PD1 을 임시 폴더에 만들어 로드하고, 사람들을 공중에 놓은 채 AI 틱과 무기 틱만 직접 돌린다. AI, 이벤트, 포인트 조회 코드를 고친 뒤에 돌린다.
 
 - `res://scenes/dev/effect_viewer.tscn` — 이펙트 프리셋을 골라 눈으로 보고(`--effect 번호`, `--additive`, `--screenshot 경로.png`), `--selftest` 로 재생 수·풀 증가·블렌드 모드·발광 감쇠·면 위 재생을 수치로 확인한다 (헤드리스 가능). 이펙트 데이터나 `EffectManager` 를 고친 뒤에 돌린다.
+
+- `res://scenes/dev/bd2_check.tscn` — 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정이 같은지 대조하고, 블록 플래그·그리지 않는 면·재질(착탄, 발소리와 박자)·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.bd1 출력.bd2` 는 파일 하나를 변환한다. 블록 로더나 충돌 조회, `BD2File` 을 고친 뒤에 돌린다. `map_viewer` 의 `--file 경로` 로 BD1 / BD2 파일 하나를 띄워 볼 수 있다.
 
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 
@@ -154,7 +156,7 @@ dotnet build GodotXOPS.csproj
 - 시야와 사선은 블록만 가린다 (`MapLoader.RaycastBlock`). 사람과 소물은 가리지 않는다.
 - 경로와 이벤트의 다음 포인트는 **종류별로** 찾는다 (`MapLoader.GetPathPoint`, `GetEventPoint`). 원본 `SearchPointdata`는 종류와 무관하게 같은 번호의 첫 포인트를 찾아서 번호가 겹치면 줄이 끊기는데, 원본의 버그로 보고 따르지 않는다 (사용자 결정).
 - 소리 신호(`Human.NotifyThreatHeard`)는 `AIController`가 매 틱 비운다. 원본보다 한 틱 빨리 듣는다 (원본은 이중 버퍼라 다음 프레임에 듣는다).
-- 발소리는 `HumanController`가 매 틱 `WorldSound.EmitFootstep(사람, 종류)`로 낸다. 지금은 달리는 소리를 다른 팀 AI 에게 알리기만 한다 (원본도 WAV 를 재생하지 않는다). 발소리 WAV 를 넣을 자리는 그 함수 하나다.
+- 발소리는 `HumanController`가 매 틱 `WorldSound.EmitFootstep(사람, 종류)`로 다른 팀 AI 에게 알린다 (달리는 소리만. 원본도 WAV 를 재생하지 않는다). 들리는 소리는 따로 `WorldSound.PlayFootstep`이 낸다: 다리 애니메이션이 `footstepPhase`를 지나는 틱(`HumanVisual.FootstepDue`)과 착지한 틱에, 발밑 면의 재질에서 소리를 골라 재생한다. 기본 데이터의 0번 재질에는 발소리가 없어서 BD1 맵에서는 나지 않는다. AI 청각과 판정에는 영향이 없다.
 - `EventManager`(Autoload, SimOrder 300)가 이벤트 세 줄과 자동 판정을 돌린다. `BeginMission()`을 부른 뒤에만 돌고 맵을 내리면 멈춘다. UI(GDScript)는 시그널 `MessageShown(id, text)`, `MissionEnded(complete)`와 프로퍼티 `Result`, `EndTicks`, `MessageId`, `MessageText`, `MessageAlpha`, `StartCount`를 쓴다.
 
 ## 화면 (씬 UI)
@@ -184,6 +186,9 @@ dotnet build GodotXOPS.csproj
 
 - `MapLoader`(Autoload)가 블록·스카이·미션 정보를 들고 있고, 씬이 바뀌어도 유지된다. 로드 함수는 이전 것을 먼저 언로드한다.
 - 블록 충돌은 `MapLoader.RaycastBlock` / `IsInsideBlock`으로 직접 계산한다 (엔진 물리 미사용). 블록 앞면만 맞는다.
+- **충돌 조회는 첫 인자로 판정 종류(`BlockLayer`)를 받는다. 기본값을 두지 않는다** (새 호출 지점을 컴파일러가 잡게 한다). `Human`: 사람의 이동·맵 충돌, 매몰, 발밑·이동 경로 레이, 벽 블라인드, 3인칭 카메라, 떨어진 무기와 소물의 바닥, AI 의 점프·낭떠러지 확인. `Bullet`: 총알 소멸, 수류탄 반사, 혈흔 입자. `Sight`: AI 시야·사선, 폭발 가림. `MapLoader` 가 판정별 블록 목록 셋을 들고 있다 (`GetBlockColliders`).
+- **블록 재질** (`godotdata/block_material_data.json`, `MapLoader.GetFaceMaterial(블록, 면)`): BD2 의 면 재질 번호가 재질 목록을 가리키고 −1 은 `MapLoader.DefaultBlockMaterial`(기본 0, 나중에 MIF2 가 정한다)이다. **BD1 블록은 면 재질 번호가 없고 모든 면이 0번 재질이다. 0번에 원본의 벽 착탄 연기와 착탄음이 들어 있다** (사용자 결정. 탄환 데이터의 `wallHitEffectIndex` 는 없앴고 `wallHitSounds` 는 수류탄이 튕기는 소리 `bounceSounds` 로 바꿨다). 블록에 맞은 탄은 항상 재질의 `hitEffect`·`bulletHoleEffect`·`hitSounds`를 쓰고(`GetFaceMaterial` 은 null 을 돌려주지 않는다), 탄흔은 한 틱에 한 번만 남긴다. 총알이 통과하는 블록(`PassBullet`)에서는 아무것도 내지 않는다 (물 같은 특수 블록은 나중에 BD2 를 확장할 때 한다. 사용자 결정). 기본 데이터의 재질은 0번 하나다. 오브젝트와 사람에 맞았을 때의 이펙트는 지금처럼 탄환 데이터가 정한다 (오브젝트도 재질을 쓰게 할지는 나중에 정한다).
+- 블록 데이터는 확장자로 BD1 / BD2 로더가 갈리고 읽은 뒤에는 같은 구조다 (`RawBlockData` → `BuildBlock` → `Block`). BD1 의 UV 한 칸 회전과 좌표 변환은 BD1 로더 안에서 끝낸다. 판형 블록 추론(정점 모양)은 BD1 에만 있고, BD2 는 블록 플래그(`BD2File.PassHuman` / `PassBullet` / `PassSight`, 켜면 통과)대로만 한다. **플래그는 통과 여부만 담고 나머지 비트는 예약이다** (사용자 결정. 읽을 때 무시한다). BD2 의 읽기·쓰기는 `src/IO/BD2File.cs`(게임 싱글톤과 무관), 구조는 `docs/modding.md` 에 있다.
 - 추가 충돌(Additional Collision, `MapLoader.AdjustCollision`): 캐릭터-맵 충돌에서 중심축 0.9 m / 1.3 m 높이의 추가 검사 2점은 **이 플래그가 켜진 미션에서만** 돈다 (원본 `human::CollisionMap`의 `AddCollisionFlag`). UnityXOPS `HumanController`는 플래그를 무시하고 항상 검사하는데, 이는 잘못 옮긴 것이므로 따라 하지 않는다.
 - 머티리얼은 `MaterialManager`의 `Create*Material`로 만든다. `alpha_clip_blend` 셰이더는 원본처럼 sRGB 값 그대로 곱하고 섞은 뒤 마지막에만 선형으로 바꾼다. 텍스처 유니폼에 `source_color`를 붙이지 않는다.
 - 안개는 Godot 환경 안개가 아니라 전역 셰이더 변수(`xops_fog_color`, `xops_fog_range`)로 셰이더가 직접 계산한다 (원본의 선형 안개 재현).

@@ -44,11 +44,12 @@ namespace GodotXOPS
         public float explosionknockbackMax;
         public string explosionSound;
         public int explosionEffectIndex;
-        public int wallHitEffectIndex;
+        // 재질이 남기는 탄흔(BlockMaterialData.bulletHoleEffect)의 크기 배율. 블록에 맞았을 때의 이펙트와 소리는 탄환이 아니라 맞은 면의 재질이 정한다.
+        public float bulletHoleSize = 1f;
         public int humanHitEffectIndex;
         public int objectHitEffectIndex;
-        public List<string> wallHitSounds;
-        public List<string> humanHitSounds; // 사람 피격음 — 리스트에서 균등 랜덤 선택 (wallHitSounds 와 동일 방식). 하나만 넣으면 그것만 재생.
+        public List<string> bounceSounds; // 중력을 받는 탄(수류탄)이 블록에 튕길 때의 소리 — 리스트 랜덤 선택. 직선 탄은 쓰지 않는다.
+        public List<string> humanHitSounds; // 사람 피격음 — 리스트에서 균등 랜덤 선택. 하나만 넣으면 그것만 재생.
         public List<string> bulletPassingSounds; // 총알이 카메라 근처 통과 시 hyu 음 — 리스트 랜덤 선택. 비어있으면(GRENADE 등) 재생 안 함.
         public float lifetime;
     }

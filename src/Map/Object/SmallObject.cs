@@ -129,7 +129,7 @@ namespace GodotXOPS
         public bool SnapToGround()
         {
             Vector3 origin = m_position + Vector3.Up * k_snapEpsilon;
-            if (!MapLoader.RaycastBlock(origin, Vector3.Down, k_snapMaxDistance + k_snapEpsilon, out float hitDist)) return false;
+            if (!MapLoader.RaycastBlock(BlockLayer.Human, origin, Vector3.Down, k_snapMaxDistance + k_snapEpsilon, out float hitDist)) return false;
 
             float groundY = origin.Y - hitDist;
             float lowestBottom = 0f;

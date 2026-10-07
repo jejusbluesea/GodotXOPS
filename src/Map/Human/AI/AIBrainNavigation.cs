@@ -175,9 +175,9 @@ namespace GodotXOPS
             Vector3 waist = position + direction * (checkDistance + m_controller.MapRadius) + Vector3.Up * (m_controller.Height * 0.5f);
             Vector3 foot = position + direction * checkDistance + Vector3.Up * k_jumpCheckHeight;
 
-            if (MapLoader.IsInsideBlock(waist)
-                || MapLoader.IsInsideBlock(foot)
-                || MapLoader.RaycastBlock(foot, Vector3.Up, m_controller.Height - k_jumpCheckHeight, out _))
+            if (MapLoader.IsInsideBlock(BlockLayer.Human, waist)
+                || MapLoader.IsInsideBlock(BlockLayer.Human, foot)
+                || MapLoader.RaycastBlock(BlockLayer.Human, foot, Vector3.Up, m_controller.Height - k_jumpCheckHeight, out _))
             {
                 m_moveIntent |= HumanMoveFlag.Jump;
                 return true;

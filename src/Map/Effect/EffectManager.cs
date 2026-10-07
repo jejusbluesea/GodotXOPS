@@ -136,11 +136,12 @@ namespace GodotXOPS
         /// <param name="surfacePoint">면 위의 점. 데칼은 여기서 법선 쪽으로 띄운 자리에 놓인다.</param>
         /// <param name="normal">면의 바깥쪽 법선. 길이가 0 이면 방향 없이 재생한다.</param>
         /// <param name="triggerValue">개수를 정하는 값. countPerTrigger 를 쓰는 emitter 에만 영향을 준다.</param>
-        public void PlayOnSurface(int effectIndex, Vector3 position, Vector3 surfacePoint, Vector3 normal, float triggerValue = 0f)
+        /// <param name="sizeScale">크기 배율.</param>
+        public void PlayOnSurface(int effectIndex, Vector3 position, Vector3 surfacePoint, Vector3 normal, float triggerValue = 0f, float sizeScale = 1f)
         {
             if (normal.LengthSquared() < 1e-6f)
             {
-                Play(effectIndex, position, triggerValue);
+                Play(effectIndex, position, Basis.Identity, sizeScale, Vector3.Zero, triggerValue);
                 return;
             }
             normal = normal.Normalized();
@@ -150,7 +151,7 @@ namespace GodotXOPS
             Basis surface = Basis.LookingAt(-normal, up);
 
             float offset = DataManager.Instance.EffectParameterData.effectGeneralData.decalSurfaceOffset;
-            Spawn(effectIndex, position, Basis.Identity, surfacePoint + normal * offset, surface, 1f, Vector3.Zero, triggerValue);
+            Spawn(effectIndex, position, Basis.Identity, surfacePoint + normal * offset, surface, sizeScale, Vector3.Zero, triggerValue);
         }
 
         /// <summary>
@@ -272,7 +273,7 @@ namespace GodotXOPS
             {
                 Vector3 move = next - slot.position;
                 float distance = move.Length();
-                if (distance > 1e-6f && MapLoader.RaycastBlock(slot.position, move / distance, distance, out float hitDist, out Vector3 normal))
+                if (distance > 1e-6f && MapLoader.RaycastBlock(BlockLayer.Bullet, slot.position, move / distance, distance, out float hitDist, out Vector3 normal))
                 {
                     SpawnWallBlood(slot.position + move / distance * hitDist, normal);
                     Recycle(slot);

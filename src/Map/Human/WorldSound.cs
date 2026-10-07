@@ -23,10 +23,47 @@ namespace GodotXOPS
     /// </summary>
     public static class WorldSound
     {
+        // 발밑의 면을 찾는 레이: 발 위 0.25 m 에서 아래로 0.5 m. 얕은 계단이나 경사에서도 밟은 면을 잡는다.
+        private const float k_footRayHeight = 0.25f;
+        private const float k_footRayLength = 0.5f;
+
+        /// <summary>
+        /// 발소리를 재생한다. 소리는 발밑 블록 면의 재질(BlockMaterialData)에서 가져온다. 재질 번호가 없는 맵(BD1)은 0번 재질이고, 기본 데이터의 0번에는 발소리가 없다.
+        /// 걷기와 달리기는 발이 땅에 닿는 틱에, 착지는 착지한 틱에 호출된다. 원본에는 없는 기능이고 판정에 영향이 없다.
+        /// </summary>
+        /// <param name="source">발소리를 낸 사람.</param>
+        /// <param name="kind">발소리 종류. 점프는 소리가 없다.</param>
+        public static void PlayFootstep(Human source, FootstepKind kind)
+        {
+            if (!SoundManager.Loaded || kind == FootstepKind.Jump) return;
+
+            Vector3 position = source.Controller.Position;
+            // 들리지 않는 거리의 발소리는 재생기를 잡기 전에 버린다 (재생기가 64개뿐이다).
+            if (!SoundManager.Instance.IsAudible(position)) return;
+
+            Vector3 origin = position + Vector3.Up * k_footRayHeight;
+            if (!MapLoader.RaycastBlock(BlockLayer.Human, origin, Vector3.Down, k_footRayLength, out _, out Block block, out int face)) return;
+
+            BlockMaterialData material = MapLoader.GetFaceMaterial(block, face);
+
+            BlockMaterialGeneralData general = DataManager.Instance.BlockMaterialParameterData.blockMaterialGeneralData;
+            switch (kind)
+            {
+                case FootstepKind.Walk:
+                    SoundManager.Instance.PlayRandomAt(material.footstepWalk, position, general.footstepWalkVolume);
+                    break;
+                case FootstepKind.Landing:
+                    SoundManager.Instance.PlayRandomAt(material.footstepLanding, position, general.footstepLandingVolume);
+                    break;
+                default:
+                    SoundManager.Instance.PlayRandomAt(material.footstepRun, position, general.footstepRunVolume);
+                    break;
+            }
+        }
+
         /// <summary>
         /// 발소리를 낸다. 원본 SoundManager::SetFootsteps (soundmanager.cpp:246-268) 에 해당하며, 움직이는 사람마다 매 틱 불린다.
-        /// 원본은 발소리 WAV 를 재생하지 않는다 (PlaySound 의 FOOTSTEPS_* 분기가 비어 있다). 발소리를 넣으려면 이 함수에서 SoundManager 를 부르면 된다.
-        /// 그때 필요한 재료는 사람(위치, 발밑 블록)과 종류로 충분하다.
+        /// 원본은 발소리 WAV 를 재생하지 않는다 (PlaySound 의 FOOTSTEPS_* 분기가 비어 있다). 여기서는 AI 가 듣는 신호만 내고, 들리는 소리는 PlayFootstep 이 따로 낸다.
         /// AI 는 다른 팀이 달리는 소리만 듣는다. 걷기·점프·착지는 듣지 못한다 (soundmanager.cpp:348-365).
         /// </summary>
         /// <param name="source">발소리를 낸 사람.</param>

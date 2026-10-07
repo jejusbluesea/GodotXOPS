@@ -168,9 +168,11 @@ namespace GodotXOPS
         private void TickStraight()
         {
             // 이번 틱 경로 위에 블록이 있는지. 0 없음 / 1 있으나 아직 내부 점에 안 걸림 / 2 내부 점에 걸림.
-            int mapFlag = MapLoader.RaycastBlock(m_position, m_direction, m_speedPerTick, out float wallDist, out Vector3 wallNormal) ? 1 : 0;
+            int mapFlag = MapLoader.RaycastBlock(BlockLayer.Bullet, m_position, m_direction, m_speedPerTick, out float wallDist, out Block wallBlock, out int wallFace) ? 1 : 0;
             Vector3 wallEntry = m_position + m_direction * (wallDist - k_wallEntryMargin);
             Vector3 wallSurface = m_position + m_direction * wallDist;
+            // 탄흔은 한 틱에 한 번만 남긴다. 관통탄은 같은 진입점으로 HitMap 을 여러 번 부른다.
+            bool holeLeft = false;
 
             int steps = Mathf.RoundToInt(m_speedPerTick / k_substep);
             for (int step = 0; step < steps; step++)
@@ -193,10 +195,11 @@ namespace GodotXOPS
 
                 if (HitSmallObjectsAt(point)) return;
 
-                if (mapFlag > 0 && MapLoader.IsInsideBlock(point))
+                if (mapFlag > 0 && MapLoader.IsInsideBlock(BlockLayer.Bullet, point))
                 {
                     if (ExplodeOnTrigger(ExplosionTrigger.Block, wallEntry)) return;
-                    HitMap(wallEntry, wallSurface, wallNormal);
+                    HitMap(wallEntry, wallSurface, wallBlock, wallFace, !holeLeft);
+                    holeLeft = true;
 
                     m_penetration--;
                     if (m_penetration >= 0) m_attacks = (int)(m_attacks * k_pierceAttenWall);
@@ -208,7 +211,7 @@ namespace GodotXOPS
             if (mapFlag == 1)
             {
                 if (ExplodeOnTrigger(ExplosionTrigger.Block, wallEntry)) return;
-                HitMap(wallEntry, wallSurface, wallNormal);
+                HitMap(wallEntry, wallSurface, wallBlock, wallFace, !holeLeft);
                 m_attacks = (int)(m_attacks * (m_penetration > 0 ? k_thinWallAttenPierce : k_thinWallAttenStop));
             }
 
@@ -243,7 +246,7 @@ namespace GodotXOPS
             float moveDist = m_velocity.Length();
             Vector3 direction = m_velocity / moveDist;
 
-            if (MapLoader.RaycastBlock(m_position, direction, moveDist, out float hitDist, out Vector3 normal))
+            if (MapLoader.RaycastBlock(BlockLayer.Bullet, m_position, direction, moveDist, out float hitDist, out Vector3 normal))
             {
                 if (ExplodeOnTrigger(ExplosionTrigger.Block, m_position + direction * Mathf.Max(0f, hitDist - k_wallEntryMargin))) return;
 
@@ -256,7 +259,7 @@ namespace GodotXOPS
                 // 약하게 굴러가며 튀는 것은 소리를 내지 않는다.
                 if (moveDist > k_grenadeBoundSoundMinSpeed && SoundManager.Loaded)
                 {
-                    SoundManager.Instance.PlayRandomAt(m_data.wallHitSounds, m_position, k_wallHitVolume);
+                    SoundManager.Instance.PlayRandomAt(m_data.bounceSounds, m_position, k_wallHitVolume);
                 }
             }
             else
@@ -385,14 +388,24 @@ namespace GodotXOPS
 
         /// <summary>
         /// 총알이 블록에 맞은 연출: 착탄 연기와 소리, 주변 AI 가 듣는 처리. 원본 ObjectManager::HitBulletMap (objectmanager.cpp:891-898).
+        /// 이펙트·탄흔·소리는 맞은 면의 재질이 정한다. 재질 번호가 없는 맵(BD1)의 면은 0번 재질이고, 거기에 원본의 착탄 연기와 착탄음이 들어 있다.
         /// </summary>
         /// <param name="position">착탄 지점. 면에서 조금 앞이다.</param>
         /// <param name="surfacePoint">탄환이 면에 닿은 점. 이펙트의 데칼이 놓이는 자리다.</param>
-        /// <param name="normal">맞은 면의 바깥쪽 법선.</param>
-        private void HitMap(Vector3 position, Vector3 surfacePoint, Vector3 normal)
+        /// <param name="block">맞은 블록.</param>
+        /// <param name="face">맞은 면 번호.</param>
+        /// <param name="leaveHole">true 면 재질의 탄흔을 남긴다.</param>
+        private void HitMap(Vector3 position, Vector3 surfacePoint, Block block, int face, bool leaveHole)
         {
-            if (EffectManager.Loaded) EffectManager.Instance.PlayOnSurface(m_data.wallHitEffectIndex, position, surfacePoint, normal);
-            if (SoundManager.Loaded) SoundManager.Instance.PlayRandomAt(m_data.wallHitSounds, position, k_wallHitVolume);
+            Vector3 normal = block.faceNormals[face];
+            BlockMaterialData material = MapLoader.GetFaceMaterial(block, face);
+
+            if (EffectManager.Loaded)
+            {
+                EffectManager.Instance.PlayOnSurface(material.hitEffect, position, surfacePoint, normal);
+                if (leaveHole) EffectManager.Instance.PlayOnSurface(material.bulletHoleEffect, position, surfacePoint, normal, 0f, m_data.bulletHoleSize);
+            }
+            if (SoundManager.Loaded) SoundManager.Instance.PlayRandomAt(material.hitSounds, position, k_wallHitVolume);
 
             float hearDistance = DataManager.Instance.HumanParameterData.humanAIParameterData.aiHearBulletWallHitDist;
             WorldSound.EmitPointSound(position, m_team, hearDistance, hearDistance);
@@ -542,7 +555,7 @@ namespace GodotXOPS
                         Vector3 toObject = smallObject.LogicPosition - origin;
                         float dist = toObject.Length();
                         if (dist > radius) continue;
-                        if (dist > 1e-6f && MapLoader.RaycastBlock(origin, toObject / dist, dist, out _)) continue;
+                        if (dist > 1e-6f && MapLoader.RaycastBlock(BlockLayer.Sight, origin, toObject / dist, dist, out _)) continue;
 
                         smallObject.HitGrenadeExplosion((int)m_data.objectExplosiveDamageMax - (int)(m_data.objectExplosiveDamageMax / radius * dist));
                     }
@@ -592,7 +605,7 @@ namespace GodotXOPS
         {
             Vector3 toTarget = target - origin;
             float dist = toTarget.Length();
-            if (dist > 1e-6f && MapLoader.RaycastBlock(origin, toTarget / dist, dist, out _)) return 0;
+            if (dist > 1e-6f && MapLoader.RaycastBlock(BlockLayer.Sight, origin, toTarget / dist, dist, out _)) return 0;
 
             int damage = (int)maxDamage - (int)(maxDamage / radius * dist);
             return damage > 0 ? damage : 0;

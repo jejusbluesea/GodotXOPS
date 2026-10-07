@@ -49,6 +49,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `mission_data.json` | 오프닝·메뉴 배경 맵, 공식 미션 목록 |
 | `sky_data.json` | 스카이 텍스처, 배경색, 안개, 시야 거리 |
 | `effect_data.json` | 이펙트 텍스처와 프리셋 |
+| `block_material_data.json` | 블록 면의 재질 (발소리, 총알이 맞았을 때의 이펙트와 소리). BD2 맵에서만 쓰입니다 |
 | `weapon/list.json` | 무기 목록 (데미지, 발사 속도, 탄창, 반동 등) |
 | `weapon/model.json` | 무기 모델, 총구 화염, 탄피, 팔 모양 |
 | `weapon/bullet.json` | 탄환 종류 (직선 탄, 수류탄. 폭발, 착탄 소리와 이펙트) |
@@ -136,11 +137,15 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `humanExplosiveHeadDamageMax`, `humanExplosiveLegDamageMax`, `objectExplosiveDamageMax` | 폭발 중심에서의 최대 데미지 |
 | `explosionknockbackMax` | 폭풍에 밀리는 최대 세기 |
 | `explosionSound`, `explosionEffectIndex` | 폭발 소리와 이펙트 |
-| `wallHitEffectIndex`, `humanHitEffectIndex`, `objectHitEffectIndex` | 맞은 곳에 따라 내는 이펙트 번호 |
-| `wallHitSounds`, `humanHitSounds`, `bulletPassingSounds` | 착탄음, 피격음, 스쳐 지나가는 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다 |
+| `humanHitEffectIndex`, `objectHitEffectIndex` | 사람, 오브젝트에 맞았을 때 내는 이펙트 번호 |
+| `humanHitSounds`, `bulletPassingSounds` | 피격음, 스쳐 지나가는 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다 |
+| `bounceSounds` | 중력을 받는 탄(수류탄)이 벽이나 바닥에 튕길 때의 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다. 직선 탄에서는 쓰이지 않습니다 |
+| `bulletHoleSize` | 재질이 남기는 탄흔(`bulletHoleEffect`)의 크기 배율. 1 이 프리셋 그대로입니다 |
 | `lifetime` | 탄환이 사라질 때까지의 시간 (초) |
 
 예: 로켓은 `explosionTrigger`를 15(1+2+4+8)로, 수류탄은 1 로 둡니다.
+
+탄환이 벽에 맞았을 때의 이펙트와 소리는 탄환이 아니라 맞은 면의 [재질](#블록-재질)이 정합니다. 1.0 의 `wallHitEffectIndex`와 `wallHitSounds`는 없어졌습니다: 착탄 연기와 착탄음은 0번 재질로 옮겨졌고, 수류탄이 튕기는 소리는 `bounceSounds`가 됐습니다.
 
 ### `weapon/general.json`
 
@@ -222,7 +227,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `name` | 이름 (구분용) |
 | `legs` | 다리 동작 한 장면씩의 `.x` 경로 목록. `human/animation.json`의 `index`가 이 목록 안의 순서를 가리킵니다 |
 
-`human/animation.json`의 `humanAnimation`은 서 있기·걷기·달리기 동작입니다. `index`는 그 동작에서 차례로 보여 줄 다리 모양 번호, `forwardSpeed`·`strafeSpeed`·`backwardSpeed`는 방향별 재생 속도입니다.
+`human/animation.json`의 `humanAnimation`은 서 있기·걷기·달리기 동작입니다. `index`는 그 동작에서 차례로 보여 줄 다리 모양 번호, `forwardSpeed`·`strafeSpeed`·`backwardSpeed`는 방향별로 동작 한 바퀴에 걸리는 시간(초)입니다. `footstepPhase`는 한 바퀴 안에서 발이 땅에 닿는 순간들이고(0 이상 1 미만의 비율, 기본 0 과 0.5), 그때 [재질](#블록-재질)의 발소리가 납니다. 비워 두면 그 동작에서는 발소리가 나지 않습니다.
 
 ## 오브젝트
 
@@ -302,10 +307,10 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 `flags`에 1 을 넣은 입자는 카메라를 따라 돌지 않고 한 방향으로 고정됩니다. 블록 면 위에서 나오는 이펙트에서는 그 면에 눕고, 면에서 `decalSurfaceOffset`만큼 떠서 놓입니다. 면 위에서 나오는 이펙트는 둘입니다.
 
-- 탄환의 `wallHitEffectIndex` — 탄환이 블록에 맞은 자리.
+- [재질](#블록-재질)의 `hitEffect`와 `bulletHoleEffect` — 탄환이 블록에 맞은 자리.
 - `wallBloodEffectIndex` — 혈흔 입자(`flags` 2)가 블록에 닿은 자리.
 
-그래서 `wallHitEffectIndex`가 가리키는 프리셋에 `flags` 1 인 입자를 더하면 탄흔이 됩니다. 같은 프리셋의 다른 입자(연기 등)는 전과 똑같이 나옵니다. 기본 데이터에는 탄흔이 없습니다 (원본에 없습니다).
+그래서 `flags` 1 인 입자로 만든 프리셋을 재질의 `bulletHoleEffect`에 넣으면 탄흔이 됩니다 (`hitEffect`의 프리셋에 그런 입자를 더해도 됩니다. 같은 프리셋의 연기 등은 전과 똑같이 나옵니다). 기본 데이터에는 탄흔이 없습니다 (원본에 없습니다).
 
 - 자국의 `positionOffset`과 `velocity`는 면 기준입니다 (x, y 가 면을 따라가는 쪽이고, z 는 음수가 면에서 나오는 쪽).
 - 자국은 `lifetime`이 다하거나 불투명도가 0 이 될 때까지 이펙트 자리를 하나씩 차지합니다. 오래 남기면 풀이 그만큼 늘어납니다.
@@ -325,6 +330,88 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 ### `sky_data.json`
 
 스카이 번호별 텍스처(`skyTexturePath`)와 안개 색(`skyColor`), 안개가 시작하고 끝나는 거리(`fogStart`, `fogEnd`), 보이는 거리(`farClippingPlane`)입니다.
+
+## 확장 블록 데이터 (BD2)
+
+BD1 의 제한(텍스처 10개, 면마다의 정보 없음)을 없앤 GodotXOPS 전용 블록 형식입니다. 확장자는 `.bd2`입니다. BD1 은 그대로 읽습니다.
+
+아직 미션에서 BD2 를 불러오는 방법(확장 미션 데이터)이 없습니다. 지금은 [개발 문서](development.md)의 `map_viewer`로 파일을 띄워 볼 수 있고, `bd2_check`의 `--convert`로 BD1 을 BD2 로 바꿀 수 있습니다.
+
+### 파일 구조
+
+바이너리이고 모든 수는 리틀 엔디안입니다.
+
+| 위치 | 크기 | 내용 |
+|---|---|---|
+| 0 | 8 | 글자 `GDXOPSBD` |
+| 8 | 4 | 텍스처 목록 파일 경로의 길이 (바이트, 부호 없는 정수) |
+| 12 | N | 텍스처 목록 파일 경로 (UTF-8, 게임 폴더 기준) |
+| 12 + N | 4 | 블록 개수 (부호 없는 정수) |
+| 16 + N | 340 × 개수 | 블록 |
+
+블록 하나는 340바이트입니다.
+
+| 위치 | 크기 | 내용 |
+|---|---|---|
+| 0 | 96 | 정점 8개. 정점마다 x, y, z (실수 4바이트) |
+| 96 | 192 | UV. 면 6개 × 정점 4개, 정점마다 u, v (실수 4바이트) |
+| 288 | 24 | 면 6개의 텍스처 번호 (정수 4바이트). 텍스처 목록의 번호이고, 음수이거나 목록에 없는 번호이면 그 면을 그리지 않습니다 |
+| 312 | 24 | 면 6개의 재질 번호 (정수 4바이트). [재질](#블록-재질) 목록의 번호이고, -1 은 기본 재질(0번)입니다 |
+| 336 | 4 | 블록 플래그 (정수 4바이트) |
+
+- 좌표는 미터이고 게임 안의 축 그대로입니다 (+x 오른쪽, +y 위, -z 앞). BD1 의 좌표 (x, y, z) 는 BD2 에서 (-x × 0.1, y × 0.1, z × 0.1) 입니다. 정점 8개의 순서는 BD1 과 같습니다.
+- 면이 쓰는 정점은 BD1 과 같습니다: 면 0 은 정점 0, 3, 2, 1 / 면 1 은 7, 4, 5, 6 / 면 2 는 4, 0, 1, 5 / 면 3 은 5, 1, 2, 6 / 면 4 는 6, 2, 3, 7 / 면 5 는 7, 3, 0, 4.
+- UV 는 면의 정점 순서대로 적습니다. 면 2 의 첫 UV 는 정점 4 의 것입니다. BD1 처럼 한 칸 밀려 있지 않습니다.
+- 텍스처 개수에는 제한이 없습니다.
+
+### 블록 플래그
+
+통과 여부만 담습니다. 판정을 끄는 비트이고, 0 이면 모든 판정에서 충돌합니다. 더해서 씁니다. 아래 세 값 밖의 비트는 나중을 위해 비워 둔 것이니 0 으로 둡니다.
+
+| 값 | 켜면 통과하는 것 |
+|---|---|
+| 1 | 사람 (이동, 떨어진 무기와 오브젝트의 바닥, 3인칭 카메라, 화면 가장자리의 벽 가림) |
+| 2 | 총알과 수류탄 |
+| 4 | AI 의 시야와 사선, 폭발 가림 |
+
+통과하는 블록에서는 아무 일도 일어나지 않습니다 (총알이 지나가도 이펙트나 소리가 없습니다). 예를 들어 5 (1 + 4) 는 걸어 들어갈 수 있고 AI 가 건너편을 볼 수 있지만 총알은 막는 블록입니다. 7 은 보이기만 하고 아무것도 막지 않는 블록입니다. BD1 은 블록 모양으로 "아무것도 막지 않는 블록"인지를 추론하지만 BD2 는 플래그에 적은 대로만 합니다.
+
+### 텍스처 목록 파일
+
+BD2 가 경로를 들고 있는 JSON 파일입니다. 파일 이름은 자유이고, 여러 맵이 한 파일을 같이 쓸 수 있습니다.
+
+```json
+{
+  "blockTextureData": [
+    { "diffusePath": "addon/mymap/wall.png" },
+    { "diffusePath": "addon/mymap/floor.png" }
+  ]
+}
+```
+
+| 키 | 뜻 |
+|---|---|
+| `diffusePath` | 텍스처 파일 경로 (게임 폴더 기준). 비워 두면 흰 면이 됩니다 |
+
+## 블록 재질
+
+`block_material_data.json`에 있습니다. BD2 의 면마다 적는 재질 번호가 `blockMaterialData` 목록의 번호입니다. 재질은 그 면을 밟았을 때의 발소리와 총알이 맞았을 때의 이펙트·소리를 정합니다.
+
+기본 데이터에는 0번 `Default` 하나만 있고, 원본의 벽 착탄 연기와 착탄음이 들어 있습니다 (발소리와 탄흔은 없습니다). **BD1 맵은 모든 면이 0번 재질입니다.** 그래서 0번을 고치면 원본 맵 전체의 착탄이 바뀌고, 0번에 발소리를 넣으면 원본 맵에서도 발소리가 납니다. BD2 에서 재질 번호 -1 도 0번입니다.
+
+재질을 더하려면 목록 끝에 항목을 추가합니다. 소리도 이펙트도 없는 면이 필요하면 내용을 비운 항목을 하나 더해 그 번호를 쓰면 됩니다. 목록에 없는 번호를 가리키는 면도 소리와 이펙트가 없습니다.
+
+| 키 | 뜻 |
+|---|---|
+| `name` | 구분용 이름 |
+| `footstepWalk`, `footstepRun`, `footstepLanding` | 걷기, 달리기, 착지 발소리의 WAV 경로 목록. 여러 개를 넣으면 그중 하나를 무작위로 냅니다. 비워 두면 소리가 나지 않습니다 |
+| `hitSounds` | 총알이 맞았을 때의 WAV 경로 목록 |
+| `hitEffect` | 총알이 맞았을 때의 이펙트 프리셋 번호 (`effect_data.json`). 0 이면 내지 않습니다 |
+| `bulletHoleEffect` | 맞은 자리에 남기는 탄흔의 이펙트 프리셋 번호. 크기에 탄환의 `bulletHoleSize`가 곱해집니다. 0 이면 남기지 않습니다. 탄흔으로 쓸 프리셋은 `flags` 1 인 입자로 만듭니다 ([벽에 붙는 자국](#벽에-붙는-자국)) |
+
+`blockMaterialGeneralData`의 `footstepWalkVolume`, `footstepRunVolume`, `footstepLandingVolume`은 발소리 볼륨(0 에서 1 사이)입니다. 소리가 거리에 따라 줄어드는 방식은 다른 효과음과 같아서, 볼륨이 작을수록 가까이에서만 들립니다.
+
+발소리가 나는 박자는 `human/animation.json`의 `footstepPhase`가 정합니다. AI 가 발소리를 듣는 것은 이 소리와 무관합니다 (`human/ai.json`의 `aiHearFootstep...`).
 
 ## 에드온 페이지
 
@@ -357,7 +444,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 원본 파일 형식에서 오는 제한입니다.
 
-- 맵(BD1) 하나가 쓸 수 있는 텍스처는 10개입니다.
+- 맵(BD1) 하나가 쓸 수 있는 텍스처는 10개입니다. BD2 에는 이 제한이 없습니다.
 - 미션 파일(PD1)의 포인트 값은 0~255 범위입니다. 사람·무기·오브젝트 번호도 이 범위 안에서만 가리킬 수 있습니다.
 - 동시에 존재할 수 있는 수: 떨어진 무기 200개, 탄환 160개. 넘으면 새로 생기지 않습니다.
 - 이펙트는 기본 256개이고 모자라면 늘어납니다 (`effect_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`).

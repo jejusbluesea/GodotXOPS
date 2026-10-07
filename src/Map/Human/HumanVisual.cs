@@ -261,6 +261,29 @@ namespace GodotXOPS
             }
         }
 
+        // 이번 틱에 다리 애니메이션이 발이 땅에 닿는 순간(footstepPhase)을 지났는지. TickLeg 가 갱신한다.
+        public bool FootstepDue { get; private set; }
+
+        /// <summary>
+        /// 다리 애니메이션의 위상이 이번 틱에 발이 닿는 순간을 하나라도 지났는지 본다. 사이클이 끝나 처음으로 돌아간 경우도 센다.
+        /// </summary>
+        /// <param name="phases">발이 닿는 순간들 (사이클 비율).</param>
+        /// <param name="previous">틱 전의 위상 (사이클 비율).</param>
+        /// <param name="current">틱 후의 위상 (사이클 비율).</param>
+        /// <returns>지났으면 true.</returns>
+        private static bool CrossedFootstepPhase(List<float> phases, float previous, float current)
+        {
+            if (phases == null) return false;
+
+            bool wrapped = current < previous;
+            for (int i = 0; i < phases.Count; i++)
+            {
+                float phase = phases[i];
+                if (wrapped ? (phase > previous || phase <= current) : (phase > previous && phase <= current)) return true;
+            }
+            return false;
+        }
+
         /// <summary>
         /// 매 틱 HumanController 가 호출한다. 이동 플래그와 몸통 yaw 에 따라 다리 메시 프레임과 다리 방향을 갱신한다.
         /// 원본 HumanMotionControl::ProcessObject (object.cpp:3396-3540) 포팅.
@@ -271,6 +294,8 @@ namespace GodotXOPS
         /// <param name="alive">생존 여부.</param>
         public void TickLeg(float dt, HumanMoveFlag moveFlag, float bodyYaw, bool alive)
         {
+            FootstepDue = false;
+
             const HumanMoveFlag directions = HumanMoveFlag.Forward | HumanMoveFlag.Back | HumanMoveFlag.Left | HumanMoveFlag.Right;
             bool walk = (moveFlag & HumanMoveFlag.Walk) != 0;
 
@@ -300,7 +325,9 @@ namespace GodotXOPS
             int frame = 0;
             if (cycle > 1e-6f && frameCount > 1)
             {
+                float previousPhase = m_legAnimationTime / cycle;
                 m_legAnimationTime = (m_legAnimationTime + dt) % cycle;
+                FootstepDue = alive && CrossedFootstepPhase(animation.footstepPhase, previousPhase, m_legAnimationTime / cycle);
                 frame = Mathf.FloorToInt(m_legAnimationTime / cycle * frameCount) % frameCount;
             }
             else

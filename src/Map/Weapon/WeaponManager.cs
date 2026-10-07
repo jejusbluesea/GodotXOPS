@@ -188,7 +188,7 @@ namespace GodotXOPS
             {
                 var direction = new Vector3(slot.velocity.X / horizontalSpeed, 0f, slot.velocity.Z / horizontalSpeed);
                 float distance = horizontalSpeed * dt;
-                if (MapLoader.RaycastBlock(slot.position, direction, distance + physics.groundCollisionMargin, out float hitDist))
+                if (MapLoader.RaycastBlock(BlockLayer.Human, slot.position, direction, distance + physics.groundCollisionMargin, out float hitDist))
                 {
                     slot.position += direction * Mathf.Max(0f, hitDist - physics.groundCollisionMargin);
                     slot.velocity.X = 0f;
@@ -204,7 +204,7 @@ namespace GodotXOPS
             if (slot.velocity.Y < physics.terminalVelocityY) slot.velocity.Y = physics.terminalVelocityY;
 
             float moveY = slot.velocity.Y * dt;
-            if (moveY < 0f && MapLoader.RaycastBlock(slot.position, Vector3.Down, -moveY + physics.groundCollisionMargin, out float groundDist))
+            if (moveY < 0f && MapLoader.RaycastBlock(BlockLayer.Human, slot.position, Vector3.Down, -moveY + physics.groundCollisionMargin, out float groundDist))
             {
                 slot.position += Vector3.Down * (groundDist - physics.groundCollisionMargin);
                 slot.velocity = Vector3.Zero;

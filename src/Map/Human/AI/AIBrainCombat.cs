@@ -271,10 +271,10 @@ namespace GodotXOPS
             Vector3 reach = direction * m_controller.MapRadius;
 
             Vector3 waist = position + Vector3.Up * (m_controller.Height * 0.5f);
-            if (MapLoader.IsInsideBlock(waist + reach) || MapLoader.IsInsideBlock(waist + reach * 0.5f)) return true;
+            if (MapLoader.IsInsideBlock(BlockLayer.Human, waist + reach) || MapLoader.IsInsideBlock(BlockLayer.Human, waist + reach * 0.5f)) return true;
 
             Vector3 ground = position + Vector3.Down * k_cliffProbeDepth;
-            return !MapLoader.IsInsideBlock(ground + reach) && !MapLoader.IsInsideBlock(ground + reach * 0.5f);
+            return !MapLoader.IsInsideBlock(BlockLayer.Human, ground + reach) && !MapLoader.IsInsideBlock(BlockLayer.Human, ground + reach * 0.5f);
         }
     }
 }

@@ -240,10 +240,10 @@ namespace GodotXOPS
             Vector3 center = camera.GlobalPosition + forward * camera.Near;
 
             int result = 0;
-            if (MapLoader.IsInsideBlock(center + up * halfHeight)) result |= BlindTop;
-            if (MapLoader.IsInsideBlock(center - up * halfHeight)) result |= BlindBottom;
-            if (MapLoader.IsInsideBlock(center - right * halfWidth)) result |= BlindLeft;
-            if (MapLoader.IsInsideBlock(center + right * halfWidth)) result |= BlindRight;
+            if (MapLoader.IsInsideBlock(BlockLayer.Human, center + up * halfHeight)) result |= BlindTop;
+            if (MapLoader.IsInsideBlock(BlockLayer.Human, center - up * halfHeight)) result |= BlindBottom;
+            if (MapLoader.IsInsideBlock(BlockLayer.Human, center - right * halfWidth)) result |= BlindLeft;
+            if (MapLoader.IsInsideBlock(BlockLayer.Human, center + right * halfWidth)) result |= BlindRight;
             return result;
         }
 

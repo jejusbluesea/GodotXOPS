@@ -280,7 +280,7 @@ namespace GodotXOPS
             if (distance > 0f)
             {
                 Vector3 eye = position + Vector3.Up * m_controller.CameraHeight;
-                if (MapLoader.RaycastBlock(eye, toTarget / distance, distance, out _)) return false;
+                if (MapLoader.RaycastBlock(BlockLayer.Sight, eye, toTarget / distance, distance, out _)) return false;
             }
 
             m_enemy = target;

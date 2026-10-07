@@ -90,6 +90,16 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 그 위치에서 난 소리가 지금 듣는 위치에서 들리는지 알려 준다.
+        /// </summary>
+        /// <param name="position">소리가 나는 위치.</param>
+        /// <returns>거리 감쇠가 0 보다 크면 true.</returns>
+        public bool IsAudible(Vector3 position)
+        {
+            return Attenuation(position, ListenerPosition) > 0f;
+        }
+
+        /// <summary>
         /// 목록에서 하나를 무작위로 골라 재생한다. 같은 경로를 여러 번 넣어 확률에 가중치를 줄 수 있다.
         /// </summary>
         /// <param name="relativePaths">WAV 경로 목록. 비어 있으면 무시.</param>

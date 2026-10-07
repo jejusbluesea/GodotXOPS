@@ -875,7 +875,7 @@ namespace GodotXOPS.Dev
                 Vector3 eye = feet + Vector3.Up * human.CameraHeight;
                 for (float yaw = 0f; yaw < 360f && watcher == null; yaw += 15f)
                 {
-                    if (!MapLoader.RaycastBlock(eye, Coord.YawForward(yaw), 15f, out float distance) || distance < 4f) continue;
+                    if (!MapLoader.RaycastBlock(BlockLayer.Sight, eye, Coord.YawForward(yaw), 15f, out float distance) || distance < 4f) continue;
 
                     watcher = human;
                     origin = feet;

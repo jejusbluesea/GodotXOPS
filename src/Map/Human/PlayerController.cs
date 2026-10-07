@@ -299,7 +299,7 @@ namespace GodotXOPS
                 + Vector3.Up * (k_thirdPersonPivotHeight + Mathf.Cos(pitchRad) * k_thirdPersonHeightBias);
 
             float dist = k_thirdPersonMaxDist;
-            if (MapLoader.RaycastBlock(focus, -look, k_thirdPersonMaxDist, out float hitDist))
+            if (MapLoader.RaycastBlock(BlockLayer.Human, focus, -look, k_thirdPersonMaxDist, out float hitDist))
             {
                 dist = Mathf.Max(0f, hitDist - k_thirdPersonWallMargin);
             }

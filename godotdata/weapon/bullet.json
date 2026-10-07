@@ -31,14 +31,10 @@
             "explosionknockbackMax": 0.0,
             "explosionSound": "",
             "explosionEffectIndex": -1,
-            "wallHitEffectIndex": 6,
+            "bulletHoleSize": 1.0,
             "humanHitEffectIndex": 4,
             "objectHitEffectIndex": 7,
-            "wallHitSounds": [
-                "data/sound/hit1.wav",
-                "data/sound/hit1.wav",
-                "data/sound/hit3.wav"
-            ],
+            "bounceSounds": [],
             "humanHitSounds": [
                 "data/sound/hit2.wav"
             ],
@@ -78,10 +74,10 @@
             "explosionknockbackMax": 0.22,
             "explosionSound": "data/sound/bang.wav",
             "explosionEffectIndex": 8,
-            "wallHitEffectIndex": -1,
+            "bulletHoleSize": 1.0,
             "humanHitEffectIndex": 4,
             "objectHitEffectIndex": -1,
-            "wallHitSounds": [
+            "bounceSounds": [
                 "data/sound/cco.wav"
             ],
             "humanHitSounds": [],

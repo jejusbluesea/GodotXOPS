@@ -1,0 +1,22 @@
+{
+  "blockMaterialGeneralData": {
+    "footstepWalkVolume": 0.15,
+    "footstepRunVolume": 0.3,
+    "footstepLandingVolume": 0.4
+  },
+  "blockMaterialData": [
+    {
+      "name": "Default",
+      "footstepWalk": [],
+      "footstepRun": [],
+      "footstepLanding": [],
+      "hitSounds": [
+        "data/sound/hit1.wav",
+        "data/sound/hit1.wav",
+        "data/sound/hit3.wav"
+      ],
+      "hitEffect": 6,
+      "bulletHoleEffect": 0
+    }
+  ]
+}

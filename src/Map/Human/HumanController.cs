@@ -239,6 +239,7 @@ namespace GodotXOPS
         /// <summary>
         /// 이번 틱의 움직임에 맞는 발소리를 낸다. 원본 ObjectManager::Process 의 발소리 부분 (objectmanager.cpp:2771-2805).
         /// 종류는 이번 틱에 소비한 이동 입력으로 정하고 (걷기 → 전진 → 후진 → 좌우 순으로 먼저 걸리는 것), 점프와 착지는 따로 낸다.
+        /// AI 가 듣는 신호는 원본처럼 매 틱 내고, 들리는 소리(원본에 없다)는 다리 애니메이션에서 발이 땅에 닿는 틱에만 낸다.
         /// </summary>
         private void EmitFootsteps()
         {
@@ -246,13 +247,29 @@ namespace GodotXOPS
             // 날고 있으면 발이 땅에 닿지 않는다.
             if (m_flight) return;
 
-            if ((m_moveFlagLt & HumanMoveFlag.Walk) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Walk);
-            else if ((m_moveFlagLt & HumanMoveFlag.Forward) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Forward);
-            else if ((m_moveFlagLt & HumanMoveFlag.Back) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Back);
-            else if ((m_moveFlagLt & (HumanMoveFlag.Left | HumanMoveFlag.Right)) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Side);
+            bool moving = true;
+            FootstepKind kind = FootstepKind.Walk;
+            if ((m_moveFlagLt & HumanMoveFlag.Walk) != 0) kind = FootstepKind.Walk;
+            else if ((m_moveFlagLt & HumanMoveFlag.Forward) != 0) kind = FootstepKind.Forward;
+            else if ((m_moveFlagLt & HumanMoveFlag.Back) != 0) kind = FootstepKind.Back;
+            else if ((m_moveFlagLt & (HumanMoveFlag.Left | HumanMoveFlag.Right)) != 0) kind = FootstepKind.Side;
+            else moving = false;
 
-            if (m_landedHard) WorldSound.EmitFootstep(m_human, FootstepKind.Landing);
-            else if ((m_moveFlagLt & HumanMoveFlag.Jump) != 0) WorldSound.EmitFootstep(m_human, FootstepKind.Jump);
+            if (moving)
+            {
+                WorldSound.EmitFootstep(m_human, kind);
+                if (m_grounded && m_human.HumanVisual != null && m_human.HumanVisual.FootstepDue) WorldSound.PlayFootstep(m_human, kind);
+            }
+
+            if (m_landedHard)
+            {
+                WorldSound.EmitFootstep(m_human, FootstepKind.Landing);
+                WorldSound.PlayFootstep(m_human, FootstepKind.Landing);
+            }
+            else if ((m_moveFlagLt & HumanMoveFlag.Jump) != 0)
+            {
+                WorldSound.EmitFootstep(m_human, FootstepKind.Jump);
+            }
         }
 
         /// <summary>
@@ -426,7 +443,7 @@ namespace GodotXOPS
                             pos.X + m_moveVelocity.X * k_embedPredictionTime,
                             shoulderY,
                             pos.Z + m_moveVelocity.Z * k_embedPredictionTime);
-                        if (MapLoader.IsInsideBlock(predicted))
+                        if (MapLoader.IsInsideBlock(BlockLayer.Human, predicted))
                         {
                             pos = pos2;
                             if (m_moveVelocity.Y > 0f) m_moveVelocity.Y = 0f;
@@ -562,7 +579,7 @@ namespace GodotXOPS
                 Vector3 travel = pos - pos2;
                 float travelLength = travel.Length();
                 if (travelLength > 1e-6f
-                    && MapLoader.RaycastBlock(pos2 + Vector3.Up * (H - k_moveCheckOffset), travel / travelLength, travelLength, out _))
+                    && MapLoader.RaycastBlock(BlockLayer.Human, pos2 + Vector3.Up * (H - k_moveCheckOffset), travel / travelLength, travelLength, out _))
                 {
                     pos = pos2;
                 }
@@ -649,7 +666,7 @@ namespace GodotXOPS
                         break;
                     }
 
-                    if (MapLoader.IsInsideBlock(m_position + HeadOffset(predictedPitch)))
+                    if (MapLoader.IsInsideBlock(BlockLayer.Human, m_position + HeadOffset(predictedPitch)))
                     {
                         if (Mathf.Abs(predictedPitch) > k_deadFlatLayPitch)
                         {
@@ -693,8 +710,8 @@ namespace GodotXOPS
                     Vector3 slide = -Coord.YawForward(m_rotationX) * (Mathf.Sin(Mathf.DegToRad(deltaPitch)) * Height);
                     Vector3 nextPosition = m_position + slide;
 
-                    if (MapLoader.IsInsideBlock(nextPosition + Vector3.Up * 0.1f)
-                        || MapLoader.IsInsideBlock(nextPosition + HeadOffset(predictedPitch)))
+                    if (MapLoader.IsInsideBlock(BlockLayer.Human, nextPosition + Vector3.Up * 0.1f)
+                        || MapLoader.IsInsideBlock(BlockLayer.Human, nextPosition + HeadOffset(predictedPitch)))
                     {
                         m_deadAddRy = 0f;
                         m_human.SetDeadState(HumanDeadState.Settling);
@@ -811,7 +828,7 @@ namespace GodotXOPS
             Vector3 lo = pos - margin;
             Vector3 hi = pos + margin + Vector3.Up * height;
 
-            IReadOnlyList<Block> all = MapLoader.BlockColliders;
+            IReadOnlyList<Block> all = MapLoader.GetBlockColliders(BlockLayer.Human);
             for (int i = 0; i < all.Count; i++)
             {
                 if (all[i].OverlapsAABB(lo, hi)) m_nearBlocks.Add(all[i]);

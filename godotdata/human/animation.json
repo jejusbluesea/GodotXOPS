@@ -8,7 +8,8 @@
                 ],
                 "forwardSpeed": 1,
                 "strafeSpeed": 1,
-                "backwardSpeed": 1
+                "backwardSpeed": 1,
+                "footstepPhase": []
             },
             {
                 "name": "Walk",
@@ -20,7 +21,8 @@
                 ],
                 "forwardSpeed": 0.72,
                 "strafeSpeed": 0.72,
-                "backwardSpeed": 0.72
+                "backwardSpeed": 0.72,
+                "footstepPhase": [0.0, 0.5]
             },
             {
                 "name": "Run",
@@ -34,7 +36,8 @@
                 ],
                 "forwardSpeed": 0.72,
                 "strafeSpeed": 1.08,
-                "backwardSpeed": 1.44
+                "backwardSpeed": 1.44,
+                "footstepPhase": [0.0, 0.5]
             }
         ]
     }

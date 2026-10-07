@@ -242,9 +242,9 @@ namespace GodotXOPS.Dev
             Expect(controller.Position == overlap, "비행 중인데 사람에게 밀림");
 
             // 블록 안으로 들어가도 밀려나지 않는다. 맵의 블록 하나의 한가운데로 옮겨 놓고 틱을 돌린다.
-            if (MapLoader.BlockColliders.Count > 0)
+            if (MapLoader.GetBlockColliders(BlockLayer.Human).Count > 0)
             {
-                Block block = MapLoader.BlockColliders[0];
+                Block block = MapLoader.GetBlockColliders(BlockLayer.Human)[0];
                 Vector3 inside = (block.boundsMin + block.boundsMax) * 0.5f;
                 controller.Teleport(inside);
                 for (int i = 0; i < 5; i++) SimClock.Step();

@@ -9,7 +9,8 @@ namespace GodotXOPS.Dev
     /// 개발용 맵 뷰어. 미션을 골라 블록과 스카이를 로드하고 자유 카메라로 날아다니며 확인한다.
     /// 조작: 마우스 오른쪽 버튼을 누른 채 시점 회전, 이동 키(move 바인딩)로 이동, Q/E 하강/상승, 왼쪽 Shift 가속.
     /// 명령행 인자("--" 뒤): --selftest 는 모든 미션을 로드해 보고 종료, --screenshot 경로 는 화면을 PNG 로 저장하고 종료,
-    /// --mission 번호 / --addon 은 시작 미션 지정, --cam x,y,z,yaw,pitch 는 카메라 위치·각도(도) 지정.
+    /// --mission 번호 / --addon 은 시작 미션 지정, --cam x,y,z,yaw,pitch 는 카메라 위치·각도(도) 지정,
+    /// --file 경로 는 미션 대신 블록 데이터 파일(BD1, BD2) 하나를 띄운다 (exe 폴더 기준 경로).
     /// </summary>
     public partial class MapViewer : Node3D
     {
@@ -64,7 +65,12 @@ namespace GodotXOPS.Dev
                 bool addon = Array.IndexOf(args, "--addon") >= 0;
                 start = m_entries.FindIndex(entry => entry.mif == addon && entry.index == missionIndex);
             }
-            if (start >= 0 && start < m_entries.Count)
+            int fileArg = Array.IndexOf(args, "--file");
+            if (fileArg >= 0 && fileArg + 1 < args.Length)
+            {
+                LoadFile(args[fileArg + 1]);
+            }
+            else if (start >= 0 && start < m_entries.Count)
             {
                 m_missionSelect.Select(start);
                 LoadEntry(start);
@@ -191,16 +197,38 @@ namespace GodotXOPS.Dev
             bool ok = MapLoader.LoadBlockData(loader.MissionBD1Path);
             MapLoader.LoadSkyData(loader.SkyIndex);
 
-            if (ok && GetMapBounds(out Vector3 min, out Vector3 max))
-            {
-                Vector3 center = (min + max) * 0.5f;
-                Vector3 size = max - min;
-                m_camera.Position = new Vector3(center.X, max.Y + 5f, center.Z + size.Z * 0.35f);
-                m_yaw = 0f;
-                m_pitch = 25f;
-                ApplyCameraRotation();
-            }
+            if (ok) PlaceCameraAboveMap();
             return ok;
+        }
+
+        /// <summary>
+        /// 미션 정보 없이 블록 데이터 파일 하나를 로드하고 카메라를 맵 위쪽에 둔다. 확장자로 BD1 과 BD2 를 가린다.
+        /// </summary>
+        /// <param name="relativePath">exe 폴더 기준 경로.</param>
+        /// <returns>블록 로드에 성공했으면 true.</returns>
+        private bool LoadFile(string relativePath)
+        {
+            MapLoader.UnloadMissionData();
+            bool ok = MapLoader.LoadBlockData(GamePath.Resolve(relativePath));
+            MapLoader.LoadSkyData(0);
+
+            if (ok) PlaceCameraAboveMap();
+            return ok;
+        }
+
+        /// <summary>
+        /// 카메라를 로드된 맵의 위쪽에 두고 맵을 내려다보게 한다.
+        /// </summary>
+        private void PlaceCameraAboveMap()
+        {
+            if (!GetMapBounds(out Vector3 min, out Vector3 max)) return;
+
+            Vector3 center = (min + max) * 0.5f;
+            Vector3 size = max - min;
+            m_camera.Position = new Vector3(center.X, max.Y + 5f, center.Z + size.Z * 0.35f);
+            m_yaw = 0f;
+            m_pitch = 25f;
+            ApplyCameraRotation();
         }
 
         /// <summary>
@@ -238,15 +266,15 @@ namespace GodotXOPS.Dev
             Vector3 position = m_camera.GlobalPosition;
             Vector3 forward = -m_camera.GlobalBasis.Z;
 
-            string hit = MapLoader.RaycastBlock(position, forward, 0f, out float dist, out Vector3 normal)
+            string hit = MapLoader.RaycastBlock(BlockLayer.Human, position, forward, 0f, out float dist, out Vector3 normal)
                 ? $"{dist:0.00} m, 법선 ({normal.X:0.00}, {normal.Y:0.00}, {normal.Z:0.00})"
                 : "없음";
 
             m_info.Text =
                 $"{loader.MissionFullname}  |  하늘 {loader.SkyIndex}, 어두운 화면 {(loader.DarkScreen ? "예" : "아니오")}\n" +
-                $"블록 {MapLoader.Blocks.Count} (충돌 {MapLoader.BlockColliders.Count})  |  {Engine.GetFramesPerSecond():0} fps\n" +
+                $"블록 {MapLoader.Blocks.Count} (충돌 {MapLoader.GetBlockColliders(BlockLayer.Human).Count})  |  {Engine.GetFramesPerSecond():0} fps\n" +
                 $"카메라 ({position.X:0.0}, {position.Y:0.0}, {position.Z:0.0}) yaw {m_yaw:0} pitch {m_pitch:0}\n" +
-                $"정면 레이: {hit}  |  블록 내부: {(MapLoader.IsInsideBlock(position) ? "예" : "아니오")}\n" +
+                $"정면 레이: {hit}  |  블록 내부: {(MapLoader.IsInsideBlock(BlockLayer.Human, position) ? "예" : "아니오")}\n" +
                 "마우스 오른쪽 버튼 + 이동: 시점  |  이동 키  |  Q/E 하강/상승  |  Shift 가속";
         }
 
@@ -272,16 +300,16 @@ namespace GodotXOPS.Dev
                 totalBlocks += MapLoader.Blocks.Count;
 
                 // 충돌 블록의 한가운데 위에서 아래로 쏘면 반드시 그 블록(또는 더 위의 블록)에 맞아야 한다.
-                if (MapLoader.BlockColliders.Count > 0)
+                if (MapLoader.GetBlockColliders(BlockLayer.Human).Count > 0)
                 {
-                    Block block = MapLoader.BlockColliders[0];
+                    Block block = MapLoader.GetBlockColliders(BlockLayer.Human)[0];
                     Vector3 center = (block.boundsMin + block.boundsMax) * 0.5f;
                     var origin = new Vector3(center.X, 1000f, center.Z);
-                    if (!MapLoader.RaycastBlock(origin, Vector3.Down, 0f, out float dist) || dist > 1000f - block.boundsMin.Y + 0.01f)
+                    if (!MapLoader.RaycastBlock(BlockLayer.Human, origin, Vector3.Down, 0f, out float dist) || dist > 1000f - block.boundsMin.Y + 0.01f)
                     {
                         failures.Add($"{label}: 아래 방향 레이가 블록에 맞지 않음");
                     }
-                    if (!MapLoader.IsInsideBlock(block.position) && block.Contains(block.position))
+                    if (!MapLoader.IsInsideBlock(BlockLayer.Human, block.position) && block.Contains(block.position))
                     {
                         failures.Add($"{label}: 내부 판정 불일치");
                     }

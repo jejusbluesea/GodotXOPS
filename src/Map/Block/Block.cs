@@ -3,14 +3,33 @@ using Godot;
 namespace GodotXOPS
 {
     /// <summary>
-    /// BD1 파일에서 읽어낸 블록의 원시 데이터(정점, UV, 텍스처 인덱스, 플래그)를 담는 구조체. 정점은 Godot 좌표다.
+    /// 블록과의 판정 종류. 블록마다 판정별로 충돌 여부가 다를 수 있다 (BD2 의 블록 플래그). 값은 플래그의 비트 번호와 같다.
+    /// </summary>
+    public enum BlockLayer
+    {
+        // 사람의 이동·맵 충돌, 매몰 판정, 발밑 레이, 이동 경로 레이, 벽 블라인드, 떨어진 무기와 소물의 바닥.
+        Human = 0,
+        // 총알의 소멸과 수류탄의 반사.
+        Bullet = 1,
+        // AI 의 시야와 사선, 폭발 가림.
+        Sight = 2,
+    }
+
+    /// <summary>
+    /// BD1 이나 BD2 파일에서 읽어낸 블록의 원시 데이터를 담는 구조체. 어느 형식에서 읽었든 같은 모양이다.
+    /// 정점은 Godot 좌표이고, 면 f 의 v 번째 정점의 UV 는 uvs[f * 4 + v] 다.
     /// </summary>
     public struct RawBlockData
     {
         public Vector3[] vertices;
         public Vector2[] uvs;
         public int[] textureIndices;
-        public int flag;
+        // 면마다의 재질 번호. BD1 에는 재질이 없어 null 이다.
+        public int[] materialIndices;
+        // true 면 passFlags 로 충돌 여부를 정한다 (BD2). false 면 정점 모양으로 판형 블록인지 추론한다 (BD1).
+        public bool hasPassFlags;
+        // 판정을 끄는 비트 (BD2File.PassHuman / PassBullet / PassSight).
+        public int passFlags;
     }
 
     /// <summary>
@@ -23,13 +42,28 @@ namespace GodotXOPS
         // mesh 의 서피스 순서와 같은 순서의 텍스처 인덱스.
         public int[] surfaceTextureIndices;
         public Vector3 position;
-        public bool collider;
+        // 파일 안에서의 블록 번호.
+        public int index;
+        // 충돌하는 판정의 비트 (1 << BlockLayer). 0 이면 어떤 판정에도 걸리지 않는다 (판형 블록).
+        public int layerMask;
+        // 면마다의 재질 번호. 재질이 없는 맵(BD1)이면 null.
+        public int[] faceMaterials;
         public Vector3[] faceNormals;
         public Vector3[] faceCenters;
 
         // 블록 8정점을 감싸는 월드 AABB. 맵 로드 시 1회 계산. 충돌 브로드페이즈 fast-reject 용.
         public Vector3 boundsMin;
         public Vector3 boundsMax;
+
+        /// <summary>
+        /// 이 블록이 해당 판정에서 충돌하는지 알려 준다.
+        /// </summary>
+        /// <param name="layer">판정 종류.</param>
+        /// <returns>충돌하면 true.</returns>
+        public bool Collides(BlockLayer layer)
+        {
+            return (layerMask & (1 << (int)layer)) != 0;
+        }
 
         /// <summary>
         /// 이 블록의 월드 AABB가 주어진 AABB(min~max)와 겹치는지 판정한다. 브로드페이즈 프리필터용 싸구려 테스트.
@@ -45,14 +79,12 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 주어진 월드 좌표가 블록 내부에 있는지 판정한다.
+        /// 주어진 월드 좌표가 블록 내부에 있는지 판정한다. 블록이 어느 판정에서 충돌하는지는 보지 않는다 (호출하는 쪽이 판정별 목록에서 블록을 고른다).
         /// </summary>
         /// <param name="worldPoint">판정할 월드 좌표.</param>
         /// <returns>내부이면 true, 외부이면 false.</returns>
         public bool Contains(Vector3 worldPoint)
         {
-            if (!collider) return false;
-
             for (int i = 0; i < 6; i++)
             {
                 float d = faceNormals[i].Dot(faceCenters[i] - worldPoint);
@@ -74,8 +106,6 @@ namespace GodotXOPS
         {
             hitFace = -1;
             hitDist = 0f;
-
-            if (!collider) return false;
 
             float minT = (maxDist > 0f) ? maxDist : float.MaxValue;
             int foundFace = -1;

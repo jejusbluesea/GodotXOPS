@@ -22,7 +22,7 @@
 | 10. 마무리 (부자연스러운 부분 수정, OPTION, 빌드) | 완료 (사용자 최종 확인 남음) | `ui/mainmenu_option.gd`, `export_presets.cfg`, `xops.png` |
 | 릴리즈 1.0.0 | 완료 (2026-10-05, 태그 `v1.0.0`) | `build/1.0/` (커밋하지 않는다) |
 | 릴리즈 1.0.1 (팔 동작 수정, 디버그 콘솔) | 완료 (2026-10-05, 태그 `v1.0.1`) | `build/1.0.1/` (커밋하지 않는다) |
-| 1.1.0 확장 파일 형식 | **작업 중** (아래 "1.1.0 설계"). 이펙트 외부 데이터화는 끝나고 커밋했다. 착탄 면의 법선을 이펙트에 넘기는 작업도 커밋했다. 다음은 BD2 다 | `src/Map/Effect/`, `src/Dev/EffectViewer.cs`, `shaders/effect_blend_add.gdshader` |
+| 1.1.0 확장 파일 형식 | **작업 중** (아래 "1.1.0 설계"). 이펙트 외부 데이터화, 착탄 면의 법선, 이펙트 데이터 정리(`effect_data.json`)는 커밋했다. **BD2 는 재질(착탄, 통과 블록, 발소리)까지 끝났다 (2026-10-07, 커밋 전). 다음은 PD2 다** | `src/IO/BD2File.cs`, `src/Map/Block/`, `src/Data/Block/`, `src/Dev/BD2Check.cs`, `src/Map/Effect/` |
 
 ## 점검 씬 (작업을 마칠 때마다 전부 통과해야 한다)
 
@@ -39,6 +39,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 
 | `res://scenes/dev/ai_check.tscn` | — | 85항목: 시야(정면·등 뒤·같은 팀·비전투·벽), 청각(총성·발소리·피격 방향), 경계 시간과 팔 각도, 조준 예측, 재장전·버리기·무기 들기, 수류탄(바꾸지 않고 던지기), 좀비 근접 공격과 전투 뒤 팔 내리기, 경로(걷기·대기·랜덤 분기·번호 겹침·우선적 달리기·5초 정지), 이벤트 세 줄, 자동 판정, 복제 |
 | `res://scenes/dev/effect_viewer.tscn` | `-- --selftest` | 23항목: 프리셋별 입자 수, 풀 초기 크기·묶음 증가·한계, 블렌드 모드별 머티리얼과 셰이더, 가산의 발광 감쇠 회수 |
+| `res://scenes/dev/bd2_check.tscn` | — | 228항목: 재질(번호 규칙, 착탄 이펙트·소리, 발소리 종류와 박자), 예약 플래그 비트, 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽은 결과(바이트 왕복, 파일 크기)와 로드한 뒤의 블록·메시·판정별 레이 200개·내부 판정 200점 대조, 블록 플래그별 통과, 그리지 않는 면, 재질 번호 전달, 텍스처 목록이 없을 때, 깨진 파일 |
 | `res://scenes/dev/ui_check.tscn` | — | 94항목: 미션 목록·버전·크레딧, 오프닝·메뉴 배경 로드, 장면 카메라, 미션 흐름(로드 → 시작 → 재시작 → 맵 내리기 → 전부 내리기), HUD 가 읽는 플레이어 값, 스코프 정보, 3D 무기 표시, 디버그 콘솔 명령(무기 탄 수, 좌표 이동, 비행, 판정 표시 포함)과 입력 차단 |
 
 화면 스크립트는 헤드리스로 한 번씩 띄워 오류가 없는지 본다 (씬을 지정하지 않고 `--headless --path . -- --scene 이름 [--mission 번호] --ui-quit 초`). 인자는 `CLAUDE.md`의 "빌드와 실행" 참조.
@@ -87,7 +88,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 - 좌표·각도 변환은 `Coord`만 쓴다. 각도는 UnityXOPS 규약(도, yaw 오른쪽 +, pitch 아래 +).
 - JSON 에 있는 값은 그대로 읽는다. 원본 상수로 하드코딩하지 않는다.
 - 조작감에 직결되는 코드는 UnityXOPS 와 원본 C++ 를 함께 대조하고, 계산 방식이 다르면 표로 사용자에게 올려 결정을 받는다. 지금까지의 경향: 원본의 어색한 동작을 UnityXOPS 가 고친 것은 UnityXOPS 를, UnityXOPS 가 엔진 사정으로 근사한 것(물리 레이, 실수 초 타이머, 렌더 프레임 계산)은 원본 방식을 택했다.
-- 작업을 마치면 점검 씬 8개를 전부 돌리고, `--headless --path . --import`로 새 `.cs.uid`를 만든 뒤 함께 커밋한다. 빌드 경고 0개.
+- 작업을 마치면 점검 씬 10개를 전부 돌리고, `--headless --path . --import`로 새 `.cs.uid`를 만든 뒤 함께 커밋한다. 빌드 경고 0개.
 
 ## 6단계에서 정한 것
 
@@ -204,7 +205,7 @@ Godot 콘솔 실행 파일로 `--headless --path . <씬> [-- 인자]` 형식으�
 2. **1.1.0 "Voyage of Extended Filesystem Part 1"**: 확장 블록·포인트·미션 데이터, 함께 들어갈 기능 일부, 이펙트 외부 데이터화. 설계는 아래 "1.1.0 설계"에 있다.
    - **이펙트 외부 데이터화는 커밋했다** (2026-10-06). 사용자가 창에서 돌려 봤다.
    - **착탄 면의 법선을 이펙트에 넘기는 작업도 커밋했다** (2026-10-06, 아래 "이펙트 외부 데이터화"의 "착탄 면의 법선"). 사용자가 창에서 확인했다.
-   - 그 다음은 **BD2(확장 블록 데이터)** 다. 레이아웃까지 정해져 있어 바로 들어갈 수 있다. 순서는 `src/IO/` 의 BD2 읽기·쓰기 → 텍스처 목록 JSON → `MapLoader` 의 블록 레이어 3분할 → 재질 전역 JSON 과 발소리·총알 이펙트 연결 → 점검 씬.
+   - **BD2 는 재질까지 끝났다** (2026-10-07, "BD2 구현"과 그 아래 "재질"). 다음은 PD2, 그 뒤가 MIF2 다 (에드온 데이터와 10000 번호 규칙의 조회 함수는 MIF2 단계에서 한다).
 3. **릴리즈 뒤에 나오는 버그 수정.** 사용자가 빌드에서 직접 확인하지 못했을 수 있는 것 (내가 화면으로 확인하지 못했거나 직접 판단할 수 없는 것):
    - OPTION: 해상도·전체화면을 바꾸고 SAVE 했을 때의 화면, UIScale 이 1 보다 클 때의 배치, RESET.
    - 4K 에서 브리핑 본문·크레딧 글자와 HUD 무기 그림의 선명도 (1080p 까지만 스크린샷으로 봤다).
@@ -320,11 +321,76 @@ MIF2 는 JSON 이고 확장자는 `.mif2` 다 (사용자 결정. `MD2` 는 버�
   - 사람: `humanData`, `humanModelData`, `humanArmModelData`, `humanLegModelData`, `humanTypeData`, `humanAIParameterData` 의 `aiData` · `aiScopeData`, 그리고 `controllerSizeData`, `humanHitboxSizeData`. 무시: `humanGeneralData`, `humanControllerData`, `humanInteractionData`, `humanAnimationData`, AI 의 전역 수치.
   - 무기: `weaponData`, `bulletData`, `scopeData`, `weaponModelData`. 무시: `weaponGeneralData`, `weaponAccuracyData`, `weaponDropPhysicsData`.
   - 오브젝트: `objectData`, `objectModelData`, `objectColliderData`. 무시: `objectGeneralData`.
-  - 이펙트: `effectData`, `effectTextureData`. 무시: `effectGeneralData`. **텍스처 목록을 `effectGeneralData.texturePaths` 에서 꺼내 최상위 `effectTextureData`(항목은 객체 `{ "texturePath": ... }`)로 옮기고, 파일 이름을 `effect_parameter_data.json` → `effect_data.json` 으로 바꿨다** (사용자 결정, 2026-10-07 구현. 커밋 전). `effectGeneralData` 에는 `wallBloodEffectIndex`, `decalSurfaceOffset`, 풀 크기 셋이 남는다 (사용자 확정). 컨테이너 클래스 이름 `EffectParameterData` 는 그대로다. 이 아래 "이펙트 외부 데이터화" 절의 옛 이름(`effect_parameter_data.json`, `texturePaths`)은 그때의 기록이다. 점검 씬 9개 통과, 빌드 경고 0.
+  - 이펙트: `effectData`, `effectTextureData`. 무시: `effectGeneralData`. **텍스처 목록을 `effectGeneralData.texturePaths` 에서 꺼내 최상위 `effectTextureData`(항목은 객체 `{ "texturePath": ... }`)로 옮기고, 파일 이름을 `effect_parameter_data.json` → `effect_data.json` 으로 바꿨다** (사용자 결정, 2026-10-07 구현, 커밋 `7ff7bb2`). `effectGeneralData` 에는 `wallBloodEffectIndex`, `decalSurfaceOffset`, 풀 크기 셋이 남는다 (사용자 확정). 컨테이너 클래스 이름 `EffectParameterData` 는 그대로다. 이 아래 "이펙트 외부 데이터화" 절의 옛 이름(`effect_parameter_data.json`, `texturePaths`)은 그때의 기록이다. 점검 씬 9개 통과, 빌드 경고 0.
   - 사람의 `controllerSizeData`, `humanHitboxSizeData` 도 에드온으로 받는다 (사용자 확정).
 - MIF2 의 키 이름은 `addonHumanDataPath`, `addonWeaponDataPath`, `addonObjectDataPath`, `addonEffectDataPath`, `addonBlockMaterialDataPath` 다 (사용자 확정. 기존 `bd1Path`, `mifPath` 처럼 경로는 `Path` 로 끝낸다).
 - **10000 규칙의 범위 검사**: 번호에서 10000 을 빼기만 하면 범위를 벗어날 수 있다 (에드온 데이터 파일을 적지 않은 MIF2 에서 10000 이상, 에드온 항목 수를 넘는 번호, 기본 항목 수와 9999 사이의 빈 구간, 음수). 조회 함수 하나가 네 경우를 모두 "없음"으로 돌려주고 호출하는 쪽은 지금의 범위 밖 처리를 그대로 쓴다. 기본 목록이 10000 개 이상이면 로드할 때 오류로 잡는다.
 - 구현할 때: 지금 코드는 `parameter.weaponData[index]` 처럼 목록을 직접 인덱싱하고 `index >= Count` 로 범위를 본다. 10000 으로 가르려면 번호를 받는 조회 함수를 두고 모든 지점을 그쪽으로 돌려야 한다. 맵을 내릴 때 에드온 데이터를 비운다.
+
+### BD2 구현 (2026-10-07. 커밋 전)
+
+한 것:
+
+- **`src/IO/BD2File.cs`** — 읽기·쓰기. 게임 싱글톤과 무관하다 (Godot 의 `Vector3` / `Vector2` 만 쓴다). 매직, 경로 길이(4096 바이트 한계), 파일 길이를 확인하고 실패 이유를 영어 문자열로 돌려준다.
+- **텍스처 목록 JSON** — `src/Data/Block/BlockTextureListData.cs`(`blockTextureData` 배열), `BlockTextureData.cs`(`diffusePath`). 키 이름 `diffusePath` 는 내가 정했다 (설계 때는 `{ "diffuse": ... }` 라고만 적었다. 다른 경로 키가 전부 `Path` 로 끝난다).
+- **로더 통합** — `MapLoader.LoadBlockData` 가 확장자로 가른다. BD1 의 UV 한 칸 회전을 BD1 로더 안으로 옮겨 `RawBlockData.uvs[f * 4 + v]` 가 두 형식에서 같은 뜻이 됐다. 텍스처 경로도 로더가 전체 경로로 만들어 넘긴다. BD2 로더는 `src/Map/Block/BlockDataBD2.cs`.
+- **판정 레이어 3분할** — `BlockLayer { Human, Bullet, Sight }`, `Block.layerMask`(`collider` 를 대체), `MapLoader.GetBlockColliders(layer)`(`BlockColliders` 를 대체). `RaycastBlock` / `IsInsideBlock` 이 첫 인자로 레이어를 받고 기본값이 없다. 호출 지점 43곳을 나눴다:
+  - `Human`: `HumanController` 전부, `PlayerController` 3인칭 카메라, `GameBridge` 벽 블라인드, `WeaponManager` 떨어진 무기, `SmallObject.SnapToGround`, `AIBrainNavigation` 점프 확인, `AIBrainCombat.BlockedOrCliff`.
+  - `Bullet`: `Bullet.TickStraight`(진입점 레이, 점 샘플링), 수류탄 반사, `EffectManager` 의 혈흔 입자.
+  - `Sight`: `AIBrainAim` 시야, `Bullet` 의 폭발 가림 두 곳.
+  - 설계 표에 없던 것을 내가 정한 것: 3인칭 카메라·AI 점프/낭떠러지 확인은 `Human`, 혈흔 입자는 `Bullet`. 사용자 확인은 받지 않았다.
+- **플래그의 뜻** — 비트가 켜지면 그 판정이 통과한다 (`BD2File.PassHuman` 1, `PassBullet` 2, `PassSight` 4. 0 이면 전부 충돌). 설계 표의 "물 블록은 비트 0 과 2 를 끄고 1 을 켠다"는 "사람·시야 판정을 끄고 총알 판정은 둔다"는 뜻으로 읽었고, 이 규칙으로는 플래그 값 5 다.
+- **`Block`** 에 `index`(파일 안의 블록 번호)와 `faceMaterials`(면 재질 번호, BD1 이면 null)를 더했다. `RaycastBlock` 에 맞은 블록과 면 번호를 돌려주는 오버로드가 있다. 재질 구현은 이것만 쓰면 된다.
+- **변환기** — `MapLoader.ConvertBD1`. 텍스처 슬롯 10개 → 목록 10항목, 범위 밖 텍스처 번호 → −1, 판형 블록 → 플래그 7, 재질 전부 −1.
+- **도구** — `scenes/dev/bd2_check.tscn`(`src/Dev/BD2Check.cs`, `--convert 입력 출력`), `map_viewer` 의 `--file 경로`.
+- 문서: `docs/modding.md` "확장 블록 데이터 (BD2)", `docs/development.md`, `CLAUDE.md`.
+
+확인한 것: 점검 씬 10개 통과, 빌드 경고 0. `bd2_check` 에서 58개 맵의 BD1 과 BD2 가 블록 수·판정 비트·법선·범위·UV·레이 600개·내부 판정 600개까지 같다. `play_test --selftest` 의 수치(사망 22, 전투 중 77, 움직인 생존자 729)가 레이어를 나누기 전과 같다. `data/map2/temp.bd1` 과 변환한 BD2 를 같은 카메라로 찍은 PNG 가 바이트까지 같다.
+
+알아 둘 것:
+
+- 텍스처 목록 파일이 없거나 깨지면 블록과 판정은 로드되고 면은 전부 그려지지 않는다 (목록에 없는 번호는 그리지 않는 면이다). 에디터에서만 오류 로그가 남는다.
+- 점검은 변환한 파일을 `build/bd2_check/` 에 쓰고 끝나면 그 폴더만 지운다 (텍스처 목록 경로가 exe 폴더 기준이라 임시 폴더를 쓸 수 없다).
+- 미션에서 BD2 를 불러오는 길은 아직 없다 (MIF2 가 없다).
+
+#### 재질 (2026-10-07. 구현했다, 커밋 전)
+
+사용자 결정: 재질 전역 JSON 은 `godotdata/block_material_data.json`, 기본 데이터는 0번 하나다 (처음에는 NONE(무음)으로 정했다가 같은 날 "원본 벽"으로 바꿨다. 아래). 3인칭 카메라는 사람이 통과하는 블록에 막히지 않는다 (`Human` 판정을 쓰므로 이미 그렇다. 사용자가 확인을 구했고 그대로 두었다).
+
+- **데이터** — `BlockMaterialParameterData`(`blockMaterialGeneralData`, `blockMaterialData`), `src/Data/Parameter/Block/`. `DataManager.BlockMaterialParameterData`. `data_check` 가 이 파일도 대조한다.
+- **재질 조회** — `MapLoader.GetFaceMaterial(블록, 면)` (`src/Map/Block/BlockMaterial.cs`). BD1 블록은 null, −1 은 `MapLoader.DefaultBlockMaterial`(기본 0. MIF2 의 `defaultBlockMaterial` 이 넣을 자리), 목록에 없는 번호와 10000 이상(에드온, 아직 없음)은 빈 재질이다.
+- **착탄** — `Bullet.HitMap` 이 맞은 블록과 면을 받는다. 재질이 있으면 `hitEffect` + `bulletHoleEffect`(크기 × 탄환의 `bulletHoleSize`) + `hitSounds`, 없으면(BD1) 탄환의 `wallHitEffectIndex` + `wallHitSounds` 그대로다. 탄흔은 한 틱에 한 번만 남긴다 (관통탄이 같은 진입점으로 여러 번 부르는 것을 막는다). 수류탄이 튀는 소리는 재질과 무관하게 탄환의 `wallHitSounds` 다 (내가 정했다).
+- **통과 블록** — `PassBullet` 이고 재질이 있는 블록의 목록을 `MapLoader` 가 따로 들고(`RaycastBulletPassBlock`), `Bullet.TickStraight` 가 틱 시작에 한 번 쏴서 들어가는 자리를 구한다. 탄이 그 거리까지 살아서 가면 재질의 `hitEffect` 와 `hitSounds` 만 낸다. 탄흔은 남기지 않고 AI 도 듣지 못한다 (내가 정했다. 물결 같은 데칼이 필요하면 `hitEffect` 프리셋에 데칼 emitter 를 넣으면 된다). 한 틱에 통과 블록이 여럿이면 첫 블록만 낸다. 통과 블록이 없는 맵은 목록이 비어 비용이 없다.
+- **`Block.Contains` / `IntersectRay` 의 "충돌 없는 블록이면 false" 가드를 뺐다.** 통과 블록(플래그 7 포함)도 레이로 맞혀야 해서다. 판정은 전부 판정별 목록을 거치므로 결과는 같다 (`play_test --selftest` 수치 동일).
+- **발소리** — `HumanVisual.TickLeg` 가 다리 애니메이션 위상이 `footstepPhase` 를 지났는지(`FootstepDue`) 알려 주고, `HumanController.EmitFootsteps` 가 접지한 틱에만 `WorldSound.PlayFootstep` 을 부른다. 착지는 `m_landedHard` 틱에 바로 낸다. 발밑 면은 발 위 0.25 m 에서 아래로 0.5 m 레이(`Human` 판정)로 찾는다. 들리지 않는 거리면 재생기를 잡기 전에 버린다 (`SoundManager.IsAudible`). AI 청각 신호(`EmitFootstep`)는 매 틱 그대로다.
+- **`footstepPhase`** 는 `animation.json` 의 동작마다 둔다 (Idle `[]`, Walk·Run `[0.0, 0.5]`).
+- **볼륨** 은 `blockMaterialGeneralData` 의 `footstepWalkVolume` 0.15, `footstepRunVolume` 0.3, `footstepLandingVolume` 0.4 (전에 생각해 둔 값을 데이터 키로 뺐다. 키로 뺀 것은 내 판단이다). 거리를 따로 자르는 키는 넣지 않았다.
+- **`bulletHoleSize`** 를 탄환 데이터에 넣었다 (기본 1, `bullet.json` 두 항목에 적었다).
+- `EffectManager.PlayOnSurface` 에 크기 배율 인자를 더했다.
+
+**0번 재질을 "원본 벽"으로 바꿨다** (사용자 결정, 2026-10-07. 바로 위의 "0번 NONE(무음)"과 10-06 의 "탄환의 `wallHitEffectIndex` 는 BD1 레거시 용도로 남긴다"를 대체한다). 계기: 수류탄의 `wallHitSounds`(`cco.wav`)는 착탄음이 아니라 튕기는 소리라서, 재질이 착탄음을 정하게 되자 키 하나가 두 뜻이 됐다.
+
+- 0번 재질 `Default` = `hitEffect` 6(WallHitSmoke) + `hitSounds` hit1, hit1, hit3 (전의 BULLET 값 그대로). 발소리와 탄흔은 비어 있다.
+- **BD1 은 모든 면이 0번 재질이다.** `GetFaceMaterial` 은 null 을 돌려주지 않고, `Bullet.HitMap` 은 항상 재질만 본다. BD1 맵의 화면과 소리는 전과 같다.
+- 탄환 데이터에서 `wallHitEffectIndex` 를 지웠고, `wallHitSounds` 를 `bounceSounds`(수류탄이 튕기는 소리)로 바꿨다. UnityXOPS 의 `bullet.json` 과 키가 달라졌다.
+- 통과 블록 이펙트는 여전히 면 재질 번호가 있는 블록(BD2)만이다. BD1 의 판형 블록까지 넣으면 원본에 없던 연기가 난다.
+- 무음 재질은 기본 데이터에 두지 않는다. 필요한 모더가 빈 항목을 더한다 (사용자 결정).
+- 사람 쪽(`humanHitEffectIndex`, `humanHitSounds`)은 그대로 둔다 (사용자 결정).
+- **오브젝트의 착탄 이펙트(탄환의 `objectHitEffectIndex`)는 나중에 정한다** (사용자: 오브젝트도 재질을 쓸 수 있게 해 볼 생각이 있다). 지금은 소리는 오브젝트(`soundPath`)가, 이펙트는 탄환이 정한다.
+
+**블록 플래그는 통과 여부만 담는다** (사용자 결정, 2026-10-07). 아래 세 비트(사람 1, 총알 2, 시야·레이 4. 켜면 통과)만 쓰고 나머지 비트는 예약이다 (0 으로 쓰고, 읽을 때 무시한다). 플래그는 설계대로 int32 라서 예약 비트는 29개다 (사용자는 "나머지 5 비트"라고 했다. 1바이트로 줄이자는 뜻이었는지는 확인하지 않았고 레이아웃은 바꾸지 않았다).
+
+- **물 같은 특수 블록은 나중에 BD2 를 확장할 때 한다** (사용자 결정). 그래서 위에 적은 "통과 블록" 이펙트(총알이 통과하는 블록에 들어가는 자리에 재질의 이펙트·소리)를 **뺐다**: `Bullet.PassBlock`, `MapLoader.RaycastBulletPassBlock`, 통과 블록 목록. 10-06 의 "총알이 통과하는 블록은 이펙트만 낸다"와 물 블록 예시(플래그 표 아래)는 이것으로 보류다.
+- 빼야 했던 다른 이유: 0번 재질이 "원본 벽"이 되면서, BD1 을 변환한 BD2 의 판형 블록(플래그 7, 재질 −1)을 총알이 지날 때 원본에 없던 연기와 착탄음이 나게 됐었다.
+- `Block.Contains` / `IntersectRay` 의 가드는 뺀 채로 두었다 (판정은 전부 판정별 목록을 거친다).
+
+확인한 것: `bd2_check` 228항목 통과 (예약 비트가 켜진 블록이 전부 충돌, 총알이 통과하는 블록에서 소리·입자 없음, 재질 번호 규칙, BD1 블록이 0번 재질, 0번 면의 착탄 연기와 착탄음, 통과 블록 → 바닥 순서의 소리 둘과 입자 수, NONE 면의 무음, 발소리 종류별 재생, 기본 재질·먼 거리·공중에서 무음, 120틱 달리기에 정확히 10번). 점검 씬 10개 통과, 빌드 경고 0, `play_test --selftest` 수치가 전과 같다. 화면 스크립트 헤드리스 실행 오류 없음.
+
+확인하지 못한 것 (재질을 쓰는 맵과 소리 파일이 아직 없다): 실제로 들리는 발소리의 음량·박자감, 사방의 AI 발소리가 혼란스러운지, 탄흔과 물보라가 화면에서 어떻게 보이는지. 쇼케이스 맵(BD2 + MIF2)과 WAV 가 생긴 뒤에 본다.
+
+알아 둘 것: 탄이 블록 면 위에 정확히 놓인 채 틱이 끝나면(점 간격 0.25 m 의 배수) 얇은 블록으로 처리돼 관통 횟수가 줄지 않고, 다음 틱에는 그 면을 맞히지 못해 블록을 지나간다. 점검용 상자에서 본 것이고 원본 판정 방식의 성질이다 (BD1 에서도 같다). 고치지 않았다.
+
+BD2 에서 남은 것: 없다 (미션에서 불러오는 것은 MIF2 의 일이다). 다음은 PD2 다.
 
 ### 재질 데이터의 모양 (2026-10-06)
 
@@ -353,8 +419,8 @@ MIF2 는 JSON 이고 확장자는 `.mif2` 다 (사용자 결정. `MD2` 는 버�
 ### 아직 정하지 않은 것
 
 - PD2 와 MIF2 의 형식은 닫혔다 (2026-10-07). 남은 것은 종류별 추가 파라미터의 내용과 IF / AND / OR 이고, 이벤트를 확장할 때 정한다.
-- 발소리를 플레이어에게 어디까지 들려줄지. 박자는 정해졌지만, 사방의 AI 달리는 소리가 다 들리면 혼란스러울 수 있다 (사용자). 볼륨·거리 값은 설계만 두고 구현할 때 정한다.
-- 재질 항목에 이펙트를 하나만 둘지 여러 개를 둘지 (프리셋 자체가 이미 emitter 묶음이라 하나를 권고했다).
+- 발소리를 플레이어에게 어디까지 들려줄지 (구현은 됐고 볼륨 키가 있다. 소리 파일이 생기면 정한다). 박자는 정해졌지만, 사방의 AI 달리는 소리가 다 들리면 혼란스러울 수 있다 (사용자). 볼륨·거리 값은 설계만 두고 구현할 때 정한다.
+- 재질 항목에 이펙트를 하나만 둘지 여러 개를 둘지 (프리셋 자체가 이미 emitter 묶음이라 하나를 권고했고, 하나(`hitEffect`)로 구현했다. 명시적 확정은 받지 않았다).
 - GodotXOPS 자체 에셋(발소리 WAV 등)을 둘 폴더. Git 으로 관리하지 않는다는 것만 정해졌다.
 - 메이저 버전의 기준 ("유저의 JSON 이나 어드온이 그대로 돌지 않게 되면 메이저"는 내 제안이고 확정되지 않았다).
 

@@ -13,5 +13,7 @@ namespace GodotXOPS
         public float forwardSpeed;
         public float strafeSpeed;
         public float backwardSpeed;
+        // 한 사이클 안에서 발이 땅에 닿는 순간들 (사이클 비율, 0 이상 1 미만). 발소리가 이때 난다. 비어 있으면 발소리가 없다.
+        public List<float> footstepPhase = new List<float>();
     }
 }
