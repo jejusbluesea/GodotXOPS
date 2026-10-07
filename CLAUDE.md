@@ -29,6 +29,7 @@
 - `shaders/` — `.gdshader`.
 - `data/`, `addon/` — 원본 XOPS 에셋. **저작권상 커밋 금지** (`.gitignore` 처리됨). 로컬에만 둔다.
 - `godotdata/` — 외부 게임 데이터 JSON (UnityXOPS의 `unitydata/`). 커밋 대상.
+- `addons/godot_sandbox/` — Godot Sandbox 확장 (GDExtension, v0.60, BSD-3-Clause. 원본 에셋 폴더 `addon/` 과 다른 폴더다). 스크립트로 만드는 이벤트를 격리해 돌리는 SafeGDScript 의 실행기다. Windows x86_64 용 DLL 과 `gdscript.elf` 만 넣었고 커밋한다 (사용자 결정. 버전을 고정한다). 에디터 플러그인과 테스트 파일은 뺐다. 저장소를 새로 받으면 `--headless --import` 를 한 번 돌려야 확장이 등록된다. **외부에서 받은 스크립트는 이 샌드박스로만 돌린다. 일반 GDScript 로 컴파일하지 않는다** (`EVENT_SCRIPT_SECURITY.md`).
 - `data/`, `addon/`, `godotdata/`에는 `.gdignore`가 있어 Godot이 임포트하지 않는다. 런타임에 `GamePath.Resolve()`로 전체 경로를 얻어 파일로 직접 읽는다.
 
 ## 좌표 변환
@@ -89,6 +90,8 @@ dotnet build GodotXOPS.csproj
 - `res://scenes/dev/pd2_check.tscn` — 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰 결과가 같은지 대조하고, 넓은 파라미터·추가 파라미터·방향·이벤트 줄 수·깨진 파일을 확인한다 (헤드리스). `-- --convert 입력.pd1 출력.pd2` 는 파일 하나를 변환한다. 포인트 로더, `PD2File`, 이벤트 줄을 고친 뒤에 돌린다.
 
 - `res://scenes/dev/block_bench.tscn` — 블록 수를 늘려 가며(상자 블록을 맵 옆에 더 얹는다) 한 틱의 시간과 레이·내부 판정 한 번의 시간을 잰다 (헤드리스). 점검이 아니라 측정이라 항상 종료 코드 0 이다. 충돌 조회의 속도를 고칠 때 앞뒤로 돌려 비교한다.
+
+- `res://scenes/dev/script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 C# 에서 로드·호출하고, 빠져나가려는 스크립트 21가지와 자원 제한(무한 루프, 재귀, 배열 폭주), 실패 통지를 확인하는 시제품이다 (헤드리스). 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe`. 확장의 버전을 올리거나 샌드박스 연결을 고친 뒤에 돌린다.
 
 - `res://scenes/dev/ui_check.tscn` — 화면이 쓰는 창구 `Game`의 값과 화면 전환 흐름(로드 → 시작 → 재시작 → 내리기)을 수치로 확인한다 (헤드리스). 창구나 화면 흐름을 고친 뒤에 돌린다.
 

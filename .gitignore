@@ -4,6 +4,8 @@
 
 # C#
 bin/
+# Godot Sandbox 확장의 바이너리는 커밋한다 (버전 고정).
+!/addons/godot_sandbox/bin/
 obj/
 .vs/
 .idea/

@@ -156,6 +156,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 - `map_viewer.tscn` — 미션을 골라 자유 카메라로 봅니다. `-- --mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]`로 화면을 저장하고 종료합니다. `-- --file 경로`는 미션 대신 블록 데이터 파일(BD1, BD2) 하나를 띄웁니다 (게임 폴더 기준 경로).
 - `mif2_check.tscn` — 원본 미션을 확장 형식 한 벌(BD2, 텍스처 목록, PD2, `.msg`, MIF2)로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로). `-- --convert-official 번호 출력폴더`는 공식 미션 하나, `-- --convert-official all 출력폴더`는 공식 미션 전부, `-- --convert 입력.mif 출력폴더`는 MIF 미션 하나입니다. 출력 폴더를 `addon.json`에 페이지로 등록하면 메뉴에서 고를 수 있습니다.
 - `pd2_check.tscn` — `-- --convert 입력.pd1 출력.pd2`로 PD1 하나를 PD2 로 바꿉니다. 같은 이름의 `.msg`도 복사합니다 (헤드리스 가능, 게임 폴더 기준 경로).
+- `script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 로드·호출하고, 격리(파일, 프로그램 실행, 씬 트리 접근 등 21가지 시도)와 자원 제한, 실패 통지를 확인합니다 (헤드리스 가능). 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe` 로 돌립니다.
 - `block_bench.tscn` — 블록 수를 늘려 가며 한 틱에 걸리는 시간과 레이·내부 판정 한 번의 시간을 잽니다 (헤드리스 가능). 점검이 아니라 측정입니다. 인자: `-- [--ticks 수] [--mission 번호]`.
 - `bd2_check.tscn` — `-- --convert 입력.bd1 출력.bd2`로 BD1 하나를 BD2 와 텍스처 목록(`출력_textures.json`)으로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로).
 - `effect_viewer.tscn` — 이펙트 프리셋을 골라 봅니다. 인자: `-- [--effect 번호] [--additive] [--screenshot 경로.png]`. 창에서는 ← →(프리셋), Space(다시 재생), B(가산 미리보기), ↑ ↓(카메라 거리).
