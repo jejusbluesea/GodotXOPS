@@ -88,6 +88,7 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Addon object data", "*.json", m => m.addonObjectDataPath, (m, v) => m.addonObjectDataPath = v);
             AddMissionPath(grid, "Addon effect data", "*.json", m => m.addonEffectDataPath, (m, v) => m.addonEffectDataPath = v);
             AddMissionPath(grid, "Addon block material data", "*.json", m => m.addonBlockMaterialDataPath, (m, v) => m.addonBlockMaterialDataPath = v);
+            AddMissionPath(grid, "Addon sound data", "*.json", m => m.addonSoundDataPath, (m, v) => m.addonSoundDataPath = v);
             AddMissionPath(grid, "Addon event pack", "*.json", m => m.addonEventDataPath, (m, v) => m.addonEventDataPath = v);
             column.AddChild(new Label
             {

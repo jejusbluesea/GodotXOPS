@@ -430,6 +430,7 @@ namespace GodotXOPS.Editor
                 case "humandata":
                 case "objectdata":
                 case "effect":
+                case "sound":
                 case k_kindMessage:
                 case k_kindLine:
                     return true;
@@ -507,6 +508,9 @@ namespace GodotXOPS.Editor
                     break;
                 case "effect":
                     for (int i = 0; i < data.EffectParameterData.effectData.Count; i++) names.Add(data.EffectParameterData.effectData[i].name);
+                    break;
+                case "sound":
+                    for (int i = 0; i < data.SoundParameterData.soundData.Count; i++) names.Add(data.SoundParameterData.soundData[i].name);
                     break;
                 case k_kindMessage:
                     foreach (string message in m_document.Messages) names.Add(Shorten(message));

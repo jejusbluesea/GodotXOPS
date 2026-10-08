@@ -502,6 +502,10 @@ func bump(p, state):
             const int waitVar = 20, waitTeamAlive = 21, waitArea = 22, waitHp = 23, waitWeapon = 24, waitTicks = 25;
             const int setVar = 40, addVar = 41, spawnHuman = 42, spawnWeapon = 43, spawnObject = 44, killHuman = 45, damageHuman = 46, moveHuman = 47;
             const int setTeam = 48, setPathMode = 49, destroyObject = 50, playEffect = 51, setAutoJudge = 52, giveWeaponPrimary = 53, giveWeaponSecondary = 54;
+            const int tweenObject = 55, playSound = 56, stopSound = 57, moveBlock = 58, toggleBlock = 59;
+            // 소물 8 을 경로 포인트로 옮기는 데 걸리는 시간 (초)과 그 틱 수, 소리를 재생할 칸.
+            const float tweenSeconds = 0.3f;
+            const int tweenTicks = 10, loopSlot = 2, missingSlot = 3, tweenPathId = 77;
             const int branchVar = 60, branchRandom = 61, randomExit = 62, startLine = 63, stopLine = 64;
             const int equal = 0, greaterEqual = 5;
 
@@ -541,9 +545,20 @@ func bump(p, state):
             file.points.Add(Event(destroyObject, 128, k_objectId, 129));
             file.points.Add(Event(playEffect, 129, 0, 130));
             file.points.Add(Event(setAutoJudge, 130, 0, 131));
-            file.points.Add(Event(damageHuman, 131, k_enemyId, 132, PD2File.FloatCell(10f)));
+            file.points.Add(Event(damageHuman, 131, k_enemyId, 1310, PD2File.FloatCell(10f)));
+            // 소물 8 을 경로 포인트로 (방향은 그 포인트의 것, 부드럽게), 되풀이하는 소리, 목록에 없는 소리.
+            file.points.Add(new PD2Point { type = MapLoader.PointAIPath, param1 = 0, param2 = -1, id = tweenPathId, position = new Vector3(3f, 501f, 2f), direction = 40f });
+            file.points.Add(Event(tweenObject, 1310, 8, 1311, tweenPathId, PD2File.FloatCell(-1f), PD2File.FloatCell(tweenSeconds), 1));
+            file.points.Add(Event(playSound, 1311, loopSlot, 1312, 0, PD2File.FloatCell(0f), 1, 1));
+            file.points.Add(Event(playSound, 1312, missingSlot, 1313, 9999, PD2File.FloatCell(1f), 0, 0));
+            // 블록 0 을 위로 2 m, 세로축 둘레로 90° (0.3초). 블록 1 을 끈다. 없는 블록은 아무 일도 없다.
+            file.points.Add(Event(moveBlock, 1313, 0, 1314, PD2File.FloatCell(0f), PD2File.FloatCell(2f), PD2File.FloatCell(0f),
+                PD2File.FloatCell(0f), PD2File.FloatCell(0f), PD2File.FloatCell(90f), PD2File.FloatCell(tweenSeconds), 0));
+            file.points.Add(Event(toggleBlock, 1314, 1, 1315, 0));
+            file.points.Add(Event(toggleBlock, 1315, 999, 132, 0));
             file.points.Add(Event(startLine, 132, 2, 133, 300));
-            file.points.Add(Event(waitVar, 133, 4, 134, greaterEqual, 1));
+            file.points.Add(Event(waitVar, 133, 4, 1340, greaterEqual, 1));
+            file.points.Add(Event(stopSound, 1340, loopSlot, 134));
             file.points.Add(Event(killHuman, 134, k_enemyId, 135));
             file.points.Add(Event(killHuman, 135, 777, 136));
             file.points.Add(Event(waitTicks, 136, 1000, 137));
@@ -586,6 +601,14 @@ func bump(p, state):
                 return;
             }
 
+            // 블록 둘: 0 번은 가로 4 × 높이 1 × 세로 2 m 의 상자, 1 번은 한 변 1 m 의 상자. 사람들이 있는 높이(500 m)와 떨어진 곳에 둔다.
+            var blockFile = new BD2File { textureListPath = string.Empty };
+            blockFile.blocks.Add(CheckBox(new Vector3(0f, 0f, 0f), new Vector3(2f, 0.5f, 1f)));
+            blockFile.blocks.Add(CheckBox(new Vector3(20f, 0f, 0f), new Vector3(0.5f, 0.5f, 0.5f)));
+            MapLoader.LoadBlockData(blockFile);
+            Expect(MapLoader.Blocks.Count == 2 && MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 0f, 0f)) && MapLoader.IsInsideBlock(BlockLayer.Bullet, new Vector3(20f, 0f, 0f)),
+                "블록 이벤트 점검용 블록이 로드되지 않음");
+
             EventManager events = EventManager.Instance;
             events.BeginMission();
             SimClock.Step();
@@ -613,6 +636,14 @@ func bump(p, state):
             Expect(events.GetVariable(10) == 1, "반경 기다리기가 넘어가지 않음");
             Expect(events.GetVariable(11) == 1, "줄 시작이 듣지 않음");
             Expect(events.GetVariable(13) == 1 && events.GetVariable(14) == 1, "체력 기다리기나 무기 기다리기가 넘어가지 않음");
+            SmallObject moved = MapLoader.SearchSmallObject(8);
+            RawPointData destination = MapLoader.GetPathPoint(tweenPathId);
+            Vector3 movedFrom = moved != null ? moved.LogicPosition : Vector3.Zero;
+            Expect(moved != null && moved.IsTweening && destination != null && movedFrom.DistanceTo(destination.position) > 0.01f, "오브젝트 움직이기가 시작되지 않았거나 바로 도착함 (순간이동이면 안 된다)");
+            Expect(SoundManager.Instance.SlotActive(loopSlot) && !SoundManager.Instance.SlotActive(missingSlot), "되풀이하는 소리가 칸에서 나지 않거나 목록에 없는 소리가 재생됨");
+            Expect(MapLoader.IsBlockMoving(0) && MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 0f, 0f)), "블록 움직이기가 시작되지 않았거나 바로 도착함 (순간이동이면 안 된다)");
+            Expect(!MapLoader.Blocks[1].enabled && !MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(20f, 0f, 0f)) && !MapLoader.IsInsideBlock(BlockLayer.Bullet, new Vector3(20f, 0f, 0f))
+                && !MapLoader.RaycastBlock(BlockLayer.Sight, new Vector3(20f, 5f, 0f), Vector3.Down, 10f, out _), "끈 블록이 판정에 남아 있음");
 
             events.SetVariable(4, 1);
             SimClock.Step();
@@ -620,6 +651,66 @@ func bump(p, state):
             for (int tick = 0; tick < 5; tick++) SimClock.Step();
             Expect(events.GetVariable(12) == 1, "팀 인원 기다리기가 넘어가지 않음");
             Expect(events.GetVariable(18) == 0 && events.Result == (int)MissionResult.InProgress, "멈춘 줄이 진행됐거나 자동 판정을 껐는데 미션이 끝남");
+            Expect(!SoundManager.Instance.SlotActive(loopSlot), "소리 멈추기가 듣지 않음");
+
+            // 오브젝트 움직이기: 도중에는 출발과 도착 사이에 있고, 시간이 지나면 도착해 멈춘다. 방향은 경로 포인트의 것이다.
+            Expect(moved != null && moved.IsTweening && moved.LogicPosition.DistanceTo(movedFrom) > 0.01f && moved.LogicPosition.DistanceTo(destination.position) > 0.01f,
+                "움직이는 오브젝트가 도중에 출발과 도착 사이에 있지 않음");
+            for (int tick = 0; tick < tweenTicks + 2; tick++) SimClock.Step();
+            Expect(moved != null && !moved.IsTweening && !moved.IsDestroyed && moved.LogicPosition.DistanceTo(destination.position) < 0.001f, "움직인 오브젝트가 경로 포인트에 도착하지 않음");
+            Expect(moved != null && moved.Position.DistanceTo(destination.position) < 0.001f
+                && Mathf.Abs(Mathf.AngleDifference(moved.Rotation.Y, Coord.FromUnityEuler(new Vector3(0f, destination.look, 0f)).Y)) < 0.001f, "움직인 오브젝트의 노드 자리나 방향이 다름");
+            if (moved?.ColliderData != null && moved.ColliderData.shapes.Count > 0)
+            {
+                Vector3 shapeCenter = moved.ColliderBasis * Coord.FromUnity(moved.ColliderData.shapes[0].center);
+                Expect(moved.Contains(destination.position + shapeCenter) && !moved.Contains(movedFrom + shapeCenter), "움직인 오브젝트의 판정이 따라오지 않음");
+            }
+            // 블록 움직이기: 위로 2 m 올라가고 세로축 둘레로 90° 돌아서, 가로로 길던 상자가 세로로 길어진다. 처음 자리의 판정은 사라진다.
+            Expect(!MapLoader.IsBlockMoving(0) && MapLoader.Blocks[0].position.DistanceTo(new Vector3(0f, 2f, 0f)) < 0.001f, "움직인 블록이 도착하지 않음");
+            Expect(MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(0f, 2f, 1.5f)) && !MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 2f, 0f))
+                && !MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 0f, 0f)), "움직인 블록의 내부 판정이 따라오지 않음");
+            Expect(MapLoader.RaycastBlock(BlockLayer.Bullet, new Vector3(0f, 10f, 1.5f), Vector3.Down, 20f, out float blockHit) && Mathf.Abs(blockHit - 7.5f) < 0.01f
+                && !MapLoader.RaycastBlock(BlockLayer.Bullet, new Vector3(1.5f, 10f, 0f), Vector3.Down, 20f, out _), "움직인 블록의 레이 판정이 따라오지 않음");
+            // 켜면 돌아오고, 미션을 내리면 옮긴 블록도 처음으로 돌아간다.
+            Expect(MapLoader.SetBlockEnabled(1, true) && MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(20f, 0f, 0f)) && !MapLoader.SetBlockEnabled(999, true), "블록을 다시 켜지 못하거나 없는 블록을 켬");
+            MapLoader.SetBlockEnabled(1, false);
+            MapLoader.MoveBlock(0, new Vector3(0f, 9f, 0f), Vector3.Zero, 0, false);
+            Expect(MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 9f, 0f)), "시간 0 으로 옮긴 블록이 바로 옮겨지지 않음");
+            MapLoader.ResetBlockMotion();
+            Expect(MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 0f, 0f)) && !MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 9f, 0f))
+                && MapLoader.Blocks[1].enabled && MapLoader.IsInsideBlock(BlockLayer.Sight, new Vector3(20f, 0f, 0f)), "되돌린 블록이 처음 상태가 아님");
+            Expect(MapLoader.GetBlockColliders(BlockLayer.Human).Count == 2 && MapLoader.GetBlockColliders(BlockLayer.Human)[0].index == 0, "되돌린 뒤 판정 목록의 순서가 처음과 다름");
+
+            moved?.StartTween(movedFrom, 0f, tweenTicks, false);
+            SimClock.Step();
+            moved?.Break();
+            Vector3 brokenAt = moved != null ? moved.LogicPosition : Vector3.Zero;
+            SimClock.Step();
+            Expect(moved != null && moved.IsDestroyed && !moved.IsTweening && moved.LogicPosition.DistanceTo(brokenAt) < 0.001f, "움직이다 부서진 오브젝트가 계속 움직임");
+        }
+
+        /// <summary>
+        /// 점검용 상자 블록 하나를 만든다 (텍스처 없음, 판정 전부 충돌).
+        /// </summary>
+        /// <param name="center">가운데.</param>
+        /// <param name="half">축마다의 절반 크기 (m).</param>
+        /// <returns>블록.</returns>
+        private static BD2Block CheckBox(Vector3 center, Vector3 half)
+        {
+            // BD1 과 같은 순서: 0~3 이 윗면, 4~7 이 아랫면.
+            Vector3[] corners =
+            {
+                new Vector3(1f, 1f, -1f), new Vector3(-1f, 1f, -1f), new Vector3(-1f, 1f, 1f), new Vector3(1f, 1f, 1f),
+                new Vector3(1f, -1f, -1f), new Vector3(-1f, -1f, -1f), new Vector3(-1f, -1f, 1f), new Vector3(1f, -1f, 1f),
+            };
+            var block = new BD2Block();
+            for (int i = 0; i < BD2Block.VertexCount; i++) block.vertices[i] = center + corners[i] * half;
+            for (int f = 0; f < BD2Block.FaceCount; f++)
+            {
+                block.materialIndices[f] = -1;
+                block.textureIndices[f] = -1;
+            }
+            return block;
         }
 
         /// <summary>

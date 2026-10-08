@@ -125,7 +125,7 @@ dotnet build GodotXOPS.csproj
 
 ## 시뮬레이션과 캐릭터
 
-- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (사람 10 → 떨어진 무기 30 → 총알 40 → 인간간 충돌 100 → AI 200 → 미션 판정·이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
+- 게임플레이는 `SimClock`(Autoload)의 33.333Hz 틱에서만 진행한다. 틱 대상은 `ISimTickable`을 구현해 `SimClock.Register`로 등록하고, `SimOrder`가 한 틱 안의 순서다 (움직이는 블록 5 → 사람 10 → 떨어진 무기 30 → 움직이는 소물 35 → 총알 40 → 인간간 충돌 100 → AI 200 → 미션 판정·이벤트 300). `SimClock.TickEnabled`가 false면 멈춘다.
 - 사람 틱(10) 안의 순서는 원본 한 프레임과 같다: 무기 입력 소비(발사 등) → 무기 카운터 감소·조준 오차 갱신(`Human.TickWeapon`) → 이동·충돌 → 사망 상태 → 다리·팔 동작. 총알은 이동 전 위치에서 나간다.
 - 시간 카운터(발사 간격, 재장전, 전환, 탄환 수명)는 정수 틱으로 센다. 데이터의 초 단위 값은 `RoundToInt(초 × SimClock.FrameRate)`로 바꾼다. 실수 초를 틱마다 빼면 잔차 때문에 원본보다 한 틱 늦어진다.
 - 게임 결과에 영향을 주는 난수는 `GameRandom.Gameplay`(틱에서만), 연출용 난수는 `GameRandom.Visual`을 쓴다.
@@ -180,7 +180,7 @@ dotnet build GodotXOPS.csproj
 
 - 포인트 종류 10 에서 19 는 `BuiltinEventHandler`(원본 그대로), **20 이상은 스크립트 이벤트**다 (`ScriptEventHandler`). `EventManager` 는 처리기 인터페이스 `IEventHandler` 만 안다: `Tick` 이 출구 번호를 돌려주고(−1 기다림, −2 실패) `TryGetNext` 가 그 출구의 다음 식별번호를 준다. 실패한 줄만 멈춘다 (`EventLine.Stopped`).
 - **스크립트 이벤트는 PD2 에서만 돈다.** PD2 에 20 이상의 종류가 있는데 등록한 묶음이 없으면 `LoadPointData` 가 실패한다. PD1 은 전과 같다.
-- 묶음 하나 = 등록 JSON(`EventPackData`) 하나 + `.sgd` 하나 = `ScriptEventPack` 하나. 종류마다 그 안의 함수 하나다 (스크립트를 종류마다 따로 컴파일하면 하나에 약 150 ms, 32 MB 가 든다). 설치형은 `godotdata/event/*.json`(번호 20 에서 9999. 기본 제공 묶음 `base.json` 이 20 에서 99 를 쓴다), 미션 전용은 MIF2 의 `addonEventDataPath`(10000 이상). **종류 번호는 항목마다 `type` 으로 적는다** (다른 에드온 데이터처럼 목록의 순서가 번호가 아니다).
+- 묶음 하나 = 등록 JSON(`EventPackData`) 하나 + `.sgd` 하나 = `ScriptEventPack` 하나. 종류마다 그 안의 함수 하나다 (스크립트를 종류마다 따로 컴파일하면 하나에 약 150 ms, 32 MB 가 든다). 설치형은 `godotdata/event/*.json`(번호 20 에서 9999. 기본 제공 묶음 `base.json` 이 20 에서 99 를 쓴다. 지금 36종), 미션 전용은 MIF2 의 `addonEventDataPath`(10000 이상). **종류 번호는 항목마다 `type` 으로 적는다** (다른 에드온 데이터처럼 목록의 순서가 번호가 아니다).
 - 계약 (사용자 결정): `init(api)` 한 번, 이벤트마다 `함수(p, state)`. 반환값은 출구 번호. `p` 는 등록 JSON 의 이름으로 채운 파라미터 사전(+ `id`, `x`, `y`, `z`, `yaw`), `state` 는 줄이 그 포인트에 머무는 동안의 저장 칸이다. 칸 표기는 원본 이름이다: `p2`(= `param1`), `p3`(= `param2`, 기본 출구), `e0` 부터 추가 파라미터.
 - 분기는 출구 여러 개로, AND / OR 는 미션 변수(`GetVariable` / `SetVariable`, 정수)로 만든다. 반복은 전용 이벤트 없이 이벤트 체인의 고리로 만든다 (사용자 결정).
 - **외부 스크립트는 `ScriptEventPack` 으로만 돌린다.** 격리(`restrictions`)를 걸 수 없으면 로드를 거절하고, 일반 GDScript 로 대신 돌리지 않는다. 샌드박스 노드는 트리에 넣지 않는다 (`_ready` / `_process` 가 돌지 않게).
@@ -189,6 +189,9 @@ dotnet build GodotXOPS.csproj
 - 실행 예산(`execution_timeout`)은 확장의 기본값 200 이다. 스크립트 안의 계산은 거의 들지 않고 API 호출이 예산을 쓴다 (단순한 호출 약 1000번, 사전을 돌려주는 호출 약 300번). `memory_max` 는 배열·문자열을 세지 않는다 (알려진 한계, 받아들이기로 했다).
 - **이벤트가 화면에 놓는 글자는 범용 칸이다** (사용자 결정: UI 에 제약을 걸지 않는다). `EventManager.SetHudText` / `ClearHudText`, 칸 32개, OS 글꼴과 `char.dds` 둘 다, 기준점 3×3 과 오프셋(화면 높이 480 기준, +y 위). 먼저 놓은 것이 뒤에 그려진다. 안내나 타이머를 고정 HUD 요소로 만들지 않는다. HUD 는 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽는다.
 - Interact 키는 사람이 아니라 이벤트가 받는다: `PlayerController` → `EventManager.QueueInteract()` → 다음 틱 한 번 `InteractPressed`.
+- **소물의 트윈** (이벤트 55 Tween Object, 사용자 요청 2026-10-09: 순간이동이 아니라 시간에 걸쳐, 충돌 무시, 움직이면서 부서질 수 있게): `SmallObject.StartTween`. 움직이는 동안만 `SimClock` 에 등록돼 틱(35)에서 논리 위치를 옮기고 노드는 틱 사이를 보간한다. 부서지면 멈춘다. 사람은 소물과 부딪치지 않으므로 위에 선 사람은 같이 움직이지 않는다. 이벤트 줄은 기다리지 않는다. 방향 값은 소물 자신의 yaw 다 (소물 포인트의 PD2 방향과 같다. `spawn_object` 의 yaw 는 사람 기준이라 180° 다르다).
+- **블록 움직이기와 끄기** (이벤트 58 Move Block / 59 Toggle Block, 사용자 요청 2026-10-09. `src/Map/Block/BlockMotion.cs`): 블록은 자기 위치나 회전이 없으므로 **처음 모양 기준의 변위**(이동량과 오일러 각)를 블록이 들고, 바뀔 때마다 면의 법선·중심·범위 상자를 처음 모양에서 다시 구한다 (`ApplyBlockTransform`). 그래서 블록의 판정 정보를 로드 뒤에 바꾸는 코드는 `base*` 값도 함께 봐야 한다. 움직이는 블록이 있을 때만 틱(5)에 등록하고 메시 노드는 틱 사이를 보간한다. 끈 블록은 `layerMask` 0 이고 판정 목록은 블록 번호 순서로 다시 만든다 (순서가 같아야 결과가 같다). **블록은 파일 안의 순번으로 가리킨다** (사용자 결정. BD2 에 식별번호를 넣는 것은 형식 변경이라 미뤘다). **사람은 블록과 함께 움직이지 않고, 끼거나 올라탄 경우는 평소의 충돌 처리에 맡긴다** (사용자 결정). 미션을 다시 시작하면(`UnloadPointData`) `ResetBlockMotion` 이 되돌린다. 스크립트의 파라미터 이름 `x`, `y`, `z`, `yaw`, `id` 는 포인트의 값으로 예약돼 있어 쓸 수 없다 (그래서 dx, dy, dz, turn).
+- **이벤트의 소리** (이벤트 56 Play Sound / 57 Stop Sound, 사용자 결정): 스크립트는 파일 경로를 받지 않으므로 소리 목록(`SoundParameterData`, `godotdata/sound_data.json`, 미션은 MIF2 의 `addonSoundDataPath` 로 10000 부터)의 번호로 재생한다. 기본 목록에는 원본의 효과음을 파일 이름 순서로 넣어 두었다. `SoundManager.PlaySlot` / `StopSlot` 의 칸 16개이고, 되풀이하는 소리는 멈추거나 맵을 내릴 때까지 다시 재생한다. 없는 번호와 읽지 못한 파일은 경고만 남기고 줄은 멈추지 않는다. AI 는 이 소리를 듣지 않는다.
 - 기본 제공 이벤트를 고치면 `base.json`, `base.sgd`, `docs/modding.md` 의 표, `event_check` 를 함께 고친다. 번호는 20개 단위로 끊는다 (20 대기, 40 동작, 60 흐름, 70 화면 글자. 사용자 결정).
 
 ## 에디터

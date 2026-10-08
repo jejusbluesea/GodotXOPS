@@ -6,8 +6,9 @@ namespace GodotXOPS
     /// 맵에 놓인 파괴 가능한 소물 (캔, PC 등). 원본 OpenXOPS smallobject 에 해당한다.
     /// 모델은 자식 노드로 조립하고, 총알·폭발 판정은 ObjectColliderData 의 형상(구·박스·캡슐)에 대해 "점이 안에 있는가"를 직접 계산한다.
     /// 부서지면 판정에서 바로 빠지고, 튀어 올랐다 사라지는 움직임은 화면 연출로만 진행한다.
+    /// 이벤트가 걸면 정해진 시간에 걸쳐 한 자리로 움직인다 (StartTween). 판정이 따라가야 하므로 틱에서 논리 위치를 옮기고 노드는 틱 사이를 보간한다. 원본에는 없는 동작이다.
     /// </summary>
-    public partial class SmallObject : Node3D
+    public partial class SmallObject : Node3D, ISimTickable
     {
         // 부서질 때의 움직임 — 원본 smallobject::Destruction / ProcessObject (object.cpp:2684-2751) 의 프레임당 값을 초 단위로 바꾼 것.
         // 수평 속도 = jump × 0.04243, 처음 상승 속도 = jump × 0.1, 프레임마다 0.1 씩 감소 (모두 원본 길이 단위 / 프레임).
@@ -33,6 +34,15 @@ namespace GodotXOPS
         private Vector3 m_position;
         private Basis m_colliderBasis;
 
+        // 움직이는 중(트윈)의 상태: 출발과 도착 자리, 전체 틱 수와 지난 틱 수, 한 틱 전의 논리 위치(보간용).
+        private bool m_tweening;
+        private bool m_tweenEase;
+        private Vector3 m_tweenFrom;
+        private Vector3 m_tweenTo;
+        private Vector3 m_previousPosition;
+        private int m_tweenTicks;
+        private int m_tweenElapsed;
+
         private Vector3 m_destroyVelocity;
         private Vector2 m_destroyAngularVelocity;
         private float m_destroyTimer;
@@ -46,6 +56,9 @@ namespace GodotXOPS
         // 판정 형상과 그 방향. 디버그 표시(ColliderView)가 판정과 같은 자리에 그릴 때 쓴다. 형상이 없으면 null.
         public ObjectColliderData ColliderData => m_colliderData;
         public Basis ColliderBasis => m_colliderBasis;
+        public bool IsTweening => m_tweening;
+        // 사람(10)과 떨어진 무기(30) 뒤, 총알(40) 앞. 총알은 이번 틱에 옮겨진 자리로 판정한다.
+        public int SimOrder => 35;
 
         /// <summary>
         /// 소물을 만든다. 트리에 추가한 뒤 호출한다.
@@ -89,8 +102,78 @@ namespace GodotXOPS
             }
         }
 
+        public override void _ExitTree()
+        {
+            SimClock.Unregister(this);
+        }
+
+        /// <summary>
+        /// 정해진 시간에 걸쳐 한 자리로 움직이기 시작한다. 방향은 바로 바뀌고, 자리는 지금 자리에서 직선으로 옮겨 간다. 블록과 사람을 무시한다.
+        /// 움직이는 중에 다시 부르면 그 순간의 자리에서 새로 시작한다. 부서진 소물은 움직이지 않는다.
+        /// </summary>
+        /// <param name="target">도착할 자리.</param>
+        /// <param name="yawDeg">소물의 방향 yaw (도. 소물 포인트의 방향과 같은 값).</param>
+        /// <param name="ticks">걸리는 틱 수. 0 이하면 바로 옮긴다.</param>
+        /// <param name="ease">true 면 천천히 출발해 천천히 멈춘다. false 면 같은 속도로 간다.</param>
+        /// <returns>시작했으면 true. 부서졌거나 자리가 올바른 수가 아니면 false.</returns>
+        public bool StartTween(Vector3 target, float yawDeg, int ticks, bool ease)
+        {
+            if (m_destroyed || !target.IsFinite() || !float.IsFinite(yawDeg)) return false;
+
+            Rotation = Coord.FromUnityEuler(new Vector3(0f, yawDeg, 0f));
+            m_colliderBasis = Basis * Basis.FromEuler(new Vector3(0f, Mathf.Pi, 0f));
+            if (ticks <= 0)
+            {
+                StopTween();
+                m_position = target;
+                Position = target;
+                return true;
+            }
+
+            m_tweening = true;
+            m_tweenEase = ease;
+            m_tweenFrom = m_position;
+            m_tweenTo = target;
+            m_previousPosition = m_position;
+            m_tweenTicks = ticks;
+            m_tweenElapsed = 0;
+            SimClock.Register(this);
+            return true;
+        }
+
+        public void SimTick()
+        {
+            if (!m_tweening) return;
+
+            // 도착한 다음 틱에 끝낸다. 그 사이에 노드가 마지막 한 틱을 보간해 따라온다.
+            if (m_tweenElapsed >= m_tweenTicks)
+            {
+                StopTween();
+                return;
+            }
+
+            m_previousPosition = m_position;
+            m_tweenElapsed++;
+            float progress = (float)m_tweenElapsed / m_tweenTicks;
+            if (m_tweenEase) progress = progress * progress * (3f - 2f * progress);
+            m_position = m_tweenFrom.Lerp(m_tweenTo, progress);
+        }
+
+        /// <summary>
+        /// 움직임을 멈추고 노드를 논리 위치에 맞춘다.
+        /// </summary>
+        private void StopTween()
+        {
+            if (!m_tweening) return;
+
+            m_tweening = false;
+            SimClock.Unregister(this);
+            Position = m_position;
+        }
+
         public override void _Process(double delta)
         {
+            if (m_tweening && !m_destroyed) Position = m_previousPosition.Lerp(m_position, SimClock.InterpolationAlpha);
             if (!m_destroyed || !Visible) return;
 
             float dt = (float)delta;
@@ -208,6 +291,8 @@ namespace GodotXOPS
         /// </summary>
         private void StartDestruction()
         {
+            // 움직이던 소물은 그 자리에서 부서진다.
+            StopTween();
             m_destroyed = true;
 
             int jump = m_objectData.jump;

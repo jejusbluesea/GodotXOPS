@@ -1267,6 +1267,8 @@ namespace GodotXOPS.Editor
                 Expect(m_snapTargets[1] == SnapTarget.Vertex && m_snapTargets[0] == SnapTarget.None, "블록 모드에서 켠 스냅 대상이 포인트 모드에도 들어감");
                 m_blockSelection.Clear();
                 m_blockSelection.Add(0);
+                UpdateDetails();
+                Expect(m_blockIndexLabel.Text == "Block #0", $"선택한 블록의 번호가 오른쪽 칸에 나오지 않음 ({m_blockIndexLabel.Text})");
                 Vector3 own = vertices[0];
                 Vector3 other = blocks[blocks.Count - 1].vertices[0];
                 BeginTransform(TransformMode.Move);

@@ -854,6 +854,7 @@ namespace GodotXOPS.Editor
                     : containerType == typeof(ObjectParameterData) ? data.ObjectParameterData
                     : containerType == typeof(EffectParameterData) ? data.EffectParameterData
                     : containerType == typeof(BlockMaterialParameterData) ? data.BlockMaterialParameterData
+                    : containerType == typeof(SoundParameterData) ? data.SoundParameterData
                     : null;
             }
             return WalkList(container, steps);

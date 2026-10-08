@@ -64,6 +64,12 @@ namespace GodotXOPS
             {
                 data.BlockMaterialParameterData.blockMaterialData.SetAddon(material.blockMaterialData);
             }
+
+            SoundParameterData sound = LoadAddonFile<SoundParameterData>(loader.m_addonSoundDataPath);
+            if (sound != null)
+            {
+                data.SoundParameterData.soundData.SetAddon(sound.soundData);
+            }
         }
 
         /// <summary>
@@ -100,6 +106,7 @@ namespace GodotXOPS
             effect.effectTextureData.ClearAddon();
 
             data.BlockMaterialParameterData.blockMaterialData.ClearAddon();
+            data.SoundParameterData.soundData.ClearAddon();
 
             if (EffectManager.Loaded) EffectManager.Instance.ClearAddonMaterials();
         }

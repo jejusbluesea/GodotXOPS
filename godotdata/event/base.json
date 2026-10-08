@@ -535,6 +535,186 @@
       ]
     },
     {
+      "type": 55,
+      "name": "Tween Object",
+      "function": "tween_object",
+      "parameters": [
+        {
+          "name": "object",
+          "slot": "p2",
+          "kind": "object"
+        },
+        {
+          "name": "path",
+          "slot": "e0",
+          "kind": "path"
+        },
+        {
+          "name": "look",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "time",
+          "slot": "e2",
+          "kind": "float"
+        },
+        {
+          "name": "ease",
+          "slot": "e3",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 56,
+      "name": "Play Sound",
+      "function": "play_sound",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "int"
+        },
+        {
+          "name": "sound",
+          "slot": "e0",
+          "kind": "sound"
+        },
+        {
+          "name": "volume",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "loop",
+          "slot": "e2",
+          "kind": "bool"
+        },
+        {
+          "name": "everywhere",
+          "slot": "e3",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 57,
+      "name": "Stop Sound",
+      "function": "stop_sound",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 58,
+      "name": "Move Block",
+      "function": "move_block",
+      "parameters": [
+        {
+          "name": "block",
+          "slot": "p2",
+          "kind": "block"
+        },
+        {
+          "name": "dx",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "dy",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "dz",
+          "slot": "e2",
+          "kind": "float"
+        },
+        {
+          "name": "pitch",
+          "slot": "e3",
+          "kind": "float"
+        },
+        {
+          "name": "roll",
+          "slot": "e4",
+          "kind": "float"
+        },
+        {
+          "name": "turn",
+          "slot": "e5",
+          "kind": "float"
+        },
+        {
+          "name": "time",
+          "slot": "e6",
+          "kind": "float"
+        },
+        {
+          "name": "ease",
+          "slot": "e7",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 59,
+      "name": "Toggle Block",
+      "function": "toggle_block",
+      "parameters": [
+        {
+          "name": "block",
+          "slot": "p2",
+          "kind": "block"
+        },
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
       "type": 60,
       "name": "Branch Variable",
       "function": "branch_var",

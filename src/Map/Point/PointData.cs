@@ -369,6 +369,8 @@ namespace GodotXOPS
                 EventManager.Instance.UnloadScripts();
             }
             loader.m_eventPointTypes.Clear();
+            // 이벤트가 옮기거나 끈 블록은 미션과 함께 처음으로 돌아간다 (블록 데이터는 다시 읽지 않는다).
+            ResetBlockMotion();
             if (BulletManager.Loaded) BulletManager.Instance.Clear();
             if (WeaponManager.Loaded) WeaponManager.Instance.Clear();
             if (EffectManager.Loaded) EffectManager.Instance.Clear();

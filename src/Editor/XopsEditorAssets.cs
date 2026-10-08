@@ -156,6 +156,7 @@ namespace GodotXOPS.Editor
             else if (type == typeof(ObjectParameterData)) name = nameof(ExtendedMissionData.addonObjectDataPath);
             else if (type == typeof(EffectParameterData)) name = nameof(ExtendedMissionData.addonEffectDataPath);
             else if (type == typeof(BlockMaterialParameterData)) name = nameof(ExtendedMissionData.addonBlockMaterialDataPath);
+            else if (type == typeof(SoundParameterData)) name = nameof(ExtendedMissionData.addonSoundDataPath);
             else if (type == typeof(EventPackData)) name = nameof(ExtendedMissionData.addonEventDataPath);
             return name == null ? null : typeof(ExtendedMissionData).GetField(name);
         }

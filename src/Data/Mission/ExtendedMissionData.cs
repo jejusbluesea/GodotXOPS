@@ -31,6 +31,7 @@ namespace GodotXOPS
         public string addonObjectDataPath = string.Empty;
         public string addonEffectDataPath = string.Empty;
         public string addonBlockMaterialDataPath = string.Empty;
+        public string addonSoundDataPath = string.Empty;
         // 이 미션 전용 스크립트 이벤트 묶음의 등록 파일. 종류 번호 10000 이상이 이 묶음의 이벤트다. 비워 두면 없다.
         public string addonEventDataPath = string.Empty;
     }

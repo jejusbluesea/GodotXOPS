@@ -43,6 +43,9 @@ namespace GodotXOPS.Editor
         private int m_textureReplaceIndex = -1;
 
         private Label m_boardLabel;
+        private Label m_blockIndexLabel;
+        // 블록 번호를 한 줄에 이만큼까지 적는다.
+        private const int k_shownBlockIndices = 8;
         private static readonly int[] s_flagBits = { BD2File.PassHuman, BD2File.PassBullet, BD2File.PassSight };
         private static readonly string[] s_flagNames = { "Humans pass through", "Bullets pass through", "Sight passes through" };
 
@@ -56,7 +59,9 @@ namespace GodotXOPS.Editor
             m_blockBox = box;
             column.AddChild(box);
 
-            box.AddChild(new Label { Text = "Block" });
+            // 블록의 번호(파일 안의 순번)를 보여 준다. 이벤트(Move Block, Toggle Block)가 블록을 이 번호로 가리킨다.
+            m_blockIndexLabel = new Label { Text = "Block", AutowrapMode = TextServer.AutowrapMode.WordSmart, TooltipText = "The block's number in the file. Events (Move Block, Toggle Block) point at a block by this number. Deleting a block lowers the numbers after it" };
+            box.AddChild(m_blockIndexLabel);
             for (int i = 0; i < s_flagBits.Length; i++)
             {
                 int bit = s_flagBits[i];
@@ -209,6 +214,15 @@ namespace GodotXOPS.Editor
                 m_flagBoxes[i].Disabled = selectedBlocks.Count == 0;
                 m_flagBoxes[i].SetPressedNoSignal(all);
             }
+
+            var shown = new List<string>();
+            foreach (int index in selectedBlocks)
+            {
+                if (shown.Count == k_shownBlockIndices) break;
+                shown.Add($"#{index}");
+            }
+            m_blockIndexLabel.Text = selectedBlocks.Count == 0 ? "Block"
+                : $"{(selectedBlocks.Count == 1 ? "Block" : "Blocks")} {string.Join(", ", shown)}{(selectedBlocks.Count > shown.Count ? $" (+{selectedBlocks.Count - shown.Count} more)" : string.Empty)}";
 
             // 모양이 판형이라 플래그와 관계없이 충돌하지 않는 블록이 선택에 있으면 알린다. 화면의 블록(MapLoader)은 옮기기를 확정한 뒤의 모양이다.
             bool board = false;

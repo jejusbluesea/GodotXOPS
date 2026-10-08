@@ -1,0 +1,60 @@
+{
+  "soundData": [
+    {
+      "name": "bang",
+      "soundPath": "data/sound/bang.wav"
+    },
+    {
+      "name": "bang1",
+      "soundPath": "data/sound/bang1.wav"
+    },
+    {
+      "name": "bang2",
+      "soundPath": "data/sound/bang2.wav"
+    },
+    {
+      "name": "bang3",
+      "soundPath": "data/sound/bang3.wav"
+    },
+    {
+      "name": "bang4",
+      "soundPath": "data/sound/bang4.wav"
+    },
+    {
+      "name": "bang5",
+      "soundPath": "data/sound/bang5.wav"
+    },
+    {
+      "name": "can",
+      "soundPath": "data/sound/can.wav"
+    },
+    {
+      "name": "cco",
+      "soundPath": "data/sound/cco.wav"
+    },
+    {
+      "name": "dan",
+      "soundPath": "data/sound/dan.wav"
+    },
+    {
+      "name": "hit1",
+      "soundPath": "data/sound/hit1.wav"
+    },
+    {
+      "name": "hit2",
+      "soundPath": "data/sound/hit2.wav"
+    },
+    {
+      "name": "hit3",
+      "soundPath": "data/sound/hit3.wav"
+    },
+    {
+      "name": "hyu",
+      "soundPath": "data/sound/hyu.wav"
+    },
+    {
+      "name": "ka",
+      "soundPath": "data/sound/ka.wav"
+    }
+  ]
+}

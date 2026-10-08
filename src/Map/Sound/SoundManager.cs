@@ -17,12 +17,21 @@ namespace GodotXOPS
         private const float k_minDistance = 1f;
         // 동시에 재생할 수 있는 소리 수. 다 쓰면 가장 오래된 것부터 끊고 다시 쓴다 (원본 MAX_SOUNDLISTS 100 참고).
         private const int k_poolSize = 64;
+        // 이벤트가 번호로 재생하고 멈추는 칸의 수.
+        public const int SlotCount = 16;
 
         private readonly AudioStreamPlayer[] m_players = new AudioStreamPlayer[k_poolSize];
         private readonly Vector3[] m_positions = new Vector3[k_poolSize];
         private readonly float[] m_volumes = new float[k_poolSize];
         private int m_next;
         private bool m_headless;
+        // 이벤트가 쓰는 칸. 칸마다 소리 하나이고, 되풀이하는 소리는 멈출 때까지 다시 재생한다.
+        private readonly AudioStreamPlayer[] m_slotPlayers = new AudioStreamPlayer[SlotCount];
+        private readonly Vector3[] m_slotPositions = new Vector3[SlotCount];
+        private readonly float[] m_slotVolumes = new float[SlotCount];
+        private readonly bool[] m_slotLoops = new bool[SlotCount];
+        private readonly bool[] m_slotEverywhere = new bool[SlotCount];
+        private readonly bool[] m_slotActive = new bool[SlotCount];
 
         // 점검 도구용 누계와 마지막 재생 정보.
         public static int PlayCount { get; private set; }
@@ -47,6 +56,11 @@ namespace GodotXOPS
                 m_players[i] = new AudioStreamPlayer { Name = $"Sfx_{i}" };
                 AddChild(m_players[i]);
             }
+            for (int i = 0; i < SlotCount; i++)
+            {
+                m_slotPlayers[i] = new AudioStreamPlayer { Name = $"Slot_{i}" };
+                AddChild(m_slotPlayers[i]);
+            }
         }
 
         public override void _Process(double delta)
@@ -57,6 +71,85 @@ namespace GodotXOPS
             {
                 if (m_players[i].Playing) m_players[i].VolumeLinear = m_volumes[i] * master * Attenuation(m_positions[i], listener);
             }
+
+            // 헤드리스에서는 실제로 재생하지 않으므로 칸의 상태만 남겨 둔다.
+            if (m_headless) return;
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (!m_slotActive[i]) continue;
+
+                AudioStreamPlayer player = m_slotPlayers[i];
+                if (!player.Playing)
+                {
+                    if (!m_slotLoops[i])
+                    {
+                        m_slotActive[i] = false;
+                        continue;
+                    }
+                    player.Play();
+                }
+                player.VolumeLinear = m_slotVolumes[i] * master * (m_slotEverywhere[i] ? 1f : Attenuation(m_slotPositions[i], listener));
+            }
+        }
+
+        /// <summary>
+        /// 이벤트의 칸 하나에 소리를 재생한다. 그 칸에서 나던 소리는 끊긴다.
+        /// </summary>
+        /// <param name="slot">칸 번호 (0 이상 SlotCount 미만).</param>
+        /// <param name="relativePath">데이터 루트 기준 WAV 경로.</param>
+        /// <param name="position">소리가 나는 위치. everywhere 면 쓰이지 않는다.</param>
+        /// <param name="volume">볼륨.</param>
+        /// <param name="loop">true 면 멈출 때까지 되풀이한다.</param>
+        /// <param name="everywhere">true 면 거리와 무관하게 같은 크기로 들린다 (배경음, 방송).</param>
+        /// <returns>재생했으면 true. 없는 칸이거나 파일을 읽지 못했으면 false.</returns>
+        public bool PlaySlot(int slot, string relativePath, Vector3 position, float volume, bool loop, bool everywhere)
+        {
+            if (slot < 0 || slot >= SlotCount || string.IsNullOrEmpty(relativePath) || volume <= 0f) return false;
+
+            string fullPath = GamePath.Resolve(relativePath);
+            AudioStreamWav stream = fullPath != null ? SoundLoader.LoadAudio(fullPath) : null;
+            if (stream == null) return false;
+
+            PlayCount++;
+            LastPlayedPath = relativePath;
+            m_slotPositions[slot] = position;
+            m_slotVolumes[slot] = volume;
+            m_slotLoops[slot] = loop;
+            m_slotEverywhere[slot] = everywhere;
+            m_slotActive[slot] = true;
+            if (m_headless) return true;
+
+            AudioStreamPlayer player = m_slotPlayers[slot];
+            player.Stream = stream;
+            player.VolumeLinear = volume * ConfigManager.Instance.MasterVolume * (everywhere ? 1f : Attenuation(position, ListenerPosition));
+            player.Play();
+            return true;
+        }
+
+        /// <summary>
+        /// 이벤트의 칸 하나의 소리를 멈춘다.
+        /// </summary>
+        /// <param name="slot">칸 번호. 음수면 모든 칸.</param>
+        public void StopSlot(int slot)
+        {
+            for (int i = 0; i < SlotCount; i++)
+            {
+                if (slot >= 0 && slot != i) continue;
+                m_slotActive[i] = false;
+                m_slotLoops[i] = false;
+                m_slotPlayers[i].Stop();
+                m_slotPlayers[i].Stream = null;
+            }
+        }
+
+        /// <summary>
+        /// 이벤트의 칸에서 소리가 나고 있는지. 헤드리스에서는 한 번만 재생하는 소리도 멈출 때까지 나는 것으로 친다.
+        /// </summary>
+        /// <param name="slot">칸 번호.</param>
+        /// <returns>나고 있으면 true.</returns>
+        public bool SlotActive(int slot)
+        {
+            return slot >= 0 && slot < SlotCount && m_slotActive[slot];
         }
 
         /// <summary>
@@ -122,6 +215,7 @@ namespace GodotXOPS
                 m_players[i].Stream = null;
             }
             m_next = 0;
+            StopSlot(-1);
         }
 
         /// <summary>

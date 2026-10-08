@@ -54,6 +54,18 @@ namespace GodotXOPS
         public Vector3[] faceNormals;
         public Vector3[] faceCenters;
 
+        // 로드했을 때의 모양과 판정. 이벤트가 블록을 옮기거나 끈 뒤에 다시 구하고 되돌리는 기준이다 (MapLoader 의 BlockMotion).
+        public Vector3[] baseVertices;
+        public Vector3[] baseFaceNormals;
+        public Vector3[] baseFaceCenters;
+        public Vector3 basePosition;
+        public int baseLayerMask;
+        // 처음 모양에서 지금까지 옮긴 양 (m)과 돌린 각도 (UnityXOPS 오일러, 도).
+        public Vector3 offset;
+        public Vector3 angles;
+        // false 면 이벤트가 꺼 둔 블록이다. 그려지지 않고 어느 판정에도 걸리지 않는다.
+        public bool enabled = true;
+
         // 블록 8정점을 감싸는 월드 AABB. 맵 로드 시 1회 계산. 충돌 브로드페이즈 fast-reject 용.
         public Vector3 boundsMin;
         public Vector3 boundsMax;

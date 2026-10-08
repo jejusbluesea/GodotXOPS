@@ -149,6 +149,41 @@ func set_auto_judge(p, state):
 	api["set_auto_judge"].call(p["enabled"] != 0)
 	return 0
 
+# Turns the object to "look" at once (the direction of an object point; below 0: the direction of the path point),
+# then moves it to the path point over "time" seconds. Blocks and humans do not stop it. The line goes on at once.
+func tween_object(p, state):
+	var point = api["path_point"].call(p["path"])
+	if not point.get("exists", false):
+		return 0
+	var yaw = p["look"]
+	if yaw < 0:
+		yaw = point["yaw"]
+	api["tween_object"].call(p["object"], point["x"], point["y"], point["z"], yaw, p["time"], p["ease"])
+	return 0
+
+# Plays a sound of the sound list in a slot, at this point or everywhere. A volume of 0 or less means 1.
+func play_sound(p, state):
+	var volume = p["volume"]
+	if volume <= 0:
+		volume = 1.0
+	api["play_sound"].call(p["slot"], p["sound"], volume, p["loop"], p["everywhere"], p["x"], p["y"], p["z"])
+	return 0
+
+func stop_sound(p, state):
+	api["stop_sound"].call(p["slot"])
+	return 0
+
+# Moves and turns a block over "time" seconds. dx, dy, dz (meters) and pitch, roll, turn (degrees; turn is the yaw) are measured from the block as it is in the file,
+# so giving all zeros brings it back. It turns around its own center. Other blocks and humans do not stop it. The line goes on at once.
+func move_block(p, state):
+	api["move_block"].call(p["block"], p["dx"], p["dy"], p["dz"], p["pitch"], p["roll"], p["turn"], p["time"], p["ease"])
+	return 0
+
+# Off: the block is not drawn and nothing collides with it. On: it is back as it was.
+func toggle_block(p, state):
+	api["toggle_block"].call(p["block"], p["enable"])
+	return 0
+
 # Slot 1 is the primary slot (held when the mission starts), slot 0 is the secondary slot.
 func give_weapon_primary(p, state):
 	api["give_weapon"].call(api["find_human"].call(p["human"]), 1, p["weapon"], p["bullets"])

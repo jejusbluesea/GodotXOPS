@@ -15,6 +15,8 @@ namespace GodotXOPS
         private const int k_maxCallsPerEvent = 1000;
         // 로그 한 줄의 최대 글자 수.
         private const int k_maxLogChars = 200;
+        // 소물이나 블록을 움직이는 데 걸리는 시간의 상한 (초).
+        private const float k_maxTweenSeconds = 3600f;
 
         // 키 이름 가운데 줄여 쓰는 것 (OPTION 화면의 표기와 같다). 그 밖의 키는 이름을 대문자로 쓴다.
         private static readonly Dictionary<string, string> s_keyLabels = new Dictionary<string, string>
@@ -66,8 +68,18 @@ namespace GodotXOPS
                 ["spawn_object"] = Callable.From((int objectIndex, int id, float x, float y, float z, float yaw, bool snap) =>
                     Enter() && MapLoader.SpawnSmallObject(objectIndex, id, new Vector3(x, y, z), yaw, snap)),
                 ["destroy_object"] = Callable.From((int id) => { if (Enter()) MapLoader.SearchSmallObject(id)?.Break(); }),
+                ["tween_object"] = Callable.From((int id, float x, float y, float z, float yaw, float seconds, bool ease) =>
+                    Enter() && TweenObject(id, new Vector3(x, y, z), yaw, seconds, ease)),
+                ["path_point"] = Callable.From((int pathId) => Enter() ? PathPointInfo(pathId) : new Godot.Collections.Dictionary()),
+                ["block"] = Callable.From((int index) => Enter() ? BlockInfo(index) : new Godot.Collections.Dictionary()),
+                ["move_block"] = Callable.From((int index, float x, float y, float z, float pitch, float roll, float yaw, float seconds, bool ease) =>
+                    Enter() && MoveBlock(index, new Vector3(x, y, z), new Vector3(pitch, yaw, roll), seconds, ease)),
+                ["toggle_block"] = Callable.From((int index, bool enabled) => Enter() && MapLoader.SetBlockEnabled(index, enabled)),
                 ["set_path_mode"] = Callable.From((int pathId, int mode) => { if (Enter()) SetPathMode(pathId, mode); }),
                 ["effect"] = Callable.From((int effect, float x, float y, float z) => { if (Enter()) PlayEffect(effect, new Vector3(x, y, z)); }),
+                ["play_sound"] = Callable.From((int slot, int sound, float volume, bool loop, bool everywhere, float x, float y, float z) =>
+                    Enter() && PlaySound(slot, sound, volume, loop, everywhere, new Vector3(x, y, z))),
+                ["stop_sound"] = Callable.From((int slot) => { if (Enter() && SoundManager.Loaded) SoundManager.Instance.StopSlot(slot); }),
 
                 // 미션
                 ["message"] = Callable.From((int id) => { if (Enter()) m_events.ShowMessage(id); }),
@@ -165,7 +177,7 @@ namespace GodotXOPS
         /// 소물 하나의 상태를 값만 담은 사전으로 만든다.
         /// </summary>
         /// <param name="id">식별번호.</param>
-        /// <returns>exists, destroyed, hp. 없는 소물이면 exists 가 false.</returns>
+        /// <returns>exists, destroyed, hp, x, y, z, moving(움직이는 중인지). 없는 소물이면 exists 가 false.</returns>
         private static Godot.Collections.Dictionary ObjectInfo(int id)
         {
             SmallObject smallObject = MapLoader.SearchSmallObject(id);
@@ -174,7 +186,111 @@ namespace GodotXOPS
                 ["exists"] = smallObject != null,
                 ["destroyed"] = smallObject != null && smallObject.IsDestroyed,
                 ["hp"] = smallObject != null ? smallObject.HP : 0f,
+                ["x"] = smallObject != null ? smallObject.LogicPosition.X : 0f,
+                ["y"] = smallObject != null ? smallObject.LogicPosition.Y : 0f,
+                ["z"] = smallObject != null ? smallObject.LogicPosition.Z : 0f,
+                ["moving"] = smallObject != null && smallObject.IsTweening,
             };
+        }
+
+        /// <summary>
+        /// 소물을 정해진 시간에 걸쳐 한 자리로 움직인다. 블록과 사람을 무시한다.
+        /// </summary>
+        /// <param name="id">소물의 식별번호.</param>
+        /// <param name="target">도착할 자리.</param>
+        /// <param name="yaw">소물의 방향 (도. 소물 포인트의 방향과 같은 값). 움직이기 시작할 때 바로 바뀐다.</param>
+        /// <param name="seconds">걸리는 시간 (초). 0 이하면 바로 옮긴다.</param>
+        /// <param name="ease">true 면 천천히 출발해 천천히 멈춘다.</param>
+        /// <returns>시작했으면 true. 없는 소물, 부서진 소물, 올바르지 않은 수면 false.</returns>
+        private static bool TweenObject(int id, Vector3 target, float yaw, float seconds, bool ease)
+        {
+            SmallObject smallObject = MapLoader.SearchSmallObject(id);
+            if (smallObject == null || !float.IsFinite(seconds)) return false;
+
+            int ticks = Mathf.RoundToInt(Mathf.Clamp(seconds, 0f, k_maxTweenSeconds) * SimClock.FrameRate);
+            return smallObject.StartTween(target, yaw, ticks, ease);
+        }
+
+        /// <summary>
+        /// 블록 하나의 상태를 값만 담은 사전으로 만든다.
+        /// </summary>
+        /// <param name="index">블록 번호 (파일 안의 순번).</param>
+        /// <returns>exists, enabled, moving, x, y, z(블록의 가운데). 없는 블록이면 exists 가 false.</returns>
+        private static Godot.Collections.Dictionary BlockInfo(int index)
+        {
+            Block block = index >= 0 && index < MapLoader.Blocks.Count ? MapLoader.Blocks[index] : null;
+            return new Godot.Collections.Dictionary
+            {
+                ["exists"] = block != null,
+                ["enabled"] = block != null && block.enabled,
+                ["moving"] = block != null && MapLoader.IsBlockMoving(index),
+                ["x"] = block != null ? block.position.X : 0f,
+                ["y"] = block != null ? block.position.Y : 0f,
+                ["z"] = block != null ? block.position.Z : 0f,
+            };
+        }
+
+        /// <summary>
+        /// 블록을 처음 모양 기준의 변위로 옮기고 돌린다. 다른 블록과 사람을 무시한다.
+        /// </summary>
+        /// <param name="index">블록 번호 (파일 안의 순번).</param>
+        /// <param name="offset">처음 자리에서의 이동량 (m).</param>
+        /// <param name="angles">처음 모양에서의 회전 (UnityXOPS 오일러 x pitch, y yaw, z roll, 도).</param>
+        /// <param name="seconds">걸리는 시간 (초). 0 이하면 바로 옮긴다.</param>
+        /// <param name="ease">true 면 천천히 출발해 천천히 멈춘다.</param>
+        /// <returns>시작했으면 true.</returns>
+        private static bool MoveBlock(int index, Vector3 offset, Vector3 angles, float seconds, bool ease)
+        {
+            if (!float.IsFinite(seconds)) return false;
+
+            int ticks = Mathf.RoundToInt(Mathf.Clamp(seconds, 0f, k_maxTweenSeconds) * SimClock.FrameRate);
+            return MapLoader.MoveBlock(index, offset, angles, ticks, ease);
+        }
+
+        /// <summary>
+        /// 경로 포인트 하나의 자리와 방향을 값만 담은 사전으로 만든다.
+        /// </summary>
+        /// <param name="pathId">경로 포인트의 식별번호.</param>
+        /// <returns>exists, x, y, z, yaw. 없는 포인트면 exists 가 false.</returns>
+        private static Godot.Collections.Dictionary PathPointInfo(int pathId)
+        {
+            RawPointData path = MapLoader.GetPathPoint(pathId);
+            return new Godot.Collections.Dictionary
+            {
+                ["exists"] = path != null,
+                ["x"] = path != null ? path.position.X : 0f,
+                ["y"] = path != null ? path.position.Y : 0f,
+                ["z"] = path != null ? path.position.Z : 0f,
+                ["yaw"] = path != null ? path.look : 0f,
+            };
+        }
+
+        /// <summary>
+        /// 소리 목록의 소리 하나를 칸에 재생한다. 없는 번호나 읽지 못한 파일은 경고만 남기고 넘어간다.
+        /// </summary>
+        /// <param name="slot">칸 번호 (0 이상 SoundManager.SlotCount 미만).</param>
+        /// <param name="sound">소리 목록의 번호 (10000 이상은 미션의 에드온 목록).</param>
+        /// <param name="volume">볼륨 (0 에서 1).</param>
+        /// <param name="loop">true 면 멈출 때까지 되풀이한다.</param>
+        /// <param name="everywhere">true 면 거리와 무관하게 들린다.</param>
+        /// <param name="position">소리가 나는 위치.</param>
+        /// <returns>재생했으면 true.</returns>
+        private static bool PlaySound(int slot, int sound, float volume, bool loop, bool everywhere, Vector3 position)
+        {
+            if (!SoundManager.Loaded || !position.IsFinite() || !float.IsFinite(volume)) return false;
+
+            DataList<SoundData> list = DataManager.Instance.SoundParameterData.soundData;
+            if (!list.Has(sound))
+            {
+                Debugger.LogWarning($"Event sound {sound} is not in the sound list", "Event");
+                return false;
+            }
+            if (!SoundManager.Instance.PlaySlot(slot, list[sound].soundPath, position, Mathf.Clamp(volume, 0f, 1f), loop, everywhere))
+            {
+                Debugger.LogWarning($"Event sound {sound} could not be played (slot {slot}, file \"{list[sound].soundPath}\")", "Event");
+                return false;
+            }
+            return true;
         }
 
         /// <summary>

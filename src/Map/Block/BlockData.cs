@@ -133,6 +133,7 @@ namespace GodotXOPS
 
                 if (block.mesh == null)
                 {
+                    loader.m_blockNodes.Add(null);
                     continue;
                 }
 
@@ -143,6 +144,7 @@ namespace GodotXOPS
                     instance.SetSurfaceOverrideMaterial(s, loader.m_blockMaterials[block.surfaceTextureIndices[s]]);
                 }
                 loader.m_blockRoot.AddChild(instance);
+                loader.m_blockNodes.Add(instance);
             }
         }
 
@@ -162,6 +164,10 @@ namespace GodotXOPS
             }
 
             loader.m_blocks.Clear();
+            loader.m_blockNodes.Clear();
+            loader.m_blockMoves.Clear();
+            loader.m_changedBlocks.Clear();
+            loader.UpdateBlockMover();
             foreach (List<Block> colliders in loader.m_layerColliders) colliders.Clear();
             loader.m_blockMaterials.Clear();
         }
@@ -498,6 +504,11 @@ namespace GodotXOPS
                 faceMaterials = raw.materialIndices,
                 faceNormals = faceNormals,
                 faceCenters = faceCenters,
+                baseVertices = (Vector3[])raw.vertices.Clone(),
+                baseFaceNormals = (Vector3[])faceNormals.Clone(),
+                baseFaceCenters = (Vector3[])faceCenters.Clone(),
+                basePosition = center,
+                baseLayerMask = layerMask,
                 boundsMin = boundsMin - Vector3.One * k_collisionAddSize,
                 boundsMax = boundsMax + Vector3.One * k_collisionAddSize,
             };
