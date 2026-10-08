@@ -7,7 +7,7 @@
 **GodotXOPS** — Godot 4.7.2 (.NET) 프로젝트. 일본 인디 FPS XOPS(2000년)의 오픈소스 구현 OpenXOPS를, 그 Unity 포팅본인 UnityXOPS를 참고해 Godot으로 옮긴다.
 
 - 참고 원본: `C:\Users\twoj2\Desktop\Project\UnityXOPS` (브랜치 `QoL-road-to-multiplay(0.4)`), C++ 원본은 그 안의 `OpenXOPS/`
-- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 을 릴리즈했다 (2026-10-05, 태그 `v1.0.0`). 최신 릴리즈는 1.0.1 이다 (2026-10-05, 태그 `v1.0.1`). 다음은 1.1.0 이다 (`ROADMAP.md`, `TODO.md`).
+- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 을 릴리즈했다 (2026-10-05, 태그 `v1.0.0`). 최신 릴리즈는 1.0.1 이다 (2026-10-05, 태그 `v1.0.1`). 다음은 1.1.0 이고 릴리즈 준비를 마쳤다 (쇼케이스가 남았다) (`ROADMAP.md`, `TODO.md`).
 
 ## 확정된 설계
 
@@ -31,7 +31,8 @@
 - `data/`, `addon/` — 원본 XOPS 에셋. **저작권상 커밋 금지** (`.gitignore` 처리됨). 로컬에만 둔다.
 - `editor_temp/` — 맵 에디터의 플레이 테스트가 쓰는 임시 파일. 커밋하지 않는다 (`.gitignore`, 만들 때 `.gdignore` 를 함께 쓴다).
 - `godotdata/` — 외부 게임 데이터 JSON (UnityXOPS의 `unitydata/`). 커밋 대상.
-- `addons/godot_sandbox/` — Godot Sandbox 확장 (GDExtension, v0.60, BSD-3-Clause. 원본 에셋 폴더 `addon/` 과 다른 폴더다). 스크립트로 만드는 이벤트를 격리해 돌리는 SafeGDScript 의 실행기다. Windows x86_64 용 DLL 과 `gdscript.elf` 만 넣었고 커밋한다 (사용자 결정. 버전을 고정한다). 에디터 플러그인과 테스트 파일은 뺐다. 저장소를 새로 받으면 `--headless --import` 를 한 번 돌려야 확장이 등록된다. **외부에서 받은 스크립트는 이 샌드박스로만 돌린다. 일반 GDScript 로 컴파일하지 않는다** (`EVENT_SCRIPT_SECURITY.md`).
+- `addons/godot_sandbox/` — Godot Sandbox 확장 (GDExtension, v0.60, BSD-3-Clause. 원본 에셋 폴더 `addon/` 과 다른 폴더다). 스크립트로 만드는 이벤트를 격리해 돌리는 SafeGDScript 의 실행기다. Windows x86_64 용 DLL 과 `gdscript.elf` 만 넣었고 커밋한다 (사용자 결정. 버전을 고정한다). 에디터 플러그인과 테스트 파일은 뺐다. 저장소를 새로 받으면 `--headless --import` 를 한 번 돌려야 확장이 등록된다. **외부에서 받은 스크립트는 이 샌드박스로만 돌린다. 일반 GDScript 로 컴파일하지 않는다.**
+- `dist/` — 릴리즈 파일에 함께 넣는 것: `GodotXOPS_Editor.bat`(에디터 실행, 사용자 결정), `THIRD_PARTY_NOTICES.txt`(Godot Engine, Godot Sandbox, .NET 런타임의 라이선스 전문. 엔진이나 확장의 버전을 올리면 다시 만든다). 외부 라이브러리의 고지는 README 와 이 파일에만 적고 `global.json` 과 메뉴의 크레딧에는 넣지 않는다 (사용자 결정). `.gdignore` 가 있다.
 - `data/`, `addon/`, `godotdata/`에는 `.gdignore`가 있어 Godot이 임포트하지 않는다. 런타임에 `GamePath.Resolve()`로 전체 경로를 얻어 파일로 직접 읽는다.
 
 ## 좌표 변환
@@ -118,7 +119,8 @@ dotnet build GodotXOPS.csproj
 
 - 프리셋은 `export_presets.cfg`의 "Windows Desktop" 이다. `build/`는 커밋하지 않는다 (`.gitignore`, `.gdignore`).
 - 결과물: `GodotXOPS.exe`, `GodotXOPS.pck`, `data_GodotXOPS_windows_x86_64/`(.NET 런타임과 어셈블리. 게임 데이터 `data/`와 다른 폴더다).
-- 실행 파일 옆에 `data/`, `addon/`, `godotdata/`, `addon.json`이 있어야 한다 (`GamePath.Root`가 익스포트 빌드에서는 실행 파일 폴더다).
+- 실행 파일 옆에 `data/`, `addon/`, `godotdata/`, `addon.json`이 있어야 한다 (`GamePath.Root`가 익스포트 빌드에서는 실행 파일 폴더다). 샌드박스 확장의 DLL 도 실행 파일 옆에 나온다.
+- 릴리즈 폴더(`build/버전/GodotXOPS/`)에는 익스포트 결과물, `godotdata/`, `addon.json`, `dist/` 의 두 파일, `LICENSE`(`LICENSE.txt` 로)를 넣는다. `data/` 와 `addon/` 은 넣지 않는다.
 - 익스포트 뒤 Godot 프로세스가 한동안 종료되지 않을 때가 있으므로 백그라운드로 돌린다.
 - 개발용 인자("--" 뒤)는 빌드에서도 동작한다. 뽑은 뒤 `GodotXOPS.exe --headless -- --scene mainmenu --ui-quit 2`의 종료 코드로 뜨는지 본다.
 - 아이콘은 `xops.png`(`config/icon`)이고 실행 파일에도 들어간다. 부트 스플래시는 로고 없이 검은 배경이다 (끄는 설정은 없다).

@@ -17,6 +17,10 @@
 - 메뉴의 OPTION 에서 키 바인딩, 해상도, 밝기·감마, 조준선 모양, 음량 설정
 - 사람·무기·오브젝트·이펙트 수치를 `godotdata/`의 JSON 으로 수정
 - `addon.json`으로 에드온 폴더를 여러 페이지로 나누어 등록
+- 확장 파일 형식 (BD2, PD2, MIF2): 텍스처 개수, 포인트 번호, 이벤트 줄 수의 제한이 없고, 미션이 자기만의 사람·무기·오브젝트·이펙트·재질·소리를 들고 올 수 있습니다. 원본 형식(BD1, PD1, MIF)도 그대로 읽습니다
+- 스크립트 이벤트: 원본의 이벤트 열 가지에 더해 변수와 분기, 스폰, 화면 글자, 오브젝트와 블록 움직이기, 소리 재생 등 36종이 들어 있고, 직접 만든 이벤트 묶음을 더할 수 있습니다. 스크립트는 격리된 환경에서만 돕니다
+- [에디터](#에디터): 블록, 포인트와 이벤트, 미션, 데이터를 고치고 바로 플레이해 봅니다
+- 디버그 콘솔 (`godotdata/config.json`의 `AllowConsole`을 `"true"`로 바꾸면 F11)
 
 ## 설치와 실행
 
@@ -32,10 +36,14 @@
 ```
 GodotXOPS/
 ├─ GodotXOPS.exe
+├─ GodotXOPS_Editor.bat             (에디터 실행)
 ├─ GodotXOPS.pck
+├─ libgodot_riscv.windows.template_release.x86_64.dll   (스크립트 이벤트의 실행기)
 ├─ data_GodotXOPS_windows_x86_64/   (.NET 런타임. 게임 데이터가 아닙니다)
 ├─ godotdata/                       (설정과 게임 수치 JSON)
 ├─ addon.json
+├─ LICENSE.txt
+├─ THIRD_PARTY_NOTICES.txt
 ├─ data/                            (원본 XOPS 에서 복사)
 └─ addon/                           (선택)
 ```
@@ -56,12 +64,21 @@ GodotXOPS/
 | 무기 슬롯 1 / 2 | 1 / 2 |
 | 발사 방식 전환 (단발 / 연발 등, 이전 / 다음) | Z / X |
 | 무기 버리기 | G |
+| 상호작용 (미션의 이벤트가 쓸 때만) | F |
 | 시점 전환 (1인칭 / 3인칭) | F1 |
 | HUD 표시 방식 | F2 |
 | 미션 재시작 | F12 |
 | 메뉴로 나가기 | ESC |
 
 원본의 치트 키(F5 ~ F9)도 그대로 들어 있습니다.
+
+## 에디터
+
+`GodotXOPS_Editor.bat`을 실행합니다 (`GodotXOPS.exe -- --scene editor`와 같습니다). 확장 형식의 블록(BD2), 포인트와 이벤트(PD2), 미션(MIF2), 데이터(JSON)를 만들고 고칩니다. 원본 형식의 맵과 미션은 File 의 Import 로 확장 형식으로 바꿔서 엽니다.
+
+- 조작은 블렌더의 기본 키를 따릅니다: 가운데 버튼으로 시점, 왼쪽 클릭으로 선택, G / R / S 로 옮기기·돌리기·크기 바꾸기. 같은 기능이 메뉴와 버튼에도 있습니다.
+- F5 로 지금 내용을 바로 플레이해 보고 Esc 로 돌아옵니다.
+- 화면의 글자는 영어입니다. 조작 전체는 [개발 문서의 에디터](docs/development.md#에디터)에 있습니다.
 
 ## 에드온 페이지
 
@@ -82,8 +99,8 @@ GodotXOPS/
 
 ## 문서
 
-- [모딩 문서](docs/modding.md) — `godotdata/` JSON 으로 무기·사람·오브젝트·이펙트·미션을 고치는 방법, 에드온 페이지
-- [개발 문서](docs/development.md) — 소스에서 빌드, 코드 구조, 점검 도구, 원본과 다르게 한 동작
+- [모딩 문서](docs/modding.md) — `godotdata/` JSON 으로 무기·사람·오브젝트·이펙트·미션을 고치는 방법, 확장 파일 형식, 스크립트 이벤트, 에드온 페이지
+- [개발 문서](docs/development.md) — 소스에서 빌드, 코드 구조, 점검 도구, 에디터, 디버그 콘솔, 원본과 다르게 한 동작
 
 ## 원본과의 차이
 
@@ -91,12 +108,13 @@ GodotXOPS/
 
 ## 앞으로 할 것
 
-1.0.0 으로 포팅을 마쳤고, 1.0.1 에서 디버그 콘솔을 넣고 버그를 고쳤습니다. 다음은 원본 파일 형식의 한계를 넘는 확장 파일 형식(1.1.0)입니다. 버전별 계획은 [로드맵](ROADMAP.md)에 있습니다.
+1.0.0 으로 포팅을 마쳤고, 1.1.0 에서 확장 파일 형식과 스크립트 이벤트, 에디터를 넣었습니다. 다음 버전에 넣을 것은 정해지는 대로 [로드맵](ROADMAP.md)에 적습니다.
 
 ## 라이선스와 고지
 
 - 이 저장소의 코드는 [MIT License](LICENSE) 입니다.
 - XOPS 의 에셋(`data`, `addon`)은 원저작자의 것이며 이 저장소에 포함되어 있지 않습니다.
+- [Godot Engine](https://godotengine.org) (MIT) 으로 만들었고, 스크립트 이벤트의 실행에 [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60 (Alf-André Walla, BSD-3-Clause) 을 씁니다. 라이선스 전문은 릴리즈 파일의 `THIRD_PARTY_NOTICES.txt`([저장소의 것](dist/THIRD_PARTY_NOTICES.txt))에 있습니다.
 - 코드 작성과 번역에 AI 를 사용했습니다. 2D·3D·사운드 에셋은 AI 생성물이 아닙니다.
 
 ## 참고한 프로젝트

@@ -46,6 +46,15 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 - 실행하려면 실행 파일 옆에 `data/`, `addon/`, `godotdata/`, `addon.json`을 둡니다.
 - 익스포트가 끝난 뒤에도 Godot 프로세스가 한동안 종료되지 않을 때가 있습니다. 결과물은 이미 만들어져 있습니다.
 - 뜨는지 확인: `GodotXOPS.exe --headless -- --scene mainmenu --ui-quit 2`의 종료 코드가 0 이면 됩니다.
+- 스크립트 이벤트의 실행기(`libgodot_riscv.windows.template_release.x86_64.dll`)가 실행 파일 옆에 함께 나옵니다. 지우면 스크립트 이벤트를 쓰는 미션이 로드되지 않습니다.
+
+릴리즈 파일에는 익스포트 결과물과 `godotdata/`, `addon.json` 에 더해 `dist/` 의 파일을 넣습니다.
+
+| 파일 | 내용 |
+|---|---|
+| `dist/GodotXOPS_Editor.bat` | 에디터를 여는 배치 파일 (`GodotXOPS.exe -- --scene editor`) |
+| `dist/THIRD_PARTY_NOTICES.txt` | 함께 배포하는 외부 소프트웨어(Godot Engine, Godot Sandbox, .NET 런타임)의 라이선스 전문. 엔진이나 확장의 버전을 올리면 다시 만듭니다 (Godot 의 것은 `Engine.get_license_text()`, `get_copyright_info()`, `get_license_info()` 로 뽑았습니다) |
+| `LICENSE` | `LICENSE.txt` 로 이름을 바꿔 넣습니다 |
 
 ## 폴더 구조
 
@@ -65,6 +74,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 | `shaders/` | `.gdshader` |
 | `godotdata/` | 외부 게임 데이터 JSON ([모딩 문서](modding.md)) |
 | `addons/godot_sandbox/` | Godot Sandbox 확장 (스크립트 이벤트의 실행기. Windows x86_64 용 바이너리를 버전을 고정해 커밋합니다). 저장소를 새로 받으면 `--headless --import` 를 한 번 돌려야 등록됩니다 |
+| `dist/` | 릴리즈 파일에 함께 넣는 것 (에디터 실행 배치 파일, 외부 소프트웨어의 라이선스 고지) |
 | `data/`, `addon/` | 원본 XOPS 에셋. 커밋하지 않습니다 |
 
 `data/`, `addon/`, `godotdata/`는 Godot 이 임포트하지 않습니다 (`.gdignore`). 런타임에 `GamePath.Resolve()`로 전체 경로를 얻어 파일로 직접 읽습니다.
@@ -177,7 +187,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 godot --path . -- --scene editor
 ```
 
-익스포트 빌드에서는 `GodotXOPS.exe -- --scene editor` 입니다.
+익스포트 빌드에서는 `GodotXOPS.exe -- --scene editor` 이고, 릴리즈 파일에는 그 명령을 담은 `GodotXOPS_Editor.bat` 이 들어 있습니다.
 
 - 에디터는 파일의 내용을 편집하고 3D 화면은 그것을 보여 줍니다. 블록은 문서의 내용을 게임의 로더에 넘겨 띄우고(안개는 끕니다. 블록을 고치면 다시 만듭니다), 포인트는 게임처럼 스폰하지 않고 표식(종류별 색, 방향 화살표, 식별번호)으로 그립니다.
 - File 메뉴에서 미션(MIF2. 그 미션의 블록과 포인트를 엽니다), 블록(BD2), 포인트(PD2)를 엽니다. 게임 폴더 안의 파일만 열 수 있습니다. 원본 형식(BD1, PD1)은 열지 않습니다.
