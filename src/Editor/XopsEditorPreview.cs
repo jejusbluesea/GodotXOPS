@@ -45,6 +45,17 @@ namespace GodotXOPS.Editor
         private Control m_previewLegBox;
         private Label m_previewArmLabel;
         private Label m_previewLegLabel;
+        // 무기를 팔과 함께(쥔 자세로) 보여 줄지, 사람의 히트박스를 그릴지. 미리 보기 아래의 체크 상자로 바꾼다.
+        private bool m_previewHeld = true;
+        private bool m_previewHitbox = true;
+        private CheckBox m_previewHeldToggle;
+        private CheckBox m_previewHitboxToggle;
+        // 지금 보는 것에 그 체크 상자가 뜻이 있는지.
+        private bool m_previewHeldOption;
+        private bool m_previewHitboxOption;
+        private static readonly Color s_hitboxHeadColor = new Color(1f, 0.3f, 0.3f, 0.95f);
+        private static readonly Color s_hitboxBodyColor = new Color(1f, 0.9f, 0.2f, 0.95f);
+        private static readonly Color s_hitboxLegColor = new Color(0.3f, 0.7f, 1f, 0.95f);
         // 이펙트를 미리 볼 때의 시점: 보는 자리의 높이와 거리 (m).
         private const float k_effectFocusHeight = 0.3f;
         private const float k_effectFocusRadius = 0.8f;
@@ -91,6 +102,12 @@ namespace GodotXOPS.Editor
             box.AddChild(variants);
             m_previewArmBox = BuildVariantBox(variants, "Arm", step => m_previewArm += step, out m_previewArmLabel);
             m_previewLegBox = BuildVariantBox(variants, "Leg", step => m_previewLeg += step, out m_previewLegLabel);
+            m_previewHeldToggle = new CheckBox { Text = "Arms", ButtonPressed = m_previewHeld, Visible = false, TooltipText = "Show the weapon held, with the arms it uses (no texture). Off: the weapon alone, at its size on the ground" };
+            m_previewHeldToggle.Toggled += pressed => SetPreviewOption(ref m_previewHeld, pressed);
+            variants.AddChild(m_previewHeldToggle);
+            m_previewHitboxToggle = new CheckBox { Text = "Hitbox", ButtonPressed = m_previewHitbox, Visible = false, TooltipText = "Draw where bullets hit: head red, body yellow, legs blue" };
+            m_previewHitboxToggle.Toggled += pressed => SetPreviewOption(ref m_previewHitbox, pressed);
+            variants.AddChild(m_previewHitboxToggle);
 
             m_previewCaption = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Modulate = s_hintColor };
             box.AddChild(m_previewCaption);
@@ -123,6 +140,20 @@ namespace GodotXOPS.Editor
                 RefreshAssetPreview();
             });
             return box;
+        }
+
+        /// <summary>
+        /// 미리 보기의 체크 상자 하나를 바꾸고 다시 그린다. 보이는 것의 크기가 달라지므로 시점도 다시 맞춘다.
+        /// </summary>
+        /// <param name="option">바꿀 값.</param>
+        /// <param name="enabled">새 값.</param>
+        private void SetPreviewOption(ref bool option, bool enabled)
+        {
+            if (option == enabled) return;
+
+            option = enabled;
+            m_previewSubject = null;
+            RefreshAssetPreview();
         }
 
         /// <summary>
@@ -223,6 +254,8 @@ namespace GodotXOPS.Editor
             m_previewImage.Visible = false;
             m_previewArmBox.Visible = false;
             m_previewLegBox.Visible = false;
+            m_previewHeldToggle.Visible = false;
+            m_previewHitboxToggle.Visible = false;
             m_previewCaption.Text = "Select a weapon, object, human or effect (or one of their models, colliders or image paths) to see it here.\nDrag to turn, wheel to zoom. One grid square is 0.5 m.";
         }
 
@@ -255,6 +288,8 @@ namespace GodotXOPS.Editor
             m_previewImage.Visible = true;
             m_previewArmBox.Visible = false;
             m_previewLegBox.Visible = false;
+            m_previewHeldToggle.Visible = false;
+            m_previewHitboxToggle.Visible = false;
             m_previewImage.Texture = texture;
             m_previewCaption.Text = texture != null ? $"{path}\n{texture.GetWidth()} x {texture.GetHeight()}" : $"{path}\n(the file could not be read)";
             return true;
@@ -278,6 +313,8 @@ namespace GodotXOPS.Editor
             }
             m_previewArmCount = 0;
             m_previewLegCount = 0;
+            m_previewHeldOption = false;
+            m_previewHitboxOption = false;
             switch (value)
             {
                 case EffectData effect:
@@ -290,13 +327,29 @@ namespace GodotXOPS.Editor
                 }
 
                 case WeaponModelData model:
+                {
+                    // 쥔 자리와 크기는 무기 데이터에 있다. 이 모델을 쓰는 첫 무기의 것으로 보여 준다.
+                    WeaponData owner = FindWeaponUsing(model);
+                    m_previewHeldOption = owner != null;
+                    if (m_previewHeld && owner != null && AddHeldWeapon(subject, owner, model))
+                    {
+                        caption = $"Weapon model: {model.name}\nheld as {owner.name}: left arm {model.leftArmIndex}, right arm {model.rightArmIndex}";
+                        break;
+                    }
                     WeaponVisual.BuildModelParts(subject, model.textures, model.modelData);
                     caption = $"Weapon model: {model.name}";
                     break;
+                }
 
                 case WeaponData weapon:
                 {
                     WeaponModelData model = LookupData<WeaponModelData>(typeof(WeaponParameterData), nameof(WeaponParameterData.weaponModelData), weapon.modelIndex);
+                    m_previewHeldOption = model != null;
+                    if (m_previewHeld && model != null && AddHeldWeapon(subject, weapon, model))
+                    {
+                        caption = $"Weapon: {weapon.name}\nmodel {weapon.modelIndex} ({model.name}), held: left arm {model.leftArmIndex}, right arm {model.rightArmIndex}";
+                        break;
+                    }
                     if (model != null) WeaponVisual.BuildModelParts(subject, model.textures, model.modelData);
                     // 떨어진 무기와 같은 크기로 보여 준다.
                     subject.Scale = Vector3.One * Mathf.Max(1e-4f, weapon.size * DataManager.Instance.WeaponParameterData.weaponGeneralData.weaponScale);
@@ -334,8 +387,24 @@ namespace GodotXOPS.Editor
                     HumanModelData model = LookupData<HumanModelData>(typeof(HumanParameterData), nameof(HumanParameterData.humanModelData), human.modelIndex);
                     if (model != null) AddHumanModel(subject, model);
                     caption = model != null ? $"Human: {human.name}\nmodel {human.modelIndex} ({model.name})" : $"Human: {human.name}\nno model {human.modelIndex}";
+
+                    // 히트박스는 사람 종류가 정한다 (게임과 같이 범위를 벗어난 번호는 가까운 끝의 것).
+                    HumanTypeData type = LookupData<HumanTypeData>(typeof(HumanParameterData), nameof(HumanParameterData.humanTypeData), human.typeIndex);
+                    IList sizes = ListOf(typeof(HumanParameterData), nameof(HumanParameterData.humanHitboxSizeData));
+                    m_previewHitboxOption = sizes != null && sizes.Count > 0;
+                    if (m_previewHitbox && m_previewHitboxOption)
+                    {
+                        int hitboxIndex = Mathf.Clamp(type != null ? type.hitboxSizeIndex : 0, 0, sizes.Count - 1);
+                        subject.AddChild(BuildHitboxWire(sizes[hitboxIndex] as HumanHitboxSizeData));
+                        caption += $"\nhitbox {hitboxIndex} of type {human.typeIndex}: head red, body yellow, legs blue";
+                    }
                     break;
                 }
+
+                case HumanHitboxSizeData size:
+                    subject.AddChild(BuildHitboxWire(size));
+                    caption = "Human hitbox: head red, body yellow, legs blue";
+                    break;
 
                 case HumanArmModelData arms:
                     m_previewArmCount = Mathf.Max(arms.leftArms.Count, arms.rightArms.Count);
@@ -364,6 +433,8 @@ namespace GodotXOPS.Editor
             m_previewCaption.Text = caption;
             m_previewArmBox.Visible = m_previewArmCount > 1;
             m_previewLegBox.Visible = m_previewLegCount > 1;
+            m_previewHeldToggle.Visible = m_previewHeldOption;
+            m_previewHitboxToggle.Visible = m_previewHitboxOption;
             m_previewArmLabel.Text = $"{m_previewArm + 1} / {m_previewArmCount}";
             m_previewLegLabel.Text = $"{m_previewLeg + 1} / {m_previewLegCount}";
 
@@ -404,6 +475,10 @@ namespace GodotXOPS.Editor
             HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
             ShaderMaterial MaterialAt(int index) => MapLoader.GetEntityMaterial(index >= 0 && index < model.textures.Count ? model.textures[index] : null);
 
+            // 원본 모델은 정면이 반대라 게임은 사람의 모델 전체를 Y 180° 돌려 놓는다 (HumanVisual.BuildNodes). 히트박스와 방향이 맞게 똑같이 한다.
+            var visual = new Node3D { Name = "Visual", Rotation = new Vector3(0f, Mathf.Pi, 0f) };
+            parent.AddChild(visual);
+            parent = visual;
             var body = new Node3D { Name = "Body", Position = new Vector3(0f, general.humanBodyHeight, 0f), Scale = Vector3.One * general.humanBodyScale };
             parent.AddChild(body);
             WeaponVisual.BuildModelParts(body, model.textures, model.modelData);
@@ -434,6 +509,104 @@ namespace GodotXOPS.Editor
                     Scale = Vector3.One * general.humanLegScale,
                 });
             }
+        }
+
+        /// <summary>
+        /// 무기를 쥔 자세로 더한다: 그 무기 모델이 고르는 왼팔·오른팔 메시(텍스처 없음)와, 팔의 부착 자리에 붙은 무기.
+        /// 게임의 HumanVisual 과 WeaponVisual 을 그대로 써서 조립한다 (몸통과 다리는 감춘다). 팔 메시는 첫 사람 데이터의 팔 모델에서 가져온다.
+        /// </summary>
+        /// <param name="parent">더할 부모.</param>
+        /// <param name="weapon">무기 데이터 (쥐는 자리, 크기).</param>
+        /// <param name="model">무기 모델 데이터 (팔 번호, 고정 각도).</param>
+        /// <returns>조립했으면 true. 팔을 가져올 사람 데이터가 없으면 false.</returns>
+        private static bool AddHeldWeapon(Node3D parent, WeaponData weapon, WeaponModelData model)
+        {
+            DataList<HumanData> humans = DataManager.Instance.HumanParameterData.humanData;
+            if (humans.Count == 0) return false;
+
+            var visual = new HumanVisual { Name = "Held" };
+            parent.AddChild(visual);
+            visual.CreateHumanVisual(null, humans[0]);
+            visual.SetBodyVisible(false);
+            visual.ApplyWeaponAttachScale(DataManager.Instance.WeaponParameterData.weaponGeneralData.weaponScale);
+            visual.ApplyArmModel(model, false);
+            ShaderMaterial plain = MapLoader.GetEntityMaterial(null);
+            foreach (string arm in new[] { "Left", "Right" })
+            {
+                if (visual.FindChild(arm, true, false) is MeshInstance3D mesh) mesh.MaterialOverride = plain;
+            }
+
+            var weaponVisual = new WeaponVisual { Name = "Weapon" };
+            (model.fixRightArm ? visual.FixedWeaponAttachRoot : visual.DynamicWeaponAttachRoot).AddChild(weaponVisual);
+            weaponVisual.Build(weapon, model);
+            return true;
+        }
+
+        /// <summary>
+        /// 무기 모델을 쓰는 첫 무기를 찾는다.
+        /// </summary>
+        /// <param name="model">무기 모델 데이터.</param>
+        /// <returns>무기 데이터. 없으면 null.</returns>
+        private WeaponData FindWeaponUsing(WeaponModelData model)
+        {
+            IList models = ListOf(typeof(WeaponParameterData), nameof(WeaponParameterData.weaponModelData));
+            IList weapons = ListOf(typeof(WeaponParameterData), nameof(WeaponParameterData.weaponData));
+            int index = models == null ? -1 : models.IndexOf(model);
+            if (index < 0 || weapons == null) return null;
+
+            foreach (object item in weapons)
+            {
+                if (item is WeaponData weapon && weapon.modelIndex == index) return weapon;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 사람의 히트박스(머리, 상반신, 다리의 원기둥)를 선으로 그린다. 판정과 같은 자리와 크기다 (HumanHitbox.Contains, 몸 방향 yaw 0).
+        /// </summary>
+        /// <param name="size">한 체형의 히트박스 데이터. null 이면 빈 노드.</param>
+        /// <returns>선으로 그린 노드.</returns>
+        private static MeshInstance3D BuildHitboxWire(HumanHitboxSizeData size)
+        {
+            var mesh = new ImmediateMesh();
+            var material = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                VertexColorUseAsAlbedo = true,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                NoDepthTest = true,
+            };
+            var parts = new (HitboxPartSizeData Part, Color Color)[]
+            {
+                (size?.head, s_hitboxHeadColor), (size?.body, s_hitboxBodyColor), (size?.leg, s_hitboxLegColor),
+            };
+            var lines = new List<Vector3>();
+            foreach ((HitboxPartSizeData part, Color color) in parts)
+            {
+                if (part == null || part.radius <= 0f || part.height <= 0f) continue;
+
+                // 원기둥의 축은 부위의 로컬 Y 다. 중심에서 위아래로 높이의 절반씩이다.
+                lines.Clear();
+                Vector3 half = Vector3.Up * (part.height * 0.5f);
+                AddWireCircle(lines, half, part.radius, 1);
+                AddWireCircle(lines, -half, part.radius, 1);
+                foreach (Vector3 side in new[] { Vector3.Right, Vector3.Left, Vector3.Forward, Vector3.Back })
+                {
+                    lines.Add(half + side * part.radius);
+                    lines.Add(-half + side * part.radius);
+                }
+
+                Basis rotation = Basis.FromEuler(Coord.FromUnityEuler(part.rotationEuler));
+                Vector3 center = Coord.FromUnity(part.position);
+                mesh.SurfaceBegin(Mesh.PrimitiveType.Lines, material);
+                foreach (Vector3 point in lines)
+                {
+                    mesh.SurfaceSetColor(color);
+                    mesh.SurfaceAddVertex(center + rotation * point);
+                }
+                mesh.SurfaceEnd();
+            }
+            return new MeshInstance3D { Name = "Hitbox", Mesh = mesh };
         }
 
         /// <summary>
@@ -584,7 +757,7 @@ namespace GodotXOPS.Editor
             {
                 Node node = pending.Pop();
                 foreach (Node child in node.GetChildren()) pending.Push(child);
-                if (node is not MeshInstance3D { Mesh: not null } instance) continue;
+                if (node is not MeshInstance3D { Mesh: not null } instance || !instance.IsVisibleInTree()) continue;
 
                 Aabb bounds = instance.GlobalTransform * instance.Mesh.GetAabb();
                 if (bounds.Size == Vector3.Zero) continue;
@@ -625,23 +798,63 @@ namespace GodotXOPS.Editor
                 return ItemAt<T>(addon.FileKind.Type == containerType ? field.GetValue(addon.Container) : null, index - DataList<T>.AddonBase);
             }
 
-            // 보고 있는 파일, 그다음 열려 있는 다른 파일, 그다음 게임의 데이터.
-            if (m_asset != null && m_asset.FileKind.Type == containerType && m_asset.Fields.Contains(field)) return ItemAt<T>(field.GetValue(m_asset.Container), index);
-            foreach (AssetFile file in m_assetFiles.Values)
+            return ItemAt<T>(ListOf(containerType, listName), index);
+        }
+
+        /// <summary>
+        /// 기본 데이터의 목록 하나를 찾는다: 보고 있는 파일, 그다음 열려 있는 다른 기본 데이터 파일(저장하지 않은 편집 포함), 그다음 게임이 읽어 둔 데이터.
+        /// </summary>
+        /// <param name="containerType">목록이 든 데이터 클래스.</param>
+        /// <param name="listPath">목록 필드의 이름. 안쪽의 목록이면 점으로 잇는다 (예: "humanAIParameterData.aiData").</param>
+        /// <returns>목록. 없으면 null.</returns>
+        private IList ListOf(Type containerType, string listPath)
+        {
+            string[] steps = listPath.Split('.');
+            FieldInfo top = containerType.GetField(steps[0]);
+            if (top == null) return null;
+
+            object container = null;
+            if (m_asset != null && m_asset.FileKind.Type == containerType && m_asset.Fields.Contains(top))
             {
-                if (file.FileKind.Type == containerType && file.Fields.Contains(field) && file.Path.StartsWith(k_dataFolder + "/", StringComparison.OrdinalIgnoreCase))
+                container = m_asset.Container;
+            }
+            else
+            {
+                foreach (AssetFile file in m_assetFiles.Values)
                 {
-                    return ItemAt<T>(field.GetValue(file.Container), index);
+                    if (file.FileKind.Type != containerType || !file.Fields.Contains(top) || !file.Path.StartsWith(k_dataFolder + "/", StringComparison.OrdinalIgnoreCase)) continue;
+                    container = file.Container;
+                    break;
                 }
             }
 
-            DataManager data = DataManager.Instance;
-            object container = containerType == typeof(HumanParameterData) ? data.HumanParameterData
-                : containerType == typeof(WeaponParameterData) ? data.WeaponParameterData
-                : containerType == typeof(ObjectParameterData) ? data.ObjectParameterData
-                : containerType == typeof(EffectParameterData) ? data.EffectParameterData
-                : null;
-            return container == null ? null : ItemAt<T>(field.GetValue(container), index);
+            if (container == null)
+            {
+                DataManager data = DataManager.Instance;
+                container = containerType == typeof(HumanParameterData) ? data.HumanParameterData
+                    : containerType == typeof(WeaponParameterData) ? data.WeaponParameterData
+                    : containerType == typeof(ObjectParameterData) ? data.ObjectParameterData
+                    : containerType == typeof(EffectParameterData) ? data.EffectParameterData
+                    : containerType == typeof(BlockMaterialParameterData) ? data.BlockMaterialParameterData
+                    : null;
+            }
+            return WalkList(container, steps);
+        }
+
+        /// <summary>
+        /// 데이터 객체에서 필드를 차례로 따라가 목록을 얻는다.
+        /// </summary>
+        /// <param name="container">시작하는 객체. null 이어도 된다.</param>
+        /// <param name="steps">따라갈 필드 이름들.</param>
+        /// <returns>목록. 중간에 없는 필드가 있거나 끝이 목록이 아니면 null.</returns>
+        private static IList WalkList(object container, string[] steps)
+        {
+            object value = container;
+            foreach (string step in steps)
+            {
+                value = value?.GetType().GetField(step)?.GetValue(value);
+            }
+            return value as IList;
         }
 
         /// <summary>

@@ -26,6 +26,8 @@ namespace GodotXOPS.Editor
             public int Index = -1;
             // 목록이면 항목의 형식, 아니면 null.
             public Type ElementType;
+            // 다른 목록의 항목을 번호로 가리키는 값이면 그 목록. 번호들의 목록이면 목록과 그 항목들이 함께 갖는다.
+            public AssetReference Reference;
             public TreeItem Item;
         }
 
@@ -109,7 +111,7 @@ namespace GodotXOPS.Editor
 
             m_assetTree = new Tree
             {
-                Columns = 2,
+                Columns = 3,
                 HideRoot = true,
                 ColumnTitlesVisible = true,
                 SizeFlagsVertical = Control.SizeFlags.ExpandFill,
@@ -117,6 +119,10 @@ namespace GodotXOPS.Editor
             };
             m_assetTree.SetColumnTitle(k_assetKeyColumn, "Key");
             m_assetTree.SetColumnTitle(k_assetValueColumn, "Value");
+            m_assetTree.SetColumnTitle(k_assetNameColumn, "Refers to");
+            m_assetTree.SetColumnExpandRatio(k_assetKeyColumn, 3);
+            m_assetTree.SetColumnExpandRatio(k_assetValueColumn, 3);
+            m_assetTree.SetColumnExpandRatio(k_assetNameColumn, 2);
             m_assetTree.ItemEdited += OnAssetEdited;
             m_assetTree.ItemSelected += RefreshAssetPreview;
             right.AddChild(m_assetTree);
@@ -134,6 +140,7 @@ namespace GodotXOPS.Editor
                 Callable.From(() => ShowFileDialog(k_menuNewAsset, $"New {m_newAssetKind.Name.ToLowerInvariant()} file", "*.json", true)).CallDeferred();
             };
             layer.AddChild(m_assetKindMenu);
+            BuildReferenceMenu(layer);
         }
 
         /// <summary>
@@ -349,7 +356,7 @@ namespace GodotXOPS.Editor
             TreeItem root = m_assetTree.CreateItem();
             foreach (FieldInfo field in file.Fields)
             {
-                AddAssetItem(root, null, field.Name, field.FieldType, () => field.GetValue(file.Container), value => field.SetValue(file.Container, value), -1, 0);
+                AddAssetItem(root, null, field.Name, field.FieldType, () => field.GetValue(file.Container), value => field.SetValue(file.Container, value), -1, 0, file.FileKind.Type);
             }
             RefreshAssetPreview();
         }
@@ -365,14 +372,17 @@ namespace GodotXOPS.Editor
         /// <param name="set">값을 쓰는 함수.</param>
         /// <param name="index">목록의 항목이면 그 번호, 아니면 −1.</param>
         /// <param name="depth">최상위에서 몇 단계 아래인지. 최상위 말고는 접어 둔다.</param>
+        /// <param name="owner">이 값이 필드로 든 데이터 클래스 (label 이 그 필드 이름이다). 목록의 항목이나 벡터의 성분이면 null.</param>
         /// <returns>만든 줄의 값.</returns>
-        private AssetNode AddAssetItem(TreeItem parentItem, AssetNode parent, string label, Type type, Func<object> get, Action<object> set, int index, int depth)
+        private AssetNode AddAssetItem(TreeItem parentItem, AssetNode parent, string label, Type type, Func<object> get, Action<object> set, int index, int depth, Type owner = null)
         {
             TreeItem item = m_assetTree.CreateItem(parentItem);
             var node = new AssetNode { Label = label, Type = type, Get = get, Set = set, Parent = parent, Index = index, Item = item };
             item.SetText(k_assetKeyColumn, label);
             item.SetMetadata(k_assetKeyColumn, m_assetNodes.Count);
             m_assetNodes.Add(node);
+            // 번호들의 목록(예: caseWeaponIndex)은 항목마다 같은 목록을 가리킨다.
+            node.Reference = owner != null ? AssetReference.Find(owner, label) : (index >= 0 ? parent?.Reference : null);
 
             object value = get();
             if (type == typeof(bool))
@@ -418,7 +428,7 @@ namespace GodotXOPS.Editor
                 {
                     foreach (FieldInfo field in AssetFile.DataFields(type))
                     {
-                        AddAssetItem(item, node, field.Name, field.FieldType, () => field.GetValue(get()), v => field.SetValue(get(), v), -1, depth + 1);
+                        AddAssetItem(item, node, field.Name, field.FieldType, () => field.GetValue(get()), v => field.SetValue(get(), v), -1, depth + 1, value.GetType());
                     }
                 }
                 item.Collapsed = depth > 0;
@@ -428,6 +438,7 @@ namespace GodotXOPS.Editor
                 item.SetText(k_assetValueColumn, "(edit this value in the file)");
             }
             RefreshAssetSummary(node);
+            RefreshAssetReference(node);
             return node;
         }
 
@@ -636,7 +647,11 @@ namespace GodotXOPS.Editor
             {
                 RefreshAssetSummary(up);
             }
-            if (changed) RefreshAssetPreview();
+            if (changed)
+            {
+                RefreshAssetReferences();
+                RefreshAssetPreview();
+            }
             return changed;
         }
 

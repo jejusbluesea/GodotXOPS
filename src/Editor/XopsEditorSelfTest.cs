@@ -1056,6 +1056,16 @@ namespace GodotXOPS.Editor
                 RefreshAssetPreview();
                 int meshes = MeshCount();
                 Expect(meshes > 0 && m_previewCaption.Text.StartsWith("Weapon:", StringComparison.Ordinal) && ReferenceEquals(m_previewSubject, armed.Get()), "무기를 선택했는데 그 모델이 미리 보기에 나오지 않음");
+                // 쥔 자세: 팔 메시가 텍스처 없이 나오고 몸통과 다리는 감춰진다. 끄면 무기만 나온다.
+                var held = m_previewRoot.FindChild("Held", true, false) as HumanVisual;
+                var leftArm = held?.FindChild("Left", true, false) as MeshInstance3D;
+                var rightArm = held?.FindChild("Right", true, false) as MeshInstance3D;
+                Expect(m_previewHeldToggle.Visible && held != null && leftArm != null && rightArm != null && (leftArm.Mesh != null || rightArm.Mesh != null) && leftArm.MaterialOverride == MapLoader.GetEntityMaterial(null)
+                    && !((Node3D)held.FindChild("Body", true, false)).Visible && held.FindChild("Weapon", true, false) != null, "무기를 선택했는데 팔과 함께 쥔 자세로 나오지 않음");
+                SetPreviewOption(ref m_previewHeld, false);
+                Expect(m_previewRoot.FindChild("Held", true, false) == null && MeshCount() > 0 && MeshCount() < meshes, "팔 보여 주기를 껐는데 무기만 나오지 않음");
+                meshes = MeshCount();
+
                 m_assetNodes.Find(node => node.Parent == armed && node.Label == "name").Item.Select(0);
                 RefreshAssetPreview();
                 Expect(MeshCount() == meshes && ReferenceEquals(m_previewSubject, armed.Get()), "무기 안의 값을 선택했는데 그 무기의 미리 보기가 아님");
@@ -1090,6 +1100,16 @@ namespace GodotXOPS.Editor
                 firstHuman.Item.Select(0);
                 RefreshAssetPreview();
                 Expect(MeshCount() >= 3 && m_previewRoot.FindChild("Legs", true, false) != null && m_previewRoot.FindChild("Arms", true, false) != null, "사람을 선택했는데 몸통·팔·다리가 나오지 않음");
+            }
+
+            // 사람의 히트박스: 세 부위의 선이 나오고, 끄면 사라진다.
+            if (firstHuman != null)
+            {
+                var hitbox = m_previewRoot.FindChild("Hitbox", true, false) as MeshInstance3D;
+                Expect(m_previewHitboxToggle.Visible && !m_previewHeldToggle.Visible && hitbox != null && hitbox.Mesh.GetSurfaceCount() == 3, "사람을 선택했는데 히트박스가 나오지 않음");
+                SetPreviewOption(ref m_previewHitbox, false);
+                Expect(m_previewRoot.FindChild("Hitbox", true, false) == null && m_previewRoot.FindChild("Legs", true, false) != null, "히트박스를 껐는데 남아 있거나 모델이 사라짐");
+                SetPreviewOption(ref m_previewHitbox, true);
             }
 
             // 팔과 다리의 메시 넘겨 보기: 번호가 바뀌고 끝에서 처음으로 돌아온다. 다른 사람을 고르면 처음부터다.
@@ -1132,8 +1152,80 @@ namespace GodotXOPS.Editor
                 }
             }
 
+            Expect(OpenAsset("godotdata/human/hitbox.json"), "히트박스 파일을 열지 못함");
+            AssetNode hitboxNode = m_assetNodes.Find(node => node.Get() is HumanHitboxSizeData);
+            if (hitboxNode != null)
+            {
+                hitboxNode.Item.Select(0);
+                RefreshAssetPreview();
+                Expect(m_previewRoot.FindChild("Hitbox", true, false) != null && m_previewCaption.Text.StartsWith("Human hitbox", StringComparison.Ordinal), "히트박스 데이터를 선택했는데 그려지지 않음");
+            }
+            m_previewHeld = true;
+
+            CheckAssetReferences();
+
             Expect(!AssetsDirty(), "미리 보기만 했는데 데이터 파일이 바뀐 것으로 표시됨");
             Expect(OpenAsset($"{k_selfTestFolder}/weapon_list.json") && m_previewRoot.GetChildCount() == 0, "다른 파일로 바꿨는데 미리 보기가 남음");
+        }
+
+        /// <summary>
+        /// 번호 칸을 확인한다: 가리키는 항목의 이름이 옆에 나오는지, 목록에서 고르는 메뉴에 그 목록의 항목이 다 들어가는지, 같은 항목 안의 목록(모델의 텍스처)과
+        /// 안쪽의 목록(AI 레벨), 번호들의 목록도 되는지, 없는 번호를 알려 주는지. 기본 데이터 파일은 열어 보기만 한다.
+        /// </summary>
+        private void CheckAssetReferences()
+        {
+            DataManager data = DataManager.Instance;
+            Expect(OpenAsset("godotdata/weapon/list.json"), "무기 목록 파일을 열지 못함");
+            AssetNode weapon = m_assetNodes.Find(node => node.Get() is WeaponData item && item.modelIndex > 0 && data.WeaponParameterData.weaponModelData.Has(item.modelIndex));
+            AssetNode model = weapon == null ? null : m_assetNodes.Find(node => node.Parent == weapon && node.Label == "modelIndex");
+            AssetNode plain = weapon == null ? null : m_assetNodes.Find(node => node.Parent == weapon && node.Label == "size");
+            Expect(model != null && IsReference(model) && plain != null && !IsReference(plain), "무기의 모델 번호가 번호 칸으로 잡히지 않거나 다른 값이 번호 칸으로 잡힘");
+            if (model != null)
+            {
+                int index = (int)model.Get();
+                string name = data.WeaponParameterData.weaponModelData[index].name;
+                Expect(model.Item.GetText(k_assetNameColumn) == $"→ {name}" && plain.Item.GetText(k_assetNameColumn).Length == 0, $"모델 번호 옆에 모델의 이름이 나오지 않음 ({model.Item.GetText(k_assetNameColumn)})");
+                Expect(ShowReferenceMenu(model) == data.WeaponParameterData.weaponModelData.Count && m_referenceMenu.GetItemText(index) == $"{index}  {name}"
+                    && m_referenceMenu.GetItemId(index) == index, "모델을 고르는 메뉴에 무기 모델 목록이 그대로 들어가지 않음");
+                m_referenceMenu.Hide();
+                Expect(ShowReferenceMenu(plain) == 0, "번호 칸이 아닌 값에서 고르는 메뉴가 뜸");
+                Expect(model.Reference.Container == typeof(WeaponParameterData) && DescribeReferenceFor(model, 999) == "→ (no such item)" && DescribeReferenceFor(model, -1) == "→ (none)",
+                    "없는 번호를 알려 주지 않음");
+            }
+
+            // 같은 항목 안의 목록: 모델의 메시가 쓰는 텍스처 번호는 그 모델의 textures 를 가리킨다.
+            Expect(OpenAsset("godotdata/weapon/model.json"), "무기 모델 파일을 열지 못함");
+            AssetNode texture = m_assetNodes.Find(node => node.Label == "textureIndex" && IsReference(node) && node.Reference.Local);
+            Expect(texture != null && texture.Item.GetText(k_assetNameColumn).StartsWith("→ data/", StringComparison.Ordinal), "메시의 텍스처 번호 옆에 그 모델의 텍스처 경로가 나오지 않음");
+
+            // 안쪽의 목록(AI 레벨)과 다른 파일의 목록(무기).
+            Expect(OpenAsset("godotdata/human/list.json"), "사람 목록 파일을 열지 못함");
+            AssetNode human = m_assetNodes.Find(node => node.Get() is HumanData);
+            AssetNode ai = m_assetNodes.Find(node => node.Parent == human && node.Label == "aiIndex");
+            AssetNode carried = m_assetNodes.Find(node => node.Parent == human && node.Label == "weaponIndex0");
+            Expect(ai != null && ShowReferenceMenu(ai) == data.HumanParameterData.humanAIParameterData.aiData.Count, "AI 레벨을 고르는 메뉴가 AI 데이터의 수와 다름");
+            m_referenceMenu.Hide();
+            Expect(carried != null && carried.Item.GetText(k_assetNameColumn) == $"→ {data.WeaponParameterData.weaponData[(int)carried.Get()].name}", "사람이 드는 무기의 번호 옆에 무기의 이름이 나오지 않음");
+
+            // 번호들의 목록: 항목마다 같은 목록을 가리킨다.
+            Expect(OpenAsset("godotdata/weapon/general.json"), "무기 공통 설정 파일을 열지 못함");
+            AssetNode caseWeapon = m_assetNodes.Find(node => node.Parent != null && node.Parent.Label == "caseWeaponIndex" && node.Index == 0);
+            Expect(caseWeapon == null || (IsReference(caseWeapon) && caseWeapon.Item.GetText(k_assetNameColumn).StartsWith("→ ", StringComparison.Ordinal)), "번호들의 목록의 항목이 번호 칸으로 잡히지 않음");
+        }
+
+        /// <summary>
+        /// 번호 칸에 값을 잠깐 넣었을 때의 설명을 얻는다 (값은 되돌려 놓는다. 편집으로 기록하지 않는다).
+        /// </summary>
+        /// <param name="node">번호 칸.</param>
+        /// <param name="value">넣어 볼 값.</param>
+        /// <returns>설명.</returns>
+        private string DescribeReferenceFor(AssetNode node, int value)
+        {
+            object kept = node.Get();
+            node.Set(value);
+            string text = DescribeReference(node);
+            node.Set(kept);
+            return text;
         }
 
         /// <summary>
