@@ -466,12 +466,30 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 사람 모델을 더한다: 몸통, 팔, 다리. 팔과 다리는 메시 목록에서 고른 번호의 것이다 (m_previewArm, m_previewLeg). 높이와 크기는 게임과 같이 사람의 공통 설정을 따른다 (HumanVisual.CreateHumanVisual).
+        /// 미리 보기에 사람 모델을 더한다. 팔과 다리는 메시 목록에서 고른 번호의 것이다 (m_previewArm, m_previewLeg).
         /// </summary>
         /// <param name="parent">더할 부모.</param>
         /// <param name="model">사람 모델 데이터.</param>
         private void AddHumanModel(Node3D parent, HumanModelData model)
         {
+            BuildHumanModel(parent, model, m_previewArm, m_previewLeg, out m_previewArmCount, out m_previewLegCount);
+            m_previewArm = WrapIndex(m_previewArm, m_previewArmCount);
+            m_previewLeg = WrapIndex(m_previewLeg, m_previewLegCount);
+        }
+
+        /// <summary>
+        /// 사람 모델을 조립한다: 몸통, 팔, 다리. 높이와 크기는 게임과 같이 사람의 공통 설정을 따른다 (HumanVisual.CreateHumanVisual).
+        /// </summary>
+        /// <param name="parent">더할 부모.</param>
+        /// <param name="model">사람 모델 데이터.</param>
+        /// <param name="armIndex">팔 메시 목록에서 쓸 번호 (범위를 넘으면 돌려 맞춘다).</param>
+        /// <param name="legIndex">다리 메시 목록에서 쓸 번호 (범위를 넘으면 돌려 맞춘다).</param>
+        /// <param name="armCount">팔 메시의 수.</param>
+        /// <param name="legCount">다리 메시의 수.</param>
+        private void BuildHumanModel(Node3D parent, HumanModelData model, int armIndex, int legIndex, out int armCount, out int legCount)
+        {
+            armCount = 0;
+            legCount = 0;
             HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
             ShaderMaterial MaterialAt(int index) => MapLoader.GetEntityMaterial(index >= 0 && index < model.textures.Count ? model.textures[index] : null);
 
@@ -489,21 +507,21 @@ namespace GodotXOPS.Editor
                 var armRoot = new Node3D { Name = "Arms", Position = new Vector3(0f, general.humanArmHeight, 0f), Scale = Vector3.One * general.humanArmScale };
                 parent.AddChild(armRoot);
                 ShaderMaterial material = MaterialAt(model.armTextureIndex);
-                m_previewArmCount = Mathf.Max(arms.leftArms.Count, arms.rightArms.Count);
-                m_previewArm = WrapIndex(m_previewArm, m_previewArmCount);
-                if (m_previewArm < arms.leftArms.Count) armRoot.AddChild(new MeshInstance3D { Mesh = LoadPreviewMesh(arms.leftArms[m_previewArm]), MaterialOverride = material });
-                if (m_previewArm < arms.rightArms.Count) armRoot.AddChild(new MeshInstance3D { Mesh = LoadPreviewMesh(arms.rightArms[m_previewArm]), MaterialOverride = material });
+                armCount = Mathf.Max(arms.leftArms.Count, arms.rightArms.Count);
+                armIndex = WrapIndex(armIndex, armCount);
+                if (armIndex < arms.leftArms.Count) armRoot.AddChild(new MeshInstance3D { Mesh = LoadPreviewMesh(arms.leftArms[armIndex]), MaterialOverride = material });
+                if (armIndex < arms.rightArms.Count) armRoot.AddChild(new MeshInstance3D { Mesh = LoadPreviewMesh(arms.rightArms[armIndex]), MaterialOverride = material });
             }
 
             HumanLegModelData legs = LookupData<HumanLegModelData>(typeof(HumanParameterData), nameof(HumanParameterData.humanLegModelData), model.legIndex);
             if (legs != null && legs.legs.Count > 0)
             {
-                m_previewLegCount = legs.legs.Count;
-                m_previewLeg = WrapIndex(m_previewLeg, m_previewLegCount);
+                legCount = legs.legs.Count;
+                legIndex = WrapIndex(legIndex, legCount);
                 parent.AddChild(new MeshInstance3D
                 {
                     Name = "Legs",
-                    Mesh = LoadPreviewMesh(legs.legs[m_previewLeg]),
+                    Mesh = LoadPreviewMesh(legs.legs[legIndex]),
                     MaterialOverride = MaterialAt(model.legTextureIndex),
                     Position = new Vector3(0f, general.humanLegHeight, 0f),
                     Scale = Vector3.One * general.humanLegScale,

@@ -49,6 +49,7 @@ namespace GodotXOPS.Editor
             Expect(points.Count > 0 && MapLoader.Blocks.Count > 0 && m_markers.GetChildCount() == points.Count, "블록이나 포인트가 없거나 표식의 수가 포인트 수와 다름");
             Expect(m_pointList.ItemCount == points.Count, "목록의 줄 수가 포인트 수와 다름");
             Expect(MapLoader.HumanCount == 0, "에디터가 사람을 스폰함 (파일의 내용만 보여 줘야 한다)");
+            CheckPointModels();
 
             // 전부 선택과 해제.
             SelectAll();
@@ -1166,6 +1167,112 @@ namespace GodotXOPS.Editor
 
             Expect(!AssetsDirty(), "미리 보기만 했는데 데이터 파일이 바뀐 것으로 표시됨");
             Expect(OpenAsset($"{k_selfTestFolder}/weapon_list.json") && m_previewRoot.GetChildCount() == 0, "다른 파일로 바꿨는데 미리 보기가 남음");
+        }
+
+        /// <summary>
+        /// 포인트의 모델을 확인한다: 사람·무기·소물 포인트가 상자 대신 모델로 나오는지, 방향을 따라 도는지, 끄면 상자로 돌아가는지,
+        /// X-RAY 에서는 상자가 함께 보이는지, 가리키는 데이터가 없는 포인트는 상자로 남는지. 문서는 처음 상태로 돌려놓는다.
+        /// </summary>
+        private void CheckPointModels()
+        {
+            List<PD2Point> points = m_document.Points.points;
+            int human = points.FindIndex(point => point.type == MapLoader.PointHuman);
+            Expect(human >= 0 && HasMesh(m_markers.ModelOf(human)) && !m_markers.BoxVisible(human), "사람 포인트가 모델로 나오지 않거나 상자가 함께 보임");
+            foreach (int type in new[] { MapLoader.PointWeapon, MapLoader.PointSmallObject })
+            {
+                int index = points.FindIndex(point => point.type == type);
+                if (index >= 0) Expect(HasMesh(m_markers.ModelOf(index)), $"종류 {type} 의 포인트가 모델로 나오지 않음");
+            }
+            int path = points.FindIndex(point => point.type == MapLoader.PointAIPath || point.type == MapLoader.PointHumanInfo);
+            Expect(path < 0 || (m_markers.ModelOf(path) == null && m_markers.BoxVisible(path)), "모델이 없는 종류의 포인트에 모델이 붙거나 상자가 감춰짐");
+            if (human < 0) return;
+
+            // 방향을 바꾸면 모델이 따라 돈다.
+            float direction = points[human].direction;
+            points[human].direction = direction + 90f;
+            m_markers.Refresh(human);
+            Expect(Mathf.Abs(Mathf.AngleDifference(m_markers.ModelOf(human).Rotation.Y, Coord.FromUnityEuler(new Vector3(0f, direction + 90f, 0f)).Y)) < 1e-3f, "포인트의 방향을 바꿨는데 모델이 돌지 않음");
+            points[human].direction = direction;
+            m_markers.Refresh(human);
+
+            SetXray(true);
+            Expect(m_markers.BoxVisible(human) && m_markers.ModelOf(human) != null, "X-RAY 를 켰는데 모델이 있는 포인트의 상자가 보이지 않음");
+            SetXray(false);
+            Expect(!m_markers.BoxVisible(human), "X-RAY 를 껐는데 모델이 있는 포인트의 상자가 남음");
+
+            SetShowModels(false);
+            Expect(m_markers.ModelOf(human) == null && m_markers.BoxVisible(human) && m_markers.GetChildCount() == points.Count, "모델을 껐는데 상자로 돌아가지 않음");
+            SetShowModels(true);
+            Expect(HasMesh(m_markers.ModelOf(human)), "모델을 다시 켰는데 나오지 않음");
+
+            // 사람은 주 무기를 든다. 주 무기가 없으면(종류 6 이거나 데이터에 없으면) 보조 무기가 있어도 맨손이다. 종류를 1 과 6 으로 바꿔 가며 본다.
+            int none = DataManager.Instance.WeaponParameterData.weaponGeneralData.noneWeaponIndex;
+            DataList<HumanData> humanList = DataManager.Instance.HumanParameterData.humanData;
+            int armed = points.FindIndex(point =>
+            {
+                if (point.type != MapLoader.PointHuman && point.type != MapLoader.PointHuman2) return false;
+                PD2Point info = points.Find(other => other.type == MapLoader.PointHumanInfo && other.id == point.param1);
+                return info != null && humanList.Has(info.param1) && humanList[info.param1].weaponIndex1 != none;
+            });
+            Expect(armed >= 0, "점검용 미션에 주 무기를 가진 사람이 없어 무기를 든 모델을 확인하지 못함");
+            if (armed >= 0)
+            {
+                int originalType = points[armed].type;
+                PD2Point armedInfo = points.Find(other => other.type == MapLoader.PointHumanInfo && other.id == points[armed].param1);
+                string HeldModel() => (m_markers.ModelOf(armed)?.FindChild("Weapon", true, false) as Node)?.GetChildCount() > 0 ? HeldMeshPath(m_markers.ModelOf(armed)) : null;
+
+                points[armed].type = MapLoader.PointHuman;
+                RebuildPoints();
+                string primary = HeldModel();
+                Expect(primary != null, "주 무기를 가진 사람(종류 1)이 무기를 들고 있지 않음");
+                points[armed].type = MapLoader.PointHuman2;
+                RebuildPoints();
+                string secondary = HeldModel();
+                Expect(HasMesh(m_markers.ModelOf(armed)) && secondary == null, "주 무기 없는 사람(종류 6)이 무기를 들고 있음");
+                points[armed].type = originalType;
+                RebuildPoints();
+            }
+
+            // 사람 정보가 없는 사람은 상자로 남는다.
+            int info = points[human].param1;
+            points[human].param1 = int.MaxValue;
+            RebuildPoints();
+            Expect(m_markers.ModelOf(human) == null && m_markers.BoxVisible(human), "사람 정보가 없는 사람 포인트에 모델이 붙음");
+            points[human].param1 = info;
+            RebuildPoints();
+            Expect(HasMesh(m_markers.ModelOf(human)), "사람 정보를 되돌렸는데 모델이 나오지 않음");
+        }
+
+        /// <summary>
+        /// 사람 모델이 든 무기의 첫 메시가 무엇인지 (무기를 구별하는 데 쓴다).
+        /// </summary>
+        /// <param name="model">사람의 모델 노드.</param>
+        /// <returns>메시의 리소스 식별 값. 든 무기가 없으면 null.</returns>
+        private static string HeldMeshPath(Node model)
+        {
+            Node weapon = model?.FindChild("Weapon", true, false);
+            if (weapon == null) return null;
+            foreach (Node part in weapon.FindChildren("Part_*", "MeshInstance3D", true, false))
+            {
+                if (part is MeshInstance3D { Mesh: not null } mesh) return mesh.Mesh.GetInstanceId().ToString();
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// 노드 아래에 메시가 든 것이 하나라도 있는지.
+        /// </summary>
+        /// <param name="node">볼 노드. null 이어도 된다.</param>
+        /// <returns>있으면 true.</returns>
+        private static bool HasMesh(Node node)
+        {
+            if (node == null) return false;
+            if (node is MeshInstance3D { Mesh: not null }) return true;
+            foreach (Node child in node.GetChildren())
+            {
+                if (HasMesh(child)) return true;
+            }
+            return false;
         }
 
         /// <summary>

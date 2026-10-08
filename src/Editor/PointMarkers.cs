@@ -7,6 +7,7 @@ namespace GodotXOPS.Editor
     /// <summary>
     /// 포인트들을 3D 화면에 표식으로 그리고, 화면의 한 점이나 사각형으로 표식을 고른다.
     /// 종류마다 색과 모양이 다르고, 방향이 있는 종류에는 화살표가, 모든 표식에는 식별번호가 붙는다. 선택한 표식은 흰 테두리 상자로 감싼다.
+    /// 모델을 만들 수 있는 포인트(사람, 무기, 소물)는 상자 대신 그 모델을 보여 준다 (ModelFactory, ShowModels). 화살표와 식별번호는 그대로 붙는다.
     /// 표식은 보여 주기만 한다. 값은 MapDocument 의 포인트가 갖고, 바뀌면 Rebuild 로 다시 맞춘다.
     /// </summary>
     public partial class PointMarkers : Node3D
@@ -35,10 +36,21 @@ namespace GodotXOPS.Editor
         // 표식마다의 방향 화살표와 식별번호 글자. 방향이 없는 종류의 화살표는 null 이다.
         private readonly List<MeshInstance3D> m_arrows = new List<MeshInstance3D>();
         private readonly List<Label3D> m_labels = new List<Label3D>();
+        // 표식마다의 상자와 모델. 모델이 없는 표식의 모델은 null 이다.
+        private readonly List<MeshInstance3D> m_boxes = new List<MeshInstance3D>();
+        private readonly List<Node3D> m_models = new List<Node3D>();
         private bool m_xray;
+
+        // 포인트 하나의 모델을 만드는 함수 (yaw 0 기준으로 조립한 노드. 방향은 표식이 돌린다). 모델이 없는 포인트면 null 을 돌려준다.
+        public System.Func<PD2Point, Node3D> ModelFactory;
+        // 모델을 보여 줄지. 바꾼 뒤에는 Rebuild 를 부른다.
+        public bool ShowModels = true;
         private readonly Dictionary<Color, StandardMaterial3D> m_materials = new Dictionary<Color, StandardMaterial3D>();
         private IReadOnlyList<PD2Point> m_points;
         private StandardMaterial3D m_highlightMaterial;
+        // 모델이 있는 표식의 선택 표시는 모델을 가리지 않게 모서리 선으로만 그린다.
+        private StandardMaterial3D m_outlineMaterial;
+        private static readonly Color s_outlineColor = new Color(1f, 1f, 1f, 0.9f);
 
         /// <summary>
         /// 표식을 전부 다시 만든다. 선택 표시는 모두 꺼진 채로 만들어진다.
@@ -55,12 +67,22 @@ namespace GodotXOPS.Editor
             m_highlights.Clear();
             m_arrows.Clear();
             m_labels.Clear();
+            m_boxes.Clear();
+            m_models.Clear();
             m_points = points;
 
             m_highlightMaterial ??= new StandardMaterial3D
             {
                 ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
                 AlbedoColor = new Color(1f, 1f, 1f, 0.4f),
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                NoDepthTest = true,
+            };
+
+            m_outlineMaterial ??= new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                AlbedoColor = s_outlineColor,
                 Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
                 NoDepthTest = true,
             };
@@ -93,6 +115,11 @@ namespace GodotXOPS.Editor
         public void SetXray(bool enabled)
         {
             m_xray = enabled;
+            // 모델은 블록에 가려지므로, X-RAY 에서는 가려진 것도 보이게 상자를 함께 그린다.
+            for (int i = 0; i < m_boxes.Count; i++)
+            {
+                m_boxes[i].Visible = enabled || m_models[i] == null;
+            }
             foreach (StandardMaterial3D material in m_materials.Values)
             {
                 material.NoDepthTest = enabled;
@@ -113,6 +140,7 @@ namespace GodotXOPS.Editor
 
             PD2Point point = m_points[index];
             m_nodes[index].Position = point.position;
+            if (m_models[index] != null) m_models[index].Rotation = ModelRotation(point);
             MeshInstance3D arrow = m_arrows[index];
             if (arrow == null) return;
 
@@ -130,6 +158,36 @@ namespace GodotXOPS.Editor
         public static Vector3 Center(PD2Point point)
         {
             return point.position + Vector3.Up * (ShapeSize(PointTypeInfo.Get(point.type).Shape).Y * 0.5f);
+        }
+
+        /// <summary>
+        /// 포인트의 모델 노드.
+        /// </summary>
+        /// <param name="index">포인트 번호.</param>
+        /// <returns>모델. 모델을 보여 주지 않는 포인트면 null.</returns>
+        public Node3D ModelOf(int index)
+        {
+            return index >= 0 && index < m_models.Count ? m_models[index] : null;
+        }
+
+        /// <summary>
+        /// 포인트의 상자가 보이는지.
+        /// </summary>
+        /// <param name="index">포인트 번호.</param>
+        /// <returns>보이면 true.</returns>
+        public bool BoxVisible(int index)
+        {
+            return index >= 0 && index < m_boxes.Count && m_boxes[index].Visible;
+        }
+
+        /// <summary>
+        /// 포인트의 방향대로 모델을 돌리는 회전. PD2 의 방향은 그 자리에 놓이는 것의 yaw 다.
+        /// </summary>
+        /// <param name="point">포인트.</param>
+        /// <returns>오일러 각 (라디안).</returns>
+        private static Vector3 ModelRotation(PD2Point point)
+        {
+            return Coord.FromUnityEuler(new Vector3(0f, point.direction, 0f));
         }
 
         /// <summary>
@@ -213,12 +271,17 @@ namespace GodotXOPS.Editor
             StandardMaterial3D material = GetMaterial(info.Color);
 
             var root = new Node3D { Position = point.position };
-            root.AddChild(new MeshInstance3D
+            Node3D model = ShowModels ? ModelFactory?.Invoke(point) : null;
+            var box = new MeshInstance3D
             {
                 Mesh = new BoxMesh { Size = size },
                 MaterialOverride = material,
                 Position = Vector3.Up * (size.Y * 0.5f),
-            });
+                Visible = model == null || m_xray,
+            };
+            root.AddChild(box);
+            m_boxes.Add(box);
+            m_models.Add(model);
 
             MeshInstance3D arrow = null;
             if (info.Shape != PointTypeInfo.Shape.Node)
@@ -253,13 +316,46 @@ namespace GodotXOPS.Editor
 
             highlight = new MeshInstance3D
             {
-                Mesh = new BoxMesh { Size = size + Vector3.One * k_selectionMargin },
-                MaterialOverride = m_highlightMaterial,
+                Mesh = model != null ? BoxOutline(size + Vector3.One * k_selectionMargin) : new BoxMesh { Size = size + Vector3.One * k_selectionMargin },
+                MaterialOverride = model != null ? m_outlineMaterial : m_highlightMaterial,
                 Position = Vector3.Up * (size.Y * 0.5f),
                 Visible = false,
             };
             root.AddChild(highlight);
+            if (model != null)
+            {
+                model.Rotation = ModelRotation(point);
+                root.AddChild(model);
+            }
             return root;
+        }
+
+        /// <summary>
+        /// 상자의 모서리 12개를 선으로 그린 메시를 만든다 (가운데가 원점).
+        /// </summary>
+        /// <param name="size">가로, 높이, 세로 (m).</param>
+        /// <returns>선 메시.</returns>
+        private static ImmediateMesh BoxOutline(Vector3 size)
+        {
+            Vector3 half = size * 0.5f;
+            var mesh = new ImmediateMesh();
+            mesh.SurfaceBegin(Mesh.PrimitiveType.Lines);
+            for (int corner = 0; corner < 8; corner++)
+            {
+                var from = new Vector3((corner & 1) != 0 ? half.X : -half.X, (corner & 2) != 0 ? half.Y : -half.Y, (corner & 4) != 0 ? half.Z : -half.Z);
+                foreach (int bit in new[] { 1, 2, 4 })
+                {
+                    if ((corner & bit) != 0) continue;
+                    Vector3 to = from;
+                    if (bit == 1) to.X = half.X;
+                    else if (bit == 2) to.Y = half.Y;
+                    else to.Z = half.Z;
+                    mesh.SurfaceAddVertex(from);
+                    mesh.SurfaceAddVertex(to);
+                }
+            }
+            mesh.SurfaceEnd();
+            return mesh;
         }
 
         /// <summary>

@@ -217,6 +217,9 @@ namespace GodotXOPS.Editor
                 if (pressed != m_xray) SetXray(pressed);
             };
             topRow.AddChild(m_xrayButton);
+            m_modelsButton = new CheckBox { Text = "Models", ButtonPressed = m_markers.ShowModels, FocusMode = Control.FocusModeEnum.None, TooltipText = "Show humans, weapons and objects as their models. Off: boxes only" };
+            m_modelsButton.Toggled += SetShowModels;
+            topRow.AddChild(m_modelsButton);
 
             // 변형 도구. 누르면 키(G / R)와 같이 마우스로 움직이고 클릭으로 확정한다.
             topRow.AddChild(new VSeparator());

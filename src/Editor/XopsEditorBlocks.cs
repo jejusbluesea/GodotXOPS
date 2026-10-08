@@ -64,7 +64,10 @@ namespace GodotXOPS.Editor
         {
             if (Transforming) CancelTransform();
             CancelPick();
+            // 미션이나 에셋 모드에서 고친 데이터가 포인트의 모델에 보이게 한다.
+            bool backToView = m_editMode >= EditMode.Mission && mode < EditMode.Mission;
             m_editMode = mode;
+            if (backToView && m_markers != null && m_markers.ShowModels) RebuildPoints();
             if (m_missionPanel != null) m_missionPanel.Visible = mode == EditMode.Mission;
             if (m_assetPanel != null) m_assetPanel.Visible = mode == EditMode.Asset;
             if (mode == EditMode.Mission) ApplyMission();

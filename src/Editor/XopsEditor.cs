@@ -79,7 +79,7 @@ namespace GodotXOPS.Editor
             camera.MakeCurrent();
             m_view = new EditorCamera(camera);
 
-            m_markers = new PointMarkers { Name = "Markers" };
+            m_markers = new PointMarkers { Name = "Markers", ModelFactory = BuildPointModel };
             AddChild(m_markers);
             m_blockOverlay = new BlockOverlay { Name = "BlockOverlay", Visible = false };
             AddChild(m_blockOverlay);
