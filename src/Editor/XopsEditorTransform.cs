@@ -64,10 +64,7 @@ namespace GodotXOPS.Editor
         private Vector3 m_transformCenter;
         private Vector2 m_transformStartMouse;
         private Vector2 m_transformMouse;
-        private bool m_gridLock;
         private float m_gridSize = k_defaultGridSize;
-        // 옮길 때 마우스 아래의 블록 면에 붙일지 (Surface). 사람이나 무기처럼 바닥에 놓는 것을 옮길 때 쓴다. 포인트에만 듣고, 축을 묶거나 숫자를 치면 듣지 않는다.
-        private bool m_surfaceSnap = true;
         // 저장한 뒤로 포인트가 바뀌었는지.
         private bool m_dirty;
 
@@ -105,6 +102,7 @@ namespace GodotXOPS.Editor
             m_transformCenter = (min + max) * 0.5f;
             m_transformStartMouse = GetViewport().GetMousePosition();
             m_transformMouse = m_transformStartMouse;
+            ChooseTransformAnchor();
             UpdateTransform();
         }
 
@@ -270,39 +268,44 @@ namespace GodotXOPS.Editor
             if (!Transforming) return;
 
             bool hasNumber = float.TryParse(m_numeric, NumberStyles.Float, CultureInfo.InvariantCulture, out float number);
-            bool snap = m_gridLock || Input.IsKeyPressed(Key.Ctrl);
+            // 숫자를 치면 그 값 그대로다. 스냅은 듣지 않는다.
+            SnapTarget targets = hasNumber ? SnapTarget.None : ActiveSnap();
+            bool snap = targets.HasFlag(SnapTarget.Grid);
             string typedText = hasNumber ? $" [{m_numeric}]" : string.Empty;
-            const string hint = "   |   X/Y/Z: axis, numbers: value, Ctrl: snap, click/Enter: confirm, right click/Esc: cancel";
+            const string hint = "   |   X/Y/Z: axis, numbers: value, Ctrl: snap on/off, click/Enter: confirm, right click/Esc: cancel";
 
             switch (m_transformMode)
             {
                 case TransformMode.Move:
                 {
-                    // 맨 앞의 것이 기준이다: 면에 붙일 때도 격자에 맞출 때도 이것이 그 자리에 오고, 나머지는 같은 만큼 따라온다.
-                    Vector3 anchor = m_transformStarts[0];
-                    bool onSurface = false;
+                    // 대상(꼭짓점, 모서리, 면)에 붙을 때는 시작할 때 마우스에 가장 가까웠던 것이 그 자리에 오고, 격자에는 맨 앞의 것이 맞춰진다. 나머지는 같은 만큼 따라온다.
+                    Vector3 anchor = m_transformStarts[Mathf.Min(m_transformAnchor, m_transformStarts.Length - 1)];
+                    SnapTarget snapped = SnapTarget.None;
                     Vector3 delta;
                     if (hasNumber)
                     {
                         delta = AxisVector(m_transformAxis == TransformAxis.None ? TransformAxis.X : m_transformAxis) * number;
                     }
-                    else if (m_surfaceSnap && !m_transformingBlocks && m_transformAxis == TransformAxis.None && SurfaceUnder(m_transformMouse, out Vector3 hit))
+                    else if ((targets & ~SnapTarget.Grid) != 0 && FindSnapPoint(m_transformMouse, targets & ~SnapTarget.Grid, out Vector3 hit, out snapped))
                     {
-                        delta = hit - anchor;
-                        onSurface = true;
+                        // 축을 묶었으면 그 축 위에서 대상과 가장 가까운 자리까지만 간다.
+                        Vector3 axis = AxisVector(m_transformAxis);
+                        delta = m_transformAxis == TransformAxis.None ? hit - anchor : axis * (hit - anchor).Dot(axis);
+                        // 면 위에 놓은 포인트는 격자와 함께면 가로만 격자에 맞추고 높이는 그 자리의 면을 다시 찾는다.
+                        if (snap && snapped == SnapTarget.Face && !m_transformingBlocks && m_transformAxis == TransformAxis.None) delta = SnapToGrid(anchor, delta, true);
                     }
                     else
                     {
                         delta = MouseMoveDelta();
+                        if (snap) delta = SnapToGrid(m_transformStarts[0], delta, false);
                     }
-                    if (snap && !hasNumber) delta = SnapToGrid(anchor, delta, onSurface);
 
                     for (int i = 0; i < m_transformStarts.Length; i++)
                     {
                         ApplyTransformed(i, m_transformStarts[i] + delta, 0f);
                     }
                     SetMessage(string.Format(CultureInfo.InvariantCulture, "Move{0}: {1:0.00}, {2:0.00}, {3:0.00} m{4}{5}",
-                        m_transformAxis == TransformAxis.None ? (onSurface ? " on surface" : string.Empty) : " along " + m_transformAxis, delta.X, delta.Y, delta.Z, typedText, hint));
+                        (m_transformAxis == TransformAxis.None ? string.Empty : " along " + m_transformAxis) + (snapped == SnapTarget.None ? string.Empty : $" (snapped to {snapped})"), delta.X, delta.Y, delta.Z, typedText, hint));
                     break;
                 }
 
@@ -312,7 +315,7 @@ namespace GodotXOPS.Editor
                     TransformAxis axis = m_transformingBlocks && m_transformAxis != TransformAxis.None ? m_transformAxis : TransformAxis.Y;
                     Vector3 axisVector = AxisVector(axis);
                     float angle = hasNumber ? number : MouseRotateAngle(axisVector);
-                    if (snap && !hasNumber) angle = Mathf.Round(angle / k_rotateSnapDegrees) * k_rotateSnapDegrees;
+                    if (snap) angle = Mathf.Round(angle / k_rotateSnapDegrees) * k_rotateSnapDegrees;
                     float radians = Mathf.DegToRad(angle);
                     for (int i = 0; i < m_transformStarts.Length; i++)
                     {
@@ -326,7 +329,7 @@ namespace GodotXOPS.Editor
                 case TransformMode.Scale:
                 {
                     float factor = hasNumber ? number : MouseScaleFactor();
-                    if (snap && !hasNumber) factor = Mathf.Round(factor / k_scaleSnap) * k_scaleSnap;
+                    if (snap) factor = Mathf.Round(factor / k_scaleSnap) * k_scaleSnap;
                     factor = Mathf.Max(k_minScale, factor);
                     Vector3 scale = m_transformAxis == TransformAxis.None ? Vector3.One * factor : Vector3.One + AxisVector(m_transformAxis).Abs() * (factor - 1f);
                     for (int i = 0; i < m_transformStarts.Length; i++)

@@ -43,6 +43,8 @@ namespace GodotXOPS.Editor
         // 메뉴에는 없고 파일 창의 쓰임으로만 쓰는 번호: 에셋 모드에서 열 파일, 새로 만들 파일.
         private const int k_menuOpenAsset = 60;
         private const int k_menuNewAsset = 61;
+        private const int k_menuShowGrid = 62;
+        private const int k_menuShowFloorGrid = 63;
         // 메뉴에는 없고 파일 창의 쓰임으로만 쓰는 번호: 텍스처로 쓸 이미지 고르기.
         private const int k_menuPickTexture = 40;
         // Add 메뉴에서 포인트 종류가 아니라 상자 블록을 놓는 항목의 번호.
@@ -205,6 +207,10 @@ namespace GodotXOPS.Editor
             view.AddSeparator();
             view.AddCheckItem("Links between points (events, paths)", k_menuShowLinks);
             view.SetItemChecked(view.GetItemIndex(k_menuShowLinks), m_showLinks);
+            view.AddCheckItem("Grid in orthographic views", k_menuShowGrid);
+            view.SetItemChecked(view.GetItemIndex(k_menuShowGrid), m_showGrid);
+            view.AddCheckItem("Floor grid in perspective (height 0)", k_menuShowFloorGrid);
+            view.SetItemChecked(view.GetItemIndex(k_menuShowFloorGrid), m_showFloorGrid);
             m_viewMenu = view;
 
             PopupMenu select = AddMenu(topRow, "Select");
@@ -226,16 +232,11 @@ namespace GodotXOPS.Editor
             AddToolButton(topRow, "Move", "Move the selected points (G). Then X / Y / Z: axis, numbers: value, click: confirm, right click: cancel", () => BeginTransform(TransformMode.Move));
             AddToolButton(topRow, "Rotate", "Rotate the selection (R). Points turn around the vertical axis; block elements around the axis chosen with X / Y / Z", () => BeginTransform(TransformMode.Rotate));
             AddToolButton(topRow, "Scale", "Scale the selection around its center (S)", () => BeginTransform(TransformMode.Scale));
-            var surface = new CheckBox { Text = "Surface", ButtonPressed = m_surfaceSnap, FocusMode = Control.FocusModeEnum.None, TooltipText = "While moving, keep the points on the block surface under the mouse" };
-            surface.Toggled += pressed => m_surfaceSnap = pressed;
-            topRow.AddChild(surface);
-            var gridLock = new CheckBox { Text = "Grid", FocusMode = Control.FocusModeEnum.None, TooltipText = "Always snap to grid positions while moving (hold Ctrl to snap once). Applies to points and blocks" };
-            gridLock.Toggled += pressed => m_gridLock = pressed;
-            topRow.AddChild(gridLock);
+            BuildSnapControls(topRow);
             var gridSize = new SpinBox
             {
                 MinValue = k_minGridSize, MaxValue = k_maxGridSize, Step = k_minGridSize, Value = m_gridSize, Suffix = "m",
-                TooltipText = "Grid size in meters (0.1 m is one unit of the original XOPS)",
+                TooltipText = "Grid size in meters, for the Grid snap and the grid drawn in orthographic views (0.1 m is one unit of the original XOPS)",
             };
             gridSize.ValueChanged += value => m_gridSize = (float)value;
             topRow.AddChild(gridSize);
@@ -256,6 +257,9 @@ namespace GodotXOPS.Editor
             }
             m_elementOption.ItemSelected += index => SetBlockElement((BlockElement)(int)index);
             topRow.AddChild(m_elementOption);
+            m_overlapButton = new CheckBox { Text = "Ask overlap", FocusMode = Control.FocusModeEnum.None, Visible = false, TooltipText = "When vertices or edges of several blocks share the clicked spot, ask which block's one to select instead of selecting them all (same as Ctrl + click)" };
+            m_overlapButton.Toggled += pressed => m_askOverlap = pressed;
+            topRow.AddChild(m_overlapButton);
             topRow.AddChild(new VSeparator());
 
             AddToolButton(topRow, "Play", "Play the map as it is now, unsaved changes included (F5). Esc in the game comes back here", () => PlayTest());
@@ -405,6 +409,14 @@ namespace GodotXOPS.Editor
             {
                 case k_menuSaveMissionAs: ShowFileDialog(k_menuSaveMissionAs, "Save mission as", "*" + MIF2File.Extension, true); break;
                 case k_menuMessages: ShowMessageDialog(); break;
+                case k_menuShowGrid:
+                    m_showGrid = !m_showGrid;
+                    m_viewMenu.SetItemChecked(m_viewMenu.GetItemIndex(k_menuShowGrid), m_showGrid);
+                    break;
+                case k_menuShowFloorGrid:
+                    m_showFloorGrid = !m_showFloorGrid;
+                    m_viewMenu.SetItemChecked(m_viewMenu.GetItemIndex(k_menuShowFloorGrid), m_showFloorGrid);
+                    break;
                 case k_menuShowLinks:
                     m_showLinks = !m_showLinks;
                     m_viewMenu.SetItemChecked(m_viewMenu.GetItemIndex(k_menuShowLinks), m_showLinks);
@@ -438,7 +450,7 @@ namespace GodotXOPS.Editor
                 case k_menuViewLeft: ViewRight(true); break;
                 case k_menuViewTop: ViewTop(false); break;
                 case k_menuViewBottom: ViewTop(true); break;
-                case k_menuViewOrthographic: m_view.ToggleOrthographic(); break;
+                case k_menuViewOrthographic: ToggleProjection(); break;
                 case k_menuViewFocus: FocusSelection(); break;
                 case k_menuViewAll: FocusAll(); break;
                 case k_menuSelectAll: SelectAll(); break;
@@ -532,6 +544,7 @@ namespace GodotXOPS.Editor
             m_modeOption.Select((int)m_editMode);
             m_elementOption.Visible = m_editMode == EditMode.Block;
             m_elementOption.Select((int)m_blockElement);
+            SyncSnapButtons();
         }
 
         /// <summary>

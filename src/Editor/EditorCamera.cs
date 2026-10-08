@@ -21,6 +21,8 @@ namespace GodotXOPS.Editor
         private const float k_flyFastMultiplier = 4f;
         // 선택한 것으로 시점을 맞출 때 물러나는 거리의 하한 (m).
         private const float k_focusMinDistance = 4f;
+        // 직교 시점에서 카메라를 중심에서 이만큼(m) 더 물려 둔다. 직교에서는 거리가 크기만 정하므로, 물려 두지 않으면 중심보다 가까운 것이 카메라 뒤로 넘어가 잘린다.
+        private const float k_orthographicBackoff = 1000f;
 
         private readonly Camera3D m_camera;
         private Vector3 m_pivot;
@@ -32,6 +34,8 @@ namespace GodotXOPS.Editor
         public Camera3D Camera => m_camera;
         public bool Orthographic => m_orthographic;
         public Vector3 Pivot => m_pivot;
+        // 중심에서 카메라까지의 거리 (m).
+        public float Distance => m_distance;
 
         /// <summary>
         /// 시점을 만든다.
@@ -103,6 +107,18 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
+        /// 원근이나 직교로 정한다.
+        /// </summary>
+        /// <param name="orthographic">true 면 직교.</param>
+        public void SetOrthographic(bool orthographic)
+        {
+            if (m_orthographic == orthographic) return;
+
+            m_orthographic = orthographic;
+            Apply();
+        }
+
+        /// <summary>
         /// 원근과 직교를 바꾼다.
         /// </summary>
         public void ToggleOrthographic()
@@ -134,8 +150,8 @@ namespace GodotXOPS.Editor
         /// <param name="delta">프레임 시간 (초).</param>
         public void Fly(Vector2 look, Vector2 move, float vertical, bool fast, float delta)
         {
-            // 카메라 자리를 지키며 돌려면 중심을 카메라 앞으로 다시 잡아야 한다.
-            Vector3 position = m_camera.GlobalPosition;
+            // 카메라 자리를 지키며 돌려면 중심을 카메라 앞으로 다시 잡아야 한다. 직교에서는 카메라 노드가 뒤로 물러나 있으므로 상태에서 자리를 구한다.
+            Vector3 position = m_pivot - Coord.AimDirection(m_yaw, m_pitch) * m_distance;
             m_yaw += look.X;
             m_pitch = Mathf.Clamp(m_pitch - look.Y, -k_pitchLimit, k_pitchLimit);
 
@@ -163,7 +179,7 @@ namespace GodotXOPS.Editor
         private void Apply()
         {
             m_camera.Rotation = Coord.FromUnityEuler(new Vector3(m_pitch, m_yaw, 0f));
-            m_camera.Position = m_pivot - Coord.AimDirection(m_yaw, m_pitch) * m_distance;
+            m_camera.Position = m_pivot - Coord.AimDirection(m_yaw, m_pitch) * (m_distance + (m_orthographic ? k_orthographicBackoff : 0f));
             if (m_orthographic)
             {
                 m_camera.Projection = Camera3D.ProjectionType.Orthogonal;

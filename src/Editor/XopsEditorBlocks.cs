@@ -222,7 +222,7 @@ namespace GodotXOPS.Editor
         /// </summary>
         /// <param name="screenPosition">화면 좌표 (픽셀).</param>
         /// <param name="extend">Shift 를 누르고 있었는지 (더하거나 빼기).</param>
-        /// <param name="choose">Ctrl 을 누르고 있었는지. 겹친 것이 여럿이면 어느 블록의 것을 고를지 메뉴로 묻는다.</param>
+        /// <param name="choose">Ctrl 을 누르고 있었거나 Ask overlap 이 켜져 있는지. 겹친 것이 여럿이면 어느 블록의 것을 고를지 메뉴로 묻는다.</param>
         private void BlockSelectAt(Vector2 screenPosition, bool extend, bool choose)
         {
             if (Transforming) return;
@@ -360,12 +360,27 @@ namespace GodotXOPS.Editor
         /// <returns>면의 키. 없으면 −1.</returns>
         private int PickFace(Vector3 origin, Vector3 direction)
         {
+            return PickFace(origin, direction, null, out _);
+        }
+
+        /// <summary>
+        /// 레이가 처음 만나는 블록 면과 그 거리를 찾는다. 몇몇 블록을 건너뛸 수 있다 (옮기는 중인 블록).
+        /// </summary>
+        /// <param name="origin">레이 시작점.</param>
+        /// <param name="direction">레이 방향 (정규화).</param>
+        /// <param name="excluded">건너뛸 블록의 번호들. null 이면 전부 본다.</param>
+        /// <param name="hitDistance">만난 자리까지의 거리 (m). 없으면 0.</param>
+        /// <returns>면의 키. 없으면 −1.</returns>
+        private int PickFace(Vector3 origin, Vector3 direction, ISet<int> excluded, out float hitDistance)
+        {
             List<BD2Block> blocks = m_document.Blocks.blocks;
             IReadOnlyList<int[]> faces = MapLoader.BlockFaceVertices;
             int best = -1;
             float bestDistance = float.MaxValue;
             for (int b = 0; b < blocks.Count; b++)
             {
+                if (excluded != null && excluded.Contains(b)) continue;
+
                 Vector3[] vertices = blocks[b].vertices;
                 Vector3 blockCenter = Vector3.Zero;
                 foreach (Vector3 vertex in vertices)
@@ -394,6 +409,7 @@ namespace GodotXOPS.Editor
                     best = b * ElementStride + f;
                 }
             }
+            hitDistance = best >= 0 ? bestDistance : 0f;
             return best;
         }
 
@@ -529,7 +545,7 @@ namespace GodotXOPS.Editor
             List<BD2Block> blocks = m_document.Blocks.blocks;
             BD2Block[] before = BlockListCommand.Snapshot(blocks);
             Vector3 center = SurfaceUnder(screenPosition, out Vector3 hit) ? hit + Vector3.Up * (k_newBlockSize * 0.5f) : m_view.Pivot;
-            if (m_gridLock) center = (center / m_gridSize).Round() * m_gridSize;
+            if (ActiveSnap().HasFlag(SnapTarget.Grid)) center = (center / m_gridSize).Round() * m_gridSize;
 
             var block = new BD2Block();
             for (int i = 0; i < BD2Block.VertexCount; i++)
@@ -667,7 +683,7 @@ namespace GodotXOPS.Editor
             string unit = m_blockElement.ToString().ToLowerInvariant();
             if (m_blockSelection.Count == 0)
             {
-                return $"Block mode ({unit}).\n\nClick or drag a box to select.\n1 vertex, 2 edge, 3 face, 4 block.\nCtrl+click picks one of overlapping elements.";
+                return $"Block mode ({unit}).\n\nClick or drag a box to select.\n1 vertex, 2 edge, 3 face, 4 block.\nOverlapping vertices and edges are selected together.\nTo pick one block's, turn on Ask overlap above (or Ctrl+click).";
             }
             if (m_blockSelection.Count == 1)
             {

@@ -43,6 +43,10 @@ namespace GodotXOPS.Editor
                 return;
             }
 
+            // 스냅은 따로 확인한다. 다른 점검이 뜻하지 않게 붙지 않도록 두 모드의 대상을 모두 비워 두고 시작한다.
+            m_snapTargets[0] = SnapTarget.None;
+            m_snapTargets[1] = SnapTarget.None;
+
             List<PD2Point> points = m_document.Points.points;
             Camera3D camera = m_view.Camera;
             Rect2 screen = GetViewport().GetVisibleRect();
@@ -50,6 +54,7 @@ namespace GodotXOPS.Editor
             Expect(m_pointList.ItemCount == points.Count, "목록의 줄 수가 포인트 수와 다름");
             Expect(MapLoader.HumanCount == 0, "에디터가 사람을 스폰함 (파일의 내용만 보여 줘야 한다)");
             CheckPointModels();
+            CheckSnapAndViews();
 
             // 전부 선택과 해제.
             SelectAll();
@@ -150,7 +155,7 @@ namespace GodotXOPS.Editor
             Vector3 startA = points[a].position;
             float directionA = points[a].direction;
             // 면에 붙이기는 아래에서 따로 본다. 여기서는 화면과 나란한 면 위의 이동을 확인한다.
-            m_surfaceSnap = false;
+            SetSnap(SnapTarget.Face, false);
 
             // 숫자 입력: X 축으로 1.5 m.
             SetSelection(new[] { a });
@@ -192,25 +197,25 @@ namespace GodotXOPS.Editor
             Vector3 alongZ = points[a].position - startA;
             Expect(Mathf.Abs(alongZ.X) < tolerance && Mathf.Abs(alongZ.Y) < tolerance && Mathf.Abs(alongZ.Z) > tolerance, "Z 축에 묶었는데 다른 축으로 움직임");
             SetTransformAxis(TransformAxis.Z);
-            m_gridLock = true;
+            SetSnap(SnapTarget.Grid, true);
             m_gridSize = 0.5f;
             UpdateTransform();
             Vector3 snapped = points[a].position / 0.5f;
             Expect(Mathf.Abs(snapped.X - Mathf.Round(snapped.X)) < tolerance && Mathf.Abs(snapped.Z - Mathf.Round(snapped.Z)) < tolerance,
                 "격자를 켰는데 옮긴 자리가 격자점이 아님");
             Expect(Mathf.Abs(points[a].position.Y - startA.Y) < tolerance, "격자를 켰더니 움직이지 않은 축(높이)까지 격자로 튐");
-            m_gridLock = false;
+            SetSnap(SnapTarget.Grid, false);
             CancelTransform();
 
             // 면에 붙이기: 마우스 아래의 블록 면 위에 기준 포인트가 놓인다. 격자와 함께면 가로는 격자점, 높이는 그 자리의 면이다.
-            m_surfaceSnap = true;
+            SetSnap(SnapTarget.Face, true);
             Vector2 over = camera.UnprojectPosition(points[b].position);
             bool surfaceThere = SurfaceUnder(over, out Vector3 surface);
             BeginTransform(TransformMode.Move);
             m_transformMouse = over;
             UpdateTransform();
             Expect(!surfaceThere || points[a].position.DistanceTo(surface) < tolerance, "면에 붙이기를 켰는데 포인트가 마우스 아래의 면에 놓이지 않음");
-            m_gridLock = true;
+            SetSnap(SnapTarget.Grid, true);
             UpdateTransform();
             Vector3 onGrid = points[a].position / 0.5f;
             Expect(!surfaceThere || (Mathf.Abs(onGrid.X - Mathf.Round(onGrid.X)) < tolerance && Mathf.Abs(onGrid.Z - Mathf.Round(onGrid.Z)) < tolerance),
@@ -218,9 +223,9 @@ namespace GodotXOPS.Editor
             SetTransformAxis(TransformAxis.Y);
             Vector3 lifted = points[a].position - startA;
             Expect(Mathf.Abs(lifted.X) < tolerance && Mathf.Abs(lifted.Z) < tolerance, "축을 묶었는데도 면에 붙이기가 들음");
-            m_gridLock = false;
+            SetSnap(SnapTarget.Grid, false);
             m_gridSize = k_defaultGridSize;
-            m_surfaceSnap = false;
+            SetSnap(SnapTarget.Face, false);
             CancelTransform();
 
             // 돌리기: 두 포인트를 가운데 둘레로 90° 돌리면 서로의 거리는 그대로이고 방향이 90° 는다.
@@ -525,7 +530,7 @@ namespace GodotXOPS.Editor
                 && Mathf.Abs(blocks[added].vertices[0].DistanceTo(blocks[added].vertices[1]) - 2f) < tolerance, "한 축으로만 크기를 바꾸지 못함");
 
             // 격자: 블록을 옮기면 맨 앞의 꼭짓점이 격자점에 온다.
-            m_gridLock = true;
+            SetSnap(SnapTarget.Grid, true);
             m_gridSize = 0.5f;
             Vector2 mouseFrom = camera.UnprojectPosition(boxCenter);
             BeginTransform(TransformMode.Move);
@@ -535,7 +540,7 @@ namespace GodotXOPS.Editor
             Vector3 gridded = VertexPosition(m_transformVertexKeys[0]) / 0.5f;
             Expect(Mathf.Abs(gridded.X - Mathf.Round(gridded.X)) < tolerance && Mathf.Abs(gridded.Z - Mathf.Round(gridded.Z)) < tolerance, "격자를 켜고 블록을 옮겼는데 꼭짓점이 격자점에 오지 않음");
             CancelTransform();
-            m_gridLock = false;
+            SetSnap(SnapTarget.Grid, false);
             m_gridSize = k_defaultGridSize;
 
             // 복제와 지우기, 되돌리기.
@@ -1167,6 +1172,130 @@ namespace GodotXOPS.Editor
 
             Expect(!AssetsDirty(), "미리 보기만 했는데 데이터 파일이 바뀐 것으로 표시됨");
             Expect(OpenAsset($"{k_selfTestFolder}/weapon_list.json") && m_previewRoot.GetChildCount() == 0, "다른 파일로 바꿨는데 미리 보기가 남음");
+        }
+
+        /// <summary>
+        /// 정해진 시점의 직교, 격자, 스냅을 확인한다: 정해진 시점으로 돌리면 직교가 되고 돌리면(직접 켠 직교에서도) 원근으로 돌아오는지,
+        /// 직교에서 격자가 보는 면에 그려지고 원근에서는 켰을 때만 바닥에 그려지는지, 꼭짓점·모서리 가운데·면 가운데·모서리에 붙는지,
+        /// 옮기는 블록 자신에게는 붙지 않는지, 겹친 것을 늘 묻는 설정이 듣는지. 시점과 모드, 스냅은 처음 상태로 돌려놓는다.
+        /// </summary>
+        private void CheckSnapAndViews()
+        {
+            const float tolerance = 1e-3f;
+            Camera3D camera = m_view.Camera;
+            List<BD2Block> blocks = m_document.Blocks.blocks;
+            List<PD2Point> points = m_document.Points.points;
+
+            // 정해진 시점은 직교다. 돌리면 원근으로 돌아오고, 직접 켠 직교도 돌리면 원근이 된다.
+            Expect(!m_view.Orthographic, "점검을 시작할 때 원근 시점이 아님");
+            ViewFront(false);
+            Expect(m_view.Orthographic, "정해진 시점으로 돌렸는데 직교가 되지 않음");
+            LeaveFixedView();
+            Expect(!m_view.Orthographic, "정해진 시점에서 시점을 돌렸는데 원근으로 돌아오지 않음");
+            ToggleProjection();
+            ViewRight(true);
+            LeaveFixedView();
+            Expect(!m_view.Orthographic, "직접 켠 직교에서 시점을 돌렸는데 원근으로 바뀌지 않음");
+
+            // 격자: 원근에서는 켰을 때만 바닥에, 직교에서는 보는 면에 그린다. 선은 화면에서 너무 촘촘하지 않다.
+            FocusAll();
+            m_grid.Refresh(m_view, m_gridSize, true, false);
+            Expect(m_grid.LineCount == 0, "원근 시점인데 바닥 격자를 켜지 않고도 격자가 그려짐");
+            m_grid.Refresh(m_view, m_gridSize, true, true);
+            Expect(m_grid.LineCount > 0 && m_grid.PlaneAxis == 1, "원근 시점의 바닥 격자가 그려지지 않음");
+            ViewTop(false);
+            m_grid.Refresh(m_view, m_gridSize, true, false);
+            float pixels = m_grid.Step * GetViewport().GetVisibleRect().Size.Y / camera.Size;
+            Expect(m_grid.LineCount > 0 && m_grid.PlaneAxis == 1 && pixels >= 8f - tolerance, $"위에서 본 직교 시점의 격자가 없거나 너무 촘촘함 ({m_grid.LineCount}개, {pixels}픽셀)");
+            ViewFront(false);
+            m_grid.Refresh(m_view, m_gridSize, true, false);
+            Expect(m_grid.LineCount > 0 && m_grid.PlaneAxis == 2, "정면에서 본 직교 시점의 격자가 보는 면에 놓이지 않음");
+            m_grid.Refresh(m_view, m_gridSize, false, false);
+            Expect(m_grid.LineCount == 0, "격자를 껐는데 그려짐");
+            ViewTop(false);
+
+            // 스냅 대상 찾기: 꼭짓점, 모서리의 가운데, 면의 가운데, 모서리 위의 점. 찾은 자리는 마우스 아래에 있고 그 종류의 자리다.
+            SetXray(true);
+            Vector3[] vertices = blocks[0].vertices;
+            Vector3 edgeFrom = vertices[BlockOverlay.Edges[0][0]];
+            Vector3 edgeTo = vertices[BlockOverlay.Edges[0][1]];
+            bool IsVertex(Vector3 at) => blocks.Exists(block => System.Array.Exists(block.vertices, vertex => vertex.DistanceTo(at) < tolerance));
+            bool IsEdgeCenter(Vector3 at) => blocks.Exists(block => System.Array.Exists(BlockOverlay.Edges, edge => ((block.vertices[edge[0]] + block.vertices[edge[1]]) * 0.5f).DistanceTo(at) < tolerance));
+            bool OnEdge(Vector3 at) => blocks.Exists(block => System.Array.Exists(BlockOverlay.Edges, edge =>
+                Geometry3D.GetClosestPointToSegment(at, block.vertices[edge[0]], block.vertices[edge[1]]).DistanceTo(at) < tolerance));
+
+            Vector2 mouse = camera.UnprojectPosition(vertices[0]);
+            Expect(FindSnapPoint(mouse, SnapTarget.Vertex, out Vector3 found, out SnapTarget kind) && kind == SnapTarget.Vertex && IsVertex(found)
+                && camera.UnprojectPosition(found).DistanceTo(mouse) < 1f, "꼭짓점에 붙을 자리를 찾지 못함");
+            mouse = camera.UnprojectPosition((edgeFrom + edgeTo) * 0.5f);
+            Expect(FindSnapPoint(mouse, SnapTarget.EdgeCenter, out found, out kind) && kind == SnapTarget.EdgeCenter && IsEdgeCenter(found)
+                && camera.UnprojectPosition(found).DistanceTo(mouse) < 1f, "모서리의 가운데에 붙을 자리를 찾지 못함");
+            mouse = camera.UnprojectPosition(edgeFrom.Lerp(edgeTo, 0.3f));
+            Expect(FindSnapPoint(mouse, SnapTarget.Edge, out found, out kind) && kind == SnapTarget.Edge && OnEdge(found)
+                && camera.UnprojectPosition(found).DistanceTo(mouse) < 2f, "모서리 위에 붙을 자리를 찾지 못함");
+            int[] face = MapLoader.BlockFaceVertices[0];
+            Vector3 faceCenter = (vertices[face[0]] + vertices[face[1]] + vertices[face[2]] + vertices[face[3]]) * 0.25f;
+            mouse = camera.UnprojectPosition(faceCenter);
+            Expect(FindSnapPoint(mouse, SnapTarget.FaceCenter, out found, out kind) && kind == SnapTarget.FaceCenter
+                && camera.UnprojectPosition(found).DistanceTo(mouse) < 1f, "면의 가운데에 붙을 자리를 찾지 못함");
+            Expect(!FindSnapPoint(new Vector2(-500f, -500f), SnapTarget.Vertex | SnapTarget.Edge | SnapTarget.EdgeCenter | SnapTarget.FaceCenter, out _, out _), "화면 밖에서 붙을 자리를 찾음");
+
+            // 포인트를 옮길 때 꼭짓점에 붙는다. 스냅을 끄면 붙지 않는다.
+            Vector3 startPoint = points[0].position;
+            mouse = camera.UnprojectPosition(vertices[0]);
+            SetSelection(new[] { 0 });
+            SetSnap(SnapTarget.Vertex, true);
+            BeginTransform(TransformMode.Move);
+            m_transformMouse = mouse;
+            UpdateTransform();
+            Expect(IsVertex(points[0].position) && camera.UnprojectPosition(points[0].position).DistanceTo(mouse) < 1f, "포인트를 옮길 때 꼭짓점에 붙지 않음");
+            SetSnapEnabled(false);
+            Expect(!IsVertex(points[0].position) || points[0].position.DistanceTo(startPoint) < tolerance, "스냅을 껐는데도 꼭짓점에 붙음");
+            SetSnapEnabled(true);
+            CancelTransform();
+            Expect(points[0].position.DistanceTo(startPoint) < tolerance, "붙인 뒤 취소했는데 포인트가 제자리로 돌아가지 않음");
+            SetSnap(SnapTarget.Vertex, false);
+            SelectNone();
+
+            // 블록을 옮길 때: 다른 블록의 꼭짓점에 붙고, 옮기는 블록 자신의 꼭짓점은 대상이 아니다. 모드마다 스냅을 따로 기억한다.
+            SetEditMode(EditMode.Block);
+            Expect(m_snapTargets[0] == SnapTarget.None && m_snapTargets[1] == SnapTarget.None, "스냅 대상이 모드 사이에 섞임");
+            SetBlockElement(BlockElement.Block);
+            if (blocks.Count > 1)
+            {
+                SetSnap(SnapTarget.Vertex, true);
+                Expect(m_snapTargets[1] == SnapTarget.Vertex && m_snapTargets[0] == SnapTarget.None, "블록 모드에서 켠 스냅 대상이 포인트 모드에도 들어감");
+                m_blockSelection.Clear();
+                m_blockSelection.Add(0);
+                Vector3 own = vertices[0];
+                Vector3 other = blocks[blocks.Count - 1].vertices[0];
+                BeginTransform(TransformMode.Move);
+                bool ownFound = FindSnapPoint(camera.UnprojectPosition(own), SnapTarget.Vertex, out Vector3 ownHit, out _);
+                bool otherThere = blocks.FindIndex(1, block => System.Array.Exists(block.vertices, vertex => vertex.DistanceTo(ownHit) < tolerance)) >= 0;
+                Expect(!ownFound || otherThere, "옮기는 블록 자신의 꼭짓점에 붙으려 함");
+                m_transformMouse = camera.UnprojectPosition(other);
+                UpdateTransform();
+                Vector3 anchored = VertexPosition(m_transformVertexKeys[m_transformAnchor]);
+                bool onOther = blocks.FindIndex(1, block => System.Array.Exists(block.vertices, vertex => vertex.DistanceTo(anchored) < tolerance)) >= 0;
+                Expect(onOther && camera.UnprojectPosition(anchored).DistanceTo(m_transformMouse) < 1f, "블록을 옮길 때 다른 블록의 꼭짓점에 붙지 않음");
+                CancelTransform();
+                Expect(blocks[0].vertices[0].DistanceTo(own) < tolerance, "붙인 뒤 취소했는데 블록이 제자리로 돌아가지 않음");
+                SetSnap(SnapTarget.Vertex, false);
+                m_blockSelection.Clear();
+            }
+
+            // 겹친 것을 늘 묻기: 화면의 체크 상자가 Ctrl + 클릭과 같은 일을 한다 (입력 처리는 그 값을 choose 로 넘긴다).
+            Expect(m_overlapButton.Visible && !m_askOverlap, "블록 모드인데 겹친 것을 묻는 체크 상자가 보이지 않음");
+            m_overlapButton.ButtonPressed = true;
+            Expect(m_askOverlap, "겹친 것을 묻는 체크 상자를 눌렀는데 설정이 바뀌지 않음");
+            m_overlapButton.ButtonPressed = false;
+
+            SetBlockElement(BlockElement.Vertex);
+            SetEditMode(EditMode.Point);
+            Expect(!m_overlapButton.Visible, "포인트 모드인데 겹친 것을 묻는 체크 상자가 보임");
+            SetXray(false);
+            ToggleProjection();
+            Expect(!m_view.Orthographic, "점검 뒤에 원근 시점으로 돌아오지 못함");
         }
 
         /// <summary>

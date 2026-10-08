@@ -363,7 +363,7 @@ namespace GodotXOPS.Dev
 
         /// <summary>
         /// 모양이 이상한 블록(면이 뒤틀린 것, 정점이 겹친 것, 뒤집힌 것, 납작한 것)을 마구 만들어 레이 범위 거르기가 전부 훑은 결과와 같은지 본다.
-        /// BD2 는 모양과 무관하게 플래그대로 충돌하므로 이런 블록도 전부 판정 대상이다.
+        /// 유효한 입체가 아닌 모양(판형 블록)은 BD2 에서도 판정에서 빠지므로, 판정에 남은 블록과 빠진 블록이 둘 다 있는지도 본다.
         /// </summary>
         /// <param name="workFolder">파일을 쓸 폴더 전체 경로.</param>
         private void CheckRayFilterFuzz(string workFolder)
@@ -409,6 +409,25 @@ namespace GodotXOPS.Dev
             for (int i = 0; i < MapLoader.Blocks.Count; i += 6) boxesBounded &= MapLoader.Blocks[i].rayBounded;
             Expect(boxesBounded, "상자 블록의 레이 범위가 구해지지 않음");
             Expect(bounded < MapLoader.Blocks.Count, "범위를 구할 수 없는 블록(거르지 않는 경로)이 점검에 하나도 없음");
+
+            // 판형 블록: 플래그가 0 이어도 어느 판정에도 걸리지 않는다. 상자는 걸린다. 윗면을 한 점으로 모은 것(정점이 겹침)과 뒤집힌 것은 판형이다.
+            bool boardsSkipped = true;
+            bool boxesCollide = true;
+            int boards = 0;
+            foreach (Block block in MapLoader.Blocks)
+            {
+                int shape = block.index % 6;
+                if (block.boardShape) boards++;
+                if (shape == 0) boxesCollide &= !block.boardShape && block.layerMask != 0;
+                if (shape == 3 || shape == 5) boardsSkipped &= block.boardShape;
+                if (block.boardShape) boardsSkipped &= block.layerMask == 0;
+            }
+            foreach (BlockLayer layer in s_layers)
+            {
+                foreach (Block collider in MapLoader.GetBlockColliders(layer)) boardsSkipped &= !collider.boardShape;
+            }
+            Expect(boxesCollide, "BD2 의 멀쩡한 상자 블록이 판정에서 빠짐");
+            Expect(boardsSkipped && boards > 0, $"BD2 의 판형 블록(정점이 겹치거나 뒤집힌 것)이 플래그 0 인데 판정에 남음 (판형 {boards}개)");
 
             string difference = CompareRayFilter(11, k_fuzzRays, out int hits);
             Expect(difference == null, $"이상한 모양의 블록에서 레이 범위 거르기의 결과가 다름 — {difference}");

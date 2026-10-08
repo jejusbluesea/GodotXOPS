@@ -48,6 +48,10 @@ namespace GodotXOPS.Editor
         private readonly List<int> m_pickBuffer = new List<int>();
         private EditorCamera m_view;
         private PointMarkers m_markers;
+        private EditorGrid m_grid;
+        // 직교 시점의 격자와 원근 시점의 바닥 격자를 그릴지 (View 메뉴).
+        private bool m_showGrid = true;
+        private bool m_showFloorGrid;
         private bool m_xray;
 
         // 가운데 버튼으로 시점을 움직이는 중인지.
@@ -85,6 +89,8 @@ namespace GodotXOPS.Editor
             AddChild(m_blockOverlay);
             m_links = new LinkOverlay { Name = "Links" };
             AddChild(m_links);
+            m_grid = new EditorGrid { Name = "Grid" };
+            AddChild(m_grid);
 
             BuildInterface();
             ApplyMission();
@@ -101,6 +107,7 @@ namespace GodotXOPS.Editor
 
         public override void _Process(double delta)
         {
+            RefreshGrid();
             if (m_screenshotCountdown >= 0)
             {
                 UpdateStatus();
@@ -200,7 +207,7 @@ namespace GodotXOPS.Editor
                         if (m_editMode == EditMode.Block)
                         {
                             if (m_boxing) BlockSelectBox(box, button.ShiftPressed);
-                            else BlockSelectAt(button.Position, button.ShiftPressed, button.CtrlPressed);
+                            else BlockSelectAt(button.Position, button.ShiftPressed, button.CtrlPressed || m_askOverlap);
                         }
                         else if (m_boxing)
                         {
@@ -225,8 +232,15 @@ namespace GodotXOPS.Editor
         {
             if (m_navigating)
             {
-                if (motion.ShiftPressed) m_view.Pan(motion.Relative);
-                else m_view.Orbit(motion.Relative);
+                if (motion.ShiftPressed)
+                {
+                    m_view.Pan(motion.Relative);
+                }
+                else
+                {
+                    LeaveFixedView();
+                    m_view.Orbit(motion.Relative);
+                }
                 if (Transforming) UpdateTransform();
                 return;
             }
@@ -358,7 +372,7 @@ namespace GodotXOPS.Editor
                     ViewTop(key.CtrlPressed);
                     break;
                 case Key.Kp5:
-                    m_view.ToggleOrthographic();
+                    ToggleProjection();
                     break;
             }
         }
@@ -373,6 +387,7 @@ namespace GodotXOPS.Editor
             bool flying = Input.IsMouseButtonPressed(MouseButton.Right) && !m_pressing && !Transforming && !m_blockFly;
             input.MouseCursorMode(false, flying, false);
             if (!flying) return;
+            LeaveFixedView();
 
             float sensitivity = ConfigManager.Instance.MouseSensitivity;
             float invertY = ConfigManager.Instance.InvertY ? -1f : 1f;
@@ -389,6 +404,7 @@ namespace GodotXOPS.Editor
         private void ViewFront(bool opposite)
         {
             m_view.SetAngles(k_viewFrontYaw + (opposite ? 180f : 0f), 0f);
+            EnterFixedView();
         }
 
         /// <summary>
@@ -398,6 +414,7 @@ namespace GodotXOPS.Editor
         private void ViewRight(bool opposite)
         {
             m_view.SetAngles(k_viewRightYaw + (opposite ? 180f : 0f), 0f);
+            EnterFixedView();
         }
 
         /// <summary>
@@ -407,6 +424,43 @@ namespace GodotXOPS.Editor
         private void ViewTop(bool opposite)
         {
             m_view.SetAngles(k_viewFrontYaw, opposite ? -k_viewTopPitch : k_viewTopPitch);
+            EnterFixedView();
+        }
+
+        /// <summary>
+        /// 정해진 시점(정면, 측면, 위와 그 반대쪽)으로 돌렸을 때: 직교로 바꾼다 (사용자 결정: 정해진 시점은 늘 직교다).
+        /// </summary>
+        private void EnterFixedView()
+        {
+            m_view.SetOrthographic(true);
+        }
+
+        /// <summary>
+        /// 시점을 돌리기 시작했을 때(가운데 버튼으로 돌리기, 날아다니기): 직교면 원근으로 바꾼다.
+        /// 직교는 정해진 방향에서 볼 때만 쓴다 (사용자 결정: 직교에서 돌리면 어떻게 켠 직교든 원근으로 넘어간다). 옮기기와 확대·축소는 직교를 유지한다.
+        /// </summary>
+        private void LeaveFixedView()
+        {
+            m_view.SetOrthographic(false);
+        }
+
+        /// <summary>
+        /// 원근과 직교를 직접 바꾼다 (넘버패드 5).
+        /// </summary>
+        private void ToggleProjection()
+        {
+            m_view.ToggleOrthographic();
+        }
+
+        /// <summary>
+        /// 격자를 지금의 시점과 설정에 맞춰 다시 그린다. 3D 화면이 없는 모드에서는 감춘다.
+        /// </summary>
+        private void RefreshGrid()
+        {
+            if (m_grid == null) return;
+
+            m_grid.Visible = m_editMode < EditMode.Mission;
+            if (m_grid.Visible) m_grid.Refresh(m_view, m_gridSize, m_showGrid, m_showFloorGrid);
         }
 
         /// <summary>

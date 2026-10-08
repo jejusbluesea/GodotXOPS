@@ -42,6 +42,7 @@ namespace GodotXOPS.Editor
         // 텍스처 파일을 고른 뒤 바꿀 목록의 자리. 더하기면 −1.
         private int m_textureReplaceIndex = -1;
 
+        private Label m_boardLabel;
         private static readonly int[] s_flagBits = { BD2File.PassHuman, BD2File.PassBullet, BD2File.PassSight };
         private static readonly string[] s_flagNames = { "Humans pass through", "Bullets pass through", "Sight passes through" };
 
@@ -67,6 +68,13 @@ namespace GodotXOPS.Editor
                 m_flagBoxes[i] = flag;
                 box.AddChild(flag);
             }
+
+            m_boardLabel = new Label
+            {
+                Text = "Not a valid solid shape: nothing collides with this block, whatever the boxes above say (the original game's rule)",
+                AutowrapMode = TextServer.AutowrapMode.WordSmart, Modulate = s_errorColor, Visible = false,
+            };
+            box.AddChild(m_boardLabel);
 
             var face = new VBoxContainer();
             m_faceBox = face;
@@ -201,6 +209,14 @@ namespace GodotXOPS.Editor
                 m_flagBoxes[i].Disabled = selectedBlocks.Count == 0;
                 m_flagBoxes[i].SetPressedNoSignal(all);
             }
+
+            // 모양이 판형이라 플래그와 관계없이 충돌하지 않는 블록이 선택에 있으면 알린다. 화면의 블록(MapLoader)은 옮기기를 확정한 뒤의 모양이다.
+            bool board = false;
+            foreach (int index in selectedBlocks)
+            {
+                board |= index < MapLoader.Blocks.Count && MapLoader.Blocks[index].boardShape;
+            }
+            m_boardLabel.Visible = board;
 
             m_textureList.Clear();
             m_faceTexture.Clear();

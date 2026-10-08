@@ -472,18 +472,11 @@ namespace GodotXOPS
                 mesh.CustomAabb = new Aabb(middle - size * 0.5f, size);
             }
 
-            // BD2 는 판정별 충돌 여부를 플래그로 적는다. BD1 은 정점 모양으로 판형 블록(충돌 없음)인지 추론한다.
-            int layerMask;
-            if (raw.hasPassFlags)
-            {
-                layerMask = ~raw.passFlags & k_allLayersMask;
-            }
-            else
-            {
-                bool isBoardBlock = HasDuplicateExpandedVertices(ExpandVertices(raw.vertices))
-                                  || IsCenterVisibleFromAnyFace(center, faceNormals, faceCenters);
-                layerMask = isBoardBlock ? 0 : k_allLayersMask;
-            }
+            // 정점 모양이 유효한 입체가 아닌 블록(판형 블록)은 어느 판정에도 걸리지 않는다. 원본의 규칙이고, BD2 에서도 플래그와 관계없이 그렇다 (사용자 결정).
+            // 그 밖의 블록은 BD2 면 플래그에 적힌 판정만 끄고, BD1 이면 세 판정 모두 충돌한다.
+            bool isBoardBlock = HasDuplicateExpandedVertices(ExpandVertices(raw.vertices))
+                              || IsCenterVisibleFromAnyFace(center, faceNormals, faceCenters);
+            int layerMask = isBoardBlock ? 0 : (raw.hasPassFlags ? ~raw.passFlags & k_allLayersMask : k_allLayersMask);
 
             // 8정점 월드 AABB — 충돌 브로드페이즈 fast-reject 용. 원본 COLLISION_ADDSIZE 여유를 반영해 살짝 확장.
             Vector3 boundsMin = raw.vertices[0];
@@ -501,6 +494,7 @@ namespace GodotXOPS
                 position = center,
                 index = index,
                 layerMask = layerMask,
+                boardShape = isBoardBlock,
                 faceMaterials = raw.materialIndices,
                 faceNormals = faceNormals,
                 faceCenters = faceCenters,
