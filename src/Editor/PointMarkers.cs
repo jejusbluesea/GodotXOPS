@@ -1,0 +1,303 @@
+using System.Collections.Generic;
+using Godot;
+using GodotXOPS.IO;
+
+namespace GodotXOPS.Editor
+{
+    /// <summary>
+    /// 포인트들을 3D 화면에 표식으로 그리고, 화면의 한 점이나 사각형으로 표식을 고른다.
+    /// 종류마다 색과 모양이 다르고, 방향이 있는 종류에는 화살표가, 모든 표식에는 식별번호가 붙는다. 선택한 표식은 흰 테두리 상자로 감싼다.
+    /// 표식은 보여 주기만 한다. 값은 MapDocument 의 포인트가 갖고, 바뀌면 Rebuild 로 다시 맞춘다.
+    /// </summary>
+    public partial class PointMarkers : Node3D
+    {
+        // 표식의 크기 (m).
+        private static readonly Vector3 s_humanSize = new Vector3(0.4f, 1.8f, 0.4f);
+        private static readonly Vector3 s_itemSize = new Vector3(0.35f, 0.2f, 0.35f);
+        private static readonly Vector3 s_nodeSize = new Vector3(0.3f, 0.3f, 0.3f);
+        // 방향 화살표: 표식의 가운데에서 앞으로 뻗는 막대의 길이와 굵기 (m).
+        private const float k_arrowLength = 0.8f;
+        private const float k_arrowThickness = 0.06f;
+        // 식별번호 글자: 표식 위로 띄우는 높이 (m)와 글자 크기.
+        private const float k_labelGap = 0.25f;
+        private const float k_labelPixelSize = 0.004f;
+        private const int k_labelFontSize = 48;
+        private const int k_labelOutline = 12;
+        // 선택한 표식을 감싸는 테두리 상자가 표식보다 얼마나 큰지 (m).
+        private const float k_selectionMargin = 0.12f;
+        // 클릭으로 고를 때 표식이 화면에서 이 거리(픽셀) 안에 있어야 한다.
+        private const float k_pickRadiusPixels = 14f;
+        // 가려졌는지 볼 때 표식 바로 앞에서 레이를 멈춘다 (m). 표식이 놓인 바닥이나 벽에 레이가 닿아 가려진 것으로 치지 않게 한다.
+        private const float k_occlusionSlack = 0.05f;
+
+        private readonly List<Node3D> m_nodes = new List<Node3D>();
+        private readonly List<MeshInstance3D> m_highlights = new List<MeshInstance3D>();
+        // 표식마다의 방향 화살표와 식별번호 글자. 방향이 없는 종류의 화살표는 null 이다.
+        private readonly List<MeshInstance3D> m_arrows = new List<MeshInstance3D>();
+        private readonly List<Label3D> m_labels = new List<Label3D>();
+        private bool m_xray;
+        private readonly Dictionary<Color, StandardMaterial3D> m_materials = new Dictionary<Color, StandardMaterial3D>();
+        private IReadOnlyList<PD2Point> m_points;
+        private StandardMaterial3D m_highlightMaterial;
+
+        /// <summary>
+        /// 표식을 전부 다시 만든다. 선택 표시는 모두 꺼진 채로 만들어진다.
+        /// </summary>
+        /// <param name="points">포인트 목록 (파일 순서).</param>
+        public void Rebuild(IReadOnlyList<PD2Point> points)
+        {
+            foreach (Node3D node in m_nodes)
+            {
+                RemoveChild(node);
+                node.Free();
+            }
+            m_nodes.Clear();
+            m_highlights.Clear();
+            m_arrows.Clear();
+            m_labels.Clear();
+            m_points = points;
+
+            m_highlightMaterial ??= new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                AlbedoColor = new Color(1f, 1f, 1f, 0.4f),
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                NoDepthTest = true,
+            };
+
+            foreach (PD2Point point in points)
+            {
+                Node3D node = CreateMarker(point, out MeshInstance3D highlight);
+                AddChild(node);
+                m_nodes.Add(node);
+                m_highlights.Add(highlight);
+            }
+        }
+
+        /// <summary>
+        /// 선택한 포인트들에 테두리를 두르고 나머지의 테두리를 지운다.
+        /// </summary>
+        /// <param name="selection">선택한 포인트 번호들.</param>
+        public void SetSelection(ICollection<int> selection)
+        {
+            for (int i = 0; i < m_highlights.Count; i++)
+            {
+                m_highlights[i].Visible = selection.Contains(i);
+            }
+        }
+
+        /// <summary>
+        /// X-RAY 를 켜거나 끈다. 켜면 표식이 블록에 가려지지 않고 전부 보인다 (깊이 검사를 끈다).
+        /// </summary>
+        /// <param name="enabled">켤지.</param>
+        public void SetXray(bool enabled)
+        {
+            m_xray = enabled;
+            foreach (StandardMaterial3D material in m_materials.Values)
+            {
+                material.NoDepthTest = enabled;
+            }
+            foreach (Label3D label in m_labels)
+            {
+                label.NoDepthTest = enabled;
+            }
+        }
+
+        /// <summary>
+        /// 포인트 하나의 위치나 방향이 바뀌었을 때 그 표식을 다시 맞춘다 (옮기는 도중의 미리 보기). 종류나 식별번호가 바뀌었으면 Rebuild 를 쓴다.
+        /// </summary>
+        /// <param name="index">포인트 번호.</param>
+        public void Refresh(int index)
+        {
+            if (m_points == null || index < 0 || index >= m_nodes.Count) return;
+
+            PD2Point point = m_points[index];
+            m_nodes[index].Position = point.position;
+            MeshInstance3D arrow = m_arrows[index];
+            if (arrow == null) return;
+
+            Vector3 forward = Coord.YawForward(point.direction);
+            float height = ShapeSize(PointTypeInfo.Get(point.type).Shape).Y * 0.5f;
+            arrow.Position = Vector3.Up * height + forward * (k_arrowLength * 0.5f);
+            arrow.Basis = Basis.LookingAt(forward, Vector3.Up);
+        }
+
+        /// <summary>
+        /// 포인트의 표식 가운데 (바닥이 아니라 몸통의 가운데).
+        /// </summary>
+        /// <param name="point">포인트.</param>
+        /// <returns>월드 좌표.</returns>
+        public static Vector3 Center(PD2Point point)
+        {
+            return point.position + Vector3.Up * (ShapeSize(PointTypeInfo.Get(point.type).Shape).Y * 0.5f);
+        }
+
+        /// <summary>
+        /// 화면의 한 점에서 가장 가까운 표식을 찾는다. 표식의 가운데를 화면에 투영해 거리를 재고, 같은 자리에 겹쳐 있으면 카메라에 가까운 것을 고른다.
+        /// </summary>
+        /// <param name="camera">카메라.</param>
+        /// <param name="screenPosition">화면 좌표 (픽셀).</param>
+        /// <param name="xray">true 면 블록에 가려진 표식도 고른다.</param>
+        /// <returns>포인트 번호. 가까운 표식이 없으면 −1.</returns>
+        public int Pick(Camera3D camera, Vector2 screenPosition, bool xray)
+        {
+            if (m_points == null) return -1;
+
+            int best = -1;
+            float bestDepth = float.MaxValue;
+            for (int i = 0; i < m_points.Count; i++)
+            {
+                Vector3 center = Center(m_points[i]);
+                if (camera.IsPositionBehind(center)) continue;
+                if (camera.UnprojectPosition(center).DistanceTo(screenPosition) > k_pickRadiusPixels) continue;
+                if (!xray && Occluded(camera, center)) continue;
+
+                float depth = camera.GlobalPosition.DistanceSquaredTo(center);
+                if (depth < bestDepth)
+                {
+                    bestDepth = depth;
+                    best = i;
+                }
+            }
+            return best;
+        }
+
+        /// <summary>
+        /// 화면의 사각형 안에 가운데가 들어 있는 표식을 모두 찾는다.
+        /// </summary>
+        /// <param name="camera">카메라.</param>
+        /// <param name="rect">화면 사각형 (픽셀).</param>
+        /// <param name="xray">true 면 블록에 가려진 표식도 고른다.</param>
+        /// <param name="result">찾은 포인트 번호를 더할 목록.</param>
+        public void PickRect(Camera3D camera, Rect2 rect, bool xray, List<int> result)
+        {
+            if (m_points == null) return;
+
+            for (int i = 0; i < m_points.Count; i++)
+            {
+                Vector3 center = Center(m_points[i]);
+                if (camera.IsPositionBehind(center)) continue;
+                if (!rect.HasPoint(camera.UnprojectPosition(center))) continue;
+                if (!xray && Occluded(camera, center)) continue;
+
+                result.Add(i);
+            }
+        }
+
+        /// <summary>
+        /// 카메라에서 한 점이 블록에 가려 보이지 않는지 본다. 직교 시점에서도 맞도록 그 점이 찍히는 화면 자리에서 레이를 쏜다.
+        /// </summary>
+        /// <param name="camera">카메라.</param>
+        /// <param name="target">볼 점.</param>
+        /// <returns>블록이 사이에 있으면 true.</returns>
+        private static bool Occluded(Camera3D camera, Vector3 target)
+        {
+            Vector3 origin = camera.ProjectRayOrigin(camera.UnprojectPosition(target));
+            Vector3 toTarget = target - origin;
+            float distance = toTarget.Length() - k_occlusionSlack;
+            if (distance <= 0f) return false;
+
+            return MapLoader.RaycastBlock(BlockLayer.Sight, origin, toTarget.Normalized(), distance, out _);
+        }
+
+        /// <summary>
+        /// 표식 하나를 만든다. 원점이 포인트의 위치(바닥)이고 몸통은 그 위로 선다.
+        /// </summary>
+        /// <param name="point">포인트.</param>
+        /// <param name="highlight">선택 표시용 테두리 상자 (감춰진 채로 만든다).</param>
+        /// <returns>표식 노드.</returns>
+        private Node3D CreateMarker(PD2Point point, out MeshInstance3D highlight)
+        {
+            PointTypeInfo.Info info = PointTypeInfo.Get(point.type);
+            Vector3 size = ShapeSize(info.Shape);
+            StandardMaterial3D material = GetMaterial(info.Color);
+
+            var root = new Node3D { Position = point.position };
+            root.AddChild(new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = size },
+                MaterialOverride = material,
+                Position = Vector3.Up * (size.Y * 0.5f),
+            });
+
+            MeshInstance3D arrow = null;
+            if (info.Shape != PointTypeInfo.Shape.Node)
+            {
+                // PD2 의 방향은 그 자리에 놓이는 것의 yaw 다. 화살표를 몸통 가운데에서 그 방향으로 뻗는다.
+                Vector3 forward = Coord.YawForward(point.direction);
+                arrow = new MeshInstance3D
+                {
+                    Mesh = new BoxMesh { Size = new Vector3(k_arrowThickness, k_arrowThickness, k_arrowLength) },
+                    MaterialOverride = material,
+                    Position = Vector3.Up * (size.Y * 0.5f) + forward * (k_arrowLength * 0.5f),
+                    Basis = Basis.LookingAt(forward, Vector3.Up),
+                };
+                root.AddChild(arrow);
+            }
+            m_arrows.Add(arrow);
+
+            var label = new Label3D
+            {
+                Text = point.id.ToString(),
+                Position = Vector3.Up * (size.Y + k_labelGap),
+                Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+                PixelSize = k_labelPixelSize,
+                FontSize = k_labelFontSize,
+                OutlineSize = k_labelOutline,
+                Modulate = info.Color,
+                Shaded = false,
+                NoDepthTest = m_xray,
+            };
+            root.AddChild(label);
+            m_labels.Add(label);
+
+            highlight = new MeshInstance3D
+            {
+                Mesh = new BoxMesh { Size = size + Vector3.One * k_selectionMargin },
+                MaterialOverride = m_highlightMaterial,
+                Position = Vector3.Up * (size.Y * 0.5f),
+                Visible = false,
+            };
+            root.AddChild(highlight);
+            return root;
+        }
+
+        /// <summary>
+        /// 표식 모양의 크기.
+        /// </summary>
+        /// <param name="shape">모양.</param>
+        /// <returns>가로, 높이, 세로 (m).</returns>
+        private static Vector3 ShapeSize(PointTypeInfo.Shape shape)
+        {
+            switch (shape)
+            {
+                case PointTypeInfo.Shape.Human: return s_humanSize;
+                case PointTypeInfo.Shape.Item: return s_itemSize;
+                default: return s_nodeSize;
+            }
+        }
+
+        /// <summary>
+        /// 색 하나의 표식 머티리얼. 같은 색은 함께 쓴다. 조명과 안개를 받지 않는 단색이다.
+        /// 반투명 패스로 그린다 (불투명 패스의 단색 머티리얼은 이 프로젝트의 렌더 설정에서 거의 검게 나온다). 깊이는 쓰게 해서 표식끼리 앞뒤가 맞는다.
+        /// </summary>
+        /// <param name="color">색.</param>
+        /// <returns>머티리얼.</returns>
+        private StandardMaterial3D GetMaterial(Color color)
+        {
+            if (!m_materials.TryGetValue(color, out StandardMaterial3D material))
+            {
+                material = new StandardMaterial3D
+                {
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                    AlbedoColor = color,
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Always,
+                    NoDepthTest = m_xray,
+                };
+                m_materials[color] = material;
+            }
+            return material;
+        }
+    }
+}

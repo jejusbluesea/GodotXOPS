@@ -21,6 +21,18 @@ namespace GodotXOPS
 
         public override void _Ready()
         {
+            Reload();
+        }
+
+        /// <summary>
+        /// 기본 데이터를 파일에서 전부 다시 읽는다. 에디터가 데이터 파일을 고쳐 저장한 뒤에 부른다.
+        /// 데이터 객체가 새것으로 바뀌므로 맵이 로드돼 있지 않을 때만 부른다 (로드된 사람과 무기는 옛 객체를 들고 있다).
+        /// </summary>
+        public void Reload()
+        {
+            HumanParameterData = new HumanParameterData();
+            WeaponParameterData = new WeaponParameterData();
+            ObjectParameterData = new ObjectParameterData();
             LoadHumanParameterData();
             LoadWeaponParameterData();
             LoadObjectParameterData();

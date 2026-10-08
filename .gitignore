@@ -21,5 +21,8 @@ obj/
 # 익스포트 결과물
 /build/
 
+# 맵 에디터의 플레이 테스트가 쓰는 임시 파일
+/editor_temp/
+
 # 디버그 콘솔의 ss 명령이 저장하는 화면
 /screenshot/

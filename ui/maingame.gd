@@ -645,6 +645,9 @@ func _update_fade(delta: float) -> void:
 	var text_total: float = ENDING["in_time"] + ENDING["hold"] + ENDING["out_time"]
 	if _end_time >= maxf(FADE["out_time"], text_total):
 		_left = true
+		if Game.HasHeldScene():
+			Game.ReturnToHeldScene()
+			return
 		Game.UnloadMap()
 		Game.ChangeScene(RESULT_SCENE)
 
@@ -691,6 +694,10 @@ func _update_input(delta: float) -> bool:
 
 	if InputManager.WasPressed("escape"):
 		_left = true
+		# 에디터의 플레이 테스트로 들어왔으면 메뉴가 아니라 에디터로 돌아간다.
+		if Game.HasHeldScene():
+			Game.ReturnToHeldScene()
+			return true
 		Game.UnloadMission()
 		Game.ChangeScene(MENU_SCENE)
 		return true

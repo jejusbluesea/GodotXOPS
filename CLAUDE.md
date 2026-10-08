@@ -24,10 +24,12 @@
 ## 폴더
 
 - `src/` — C#. `Utility/`(공용), `IO/`(파일 로더와 확장 형식의 읽기·쓰기), `Data/`(데이터 클래스와 `DataManager`), `Dev/`(점검 도구). 이후 `Map/` 등이 UnityXOPS `Runtime/` 구조를 따라 추가된다.
+- `src/Editor/`, `scenes/editor.tscn` — 에디터 (아래 "에디터"). 전부 C# 이고 Godot 기본 컨트롤을 코드로 만든다.
 - `scenes/` — `.tscn`. 화면은 씬 파일 단위로 나눈다.
 - `ui/` — GDScript UI. 화면별 스크립트와 `ui/common/`의 공용 도우미.
 - `shaders/` — `.gdshader`.
 - `data/`, `addon/` — 원본 XOPS 에셋. **저작권상 커밋 금지** (`.gitignore` 처리됨). 로컬에만 둔다.
+- `editor_temp/` — 맵 에디터의 플레이 테스트가 쓰는 임시 파일. 커밋하지 않는다 (`.gitignore`, 만들 때 `.gdignore` 를 함께 쓴다).
 - `godotdata/` — 외부 게임 데이터 JSON (UnityXOPS의 `unitydata/`). 커밋 대상.
 - `addons/godot_sandbox/` — Godot Sandbox 확장 (GDExtension, v0.60, BSD-3-Clause. 원본 에셋 폴더 `addon/` 과 다른 폴더다). 스크립트로 만드는 이벤트를 격리해 돌리는 SafeGDScript 의 실행기다. Windows x86_64 용 DLL 과 `gdscript.elf` 만 넣었고 커밋한다 (사용자 결정. 버전을 고정한다). 에디터 플러그인과 테스트 파일은 뺐다. 저장소를 새로 받으면 `--headless --import` 를 한 번 돌려야 확장이 등록된다. **외부에서 받은 스크립트는 이 샌드박스로만 돌린다. 일반 GDScript 로 컴파일하지 않는다** (`EVENT_SCRIPT_SECURITY.md`).
 - `data/`, `addon/`, `godotdata/`에는 `.gdignore`가 있어 Godot이 임포트하지 않는다. 런타임에 `GamePath.Resolve()`로 전체 경로를 얻어 파일로 직접 읽는다.
@@ -188,6 +190,40 @@ dotnet build GodotXOPS.csproj
 - **이벤트가 화면에 놓는 글자는 범용 칸이다** (사용자 결정: UI 에 제약을 걸지 않는다). `EventManager.SetHudText` / `ClearHudText`, 칸 32개, OS 글꼴과 `char.dds` 둘 다, 기준점 3×3 과 오프셋(화면 높이 480 기준, +y 위). 먼저 놓은 것이 뒤에 그려진다. 안내나 타이머를 고정 HUD 요소로 만들지 않는다. HUD 는 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽는다.
 - Interact 키는 사람이 아니라 이벤트가 받는다: `PlayerController` → `EventManager.QueueInteract()` → 다음 틱 한 번 `InteractPressed`.
 - 기본 제공 이벤트를 고치면 `base.json`, `base.sgd`, `docs/modding.md` 의 표, `event_check` 를 함께 고친다. 번호는 20개 단위로 끊는다 (20 대기, 40 동작, 60 흐름, 70 화면 글자. 사용자 결정).
+
+## 에디터
+
+- **에디터는 하나다** (사용자 결정, 2026-10-08. 전에 셋으로 나누기로 한 것을 취소했다): 블록(BD2), 포인트(PD2), 미션(MIF2), 에셋(`godotdata/` 의 JSON 과 에드온에 넣을 JSON)을 모드로 오간다. **3D 화면은 블록과 포인트 모드에서만 보이고, 미션과 에셋 모드는 3D 화면을 덮는 별도의 화면이다.** 씬은 `scenes/editor.tscn` 하나이고 실행 인자로 들어간다 (`-- --scene editor`). 주 클래스는 `XopsEditor` 이고 관심사별 partial(`XopsEditor*.cs`)로 나뉜다. 원본 형식(BD1, PD1, MIF)은 편집하지 않고 변환해 가져온다.
+- 미션 모드(`XopsEditorMission.cs`): 문서가 미션의 설정(`MapDocument.Mission`, 늘 있다)을 들고, 고칠 때는 `EditMission` 을 거친다 (JSON 으로 뜬 전후를 `ActionCommand` 로 기록). 블록·포인트의 경로는 저장할 때 문서의 경로를 적는다. 하늘과 이벤트 묶음이 바뀌면 `ApplyMission` 이 3D 화면과 이벤트 목록을 다시 맞춘다.
+- 이벤트 편집 (`XopsEditorEvents.cs`, 사용자 결정: 권고안 그대로): 이벤트도 포인트이므로 포인트 모드에서 고친다. 이벤트 종류의 이름과 칸은 `EventCatalog` 가 준다 (원본 10 에서 19 는 코드에서, 스크립트 이벤트는 등록 JSON 에서. 스크립트는 로드하지 않는다). 칸은 `kind` 로 입력 방식을 고른다 (목록에서 고르기, 화면에서 고르기). 노드 그래프 화면은 만들지 않고 3D 의 연결선(`LinkOverlay`)과 목록의 이벤트 보기로 줄을 보여 준다. **가리키는 이벤트가 없는 출구는 오류가 아니다** (줄이 거기서 끝난다). 이벤트의 식별번호는 종류가 달라도 이벤트 전체에서 겹치지 않게 준다 (`NextEventId`). 미션 변수에 이름을 붙이는 것은 아직 없다 (저장할 자리를 정해야 한다).
+- 에셋 모드(`XopsEditorAssets.cs`, `AssetFile`. 사용자 결정: 밖으로 뺀 데이터 전부를 고친다): 데이터 클래스를 리플렉션으로 훑어 키와 값의 트리를 만든다 (종류마다 화면을 따로 만들지 않는다. 데이터 클래스에 필드를 더하면 에디터에 바로 나온다). **파일에 있던 최상위 키만 다시 쓴다** (`AssetFile.Fields`. 기본 데이터는 한 클래스를 여러 파일에 나눠 적고 에드온 데이터는 목록 섹션만 갖는다). 파일의 종류는 키로 알아낸다 (`AssetFile.Kinds`. 종류를 더하면 여기에 한 줄). 고칠 때는 `EditAsset` 을 거친다 (파일 내용의 JSON 전후를 기록). `config.json` 은 넣지 않는다 (설정이고 OPTION 화면이 있다). 기본 데이터를 저장하면 `DataManager.Reload()` 로 다시 읽는다.
+- 에셋 모드의 미리 보기(`XopsEditorPreview.cs`): 자기만의 3D 공간을 가진 `SubViewport` 에 선택한 항목의 모델을 게임과 같은 코드로 조립한다 (`WeaponVisual.BuildModelParts`. 사람은 `HumanVisual.CreateHumanVisual` 의 배치를 따라 직접 조립한다: `Human` 노드를 만들지 않는다). 종류를 더하려면 `ShowPreviewModel` 의 분기에 더한다. 번호로 가리키는 것은 `LookupData` 로 찾는다 (열려 있는 파일의 편집 → 게임의 데이터, 10000 이상은 미션의 에드온 파일). 같은 항목을 고치는 동안에는 시점을 다시 맞추지 않는다. 팔과 다리는 메시 목록에서 넘겨 본다 (`m_previewArm`, `m_previewLeg`). 사람의 히트박스와 무기를 든 자세는 아직 없다.
+- 이펙트의 미리 보기는 `EffectPreview`(에디터 전용)가 되풀이해 재생한다. `EffectManager` 는 게임의 3D 공간과 읽어 둔 데이터에 묶여 있어서, 미리 보기 공간에서 고치는 중인 데이터로 재생하려고 같은 계산을 따로 갖는다. **`EffectManager` 의 `Spawn` / `Tick` / `ApplyTransform` 을 고치면 `EffectPreview` 도 같이 고친다** (맵 충돌은 미리 보지 않는다).
+- `DataManager.Reload()` 는 데이터 객체를 새것으로 바꾼다. 맵이 로드돼 있지 않을 때만 부른다 (에디터는 사람을 스폰하지 않으므로 괜찮다).
+- 값 몇 개를 통째로 바꾸는 편집(줄의 시작 번호, 메시지, 미션의 설정, 데이터 파일)은 `ActionCommand` 로 기록한다. `AfterHistoryStep` 이 그 `Changed` 로 무엇을 다시 그릴지 고른다.
+- **파일의 내용(모델)을 편집한다** (`MapDocument`). 게임 상태를 편집하지 않고 사람을 스폰하지 않는다. 블록만 `MapLoader.LoadBlockData` 로 띄우고 포인트는 표식(`PointMarkers`)으로 그린다.
+- "화면은 GDScript, 창구만 부른다" 규칙의 예외다. 전부 C# 이고 `char.dds` 가 아니라 Godot 기본 컨트롤을 쓴다. 화면의 글자는 영어다.
+- **조작은 블렌더의 기본 키를 따른다** (사용자 결정. 3D CAD 식 조작은 쓰지 않는다): 가운데 버튼으로 시점(`EditorCamera`), 넘버패드 시점, 왼쪽 클릭·Shift·사각형 선택, A / Alt+A, Alt+Z(X-RAY), 앞으로 G / R / S 변형. **키로 하는 일은 메뉴나 버튼으로도 할 수 있어야 한다** (사용자 결정). 날아다니기(오른쪽 버튼을 누른 채 이동 키)는 함께 둔다. 오른쪽 버튼을 누르고 있는 동안에는 다른 키를 받지 않는다.
+- 편집은 전부 되돌릴 수 있어야 한다: 바꾼 뒤 `IEditorCommand` 를 `EditorHistory` 에 넣는다 (포인트의 값은 `PointChangeCommand`). 문서의 포인트 객체는 표식과 목록이 가리키므로 객체를 바꾸지 않고 값만 옮긴다 (`PointChangeCommand.Copy`).
+- 변형(G / R)은 진행 중인 상태(`Transforming`)다: 그동안 클릭은 확정, 오른쪽 버튼은 취소이고 선택과 날아다니기는 막힌다. 마우스로 옮기기는 화면과 나란한 면 위에서, 축을 묶으면 그 축 위에서 한다. 포인트의 돌리기는 세로축 둘레뿐이다 (방향이 yaw 하나다).
+- **키는 물리 키 위치(`PhysicalKeycode`)로 읽는다.** 글자 코드로 읽으면 한글 입력 상태에서 Alt+Z 같은 키가 듣지 않는다 (사용자가 겪었다).
+- **격자 고정은 블록과 포인트가 함께 쓴다** (사용자 결정): 옮긴 자리가 격자점에 맞춰진다 (기준은 선택의 맨 앞 것, 움직이지 않은 축은 그대로). 단위는 화면에서 바꾼다 (기본 0.1 m).
+- **면에 붙이기(Surface)**: 옮길 때 마우스 아래의 블록 면 위에 놓는다 (사용자 결정: 사람 같은 포인트는 바닥에 둬야 한다). 기본으로 켜져 있고, 축을 묶거나 숫자를 치면 듣지 않는다. 새 포인트도 마우스 아래의 면에 놓인다.
+- 포인트의 수나 순서를 바꾸는 편집(놓기, 복제, 지우기)은 `PointListCommand`(목록 전체의 전후)로, 그 뒤에는 `RebuildPoints` 로 표식과 목록을 다시 만든다. 저장은 덮어쓰기 전의 파일을 `.bak` 으로 남긴다.
+- X-RAY 의 키는 블렌더와 같은 Alt+Z 하나다. 사용자의 PC 에서는 GeForce Experience 의 오버레이가 Alt+Z 를 먼저 가져가서 듣지 않았는데, 다른 사람에게는 되므로 대체 키를 두지 않기로 했다 (사용자 결정. 체크 상자로 켤 수 있다).
+- **X-RAY**: 켜면 가려진 것도 **보이고**(표식의 깊이 검사를 끈다. 사용자 결정) 선택된다. 끄면 보이는 것만 선택한다. 가려졌는지는 `MapLoader.RaycastBlock(BlockLayer.Sight, ...)` 로 본다.
+- 블록 편집 (사용자 결정): 점·선·면·블록 단위로 선택한다 (`BlockElement`, 키 1 에서 4). 블록은 꼭짓점 8개짜리 육면체이고 블록끼리 꼭짓점을 공유하지 않으므로, 클릭은 같은 자리에 겹친 것을 함께 선택하고 **Ctrl + 클릭으로 특정 블록의 것만 고를 수 있다** (`CollectCoincident`, 겹친 것 메뉴). 블록 하나를 쪼개거나(Loop Cut 같은 것) 육면체를 벗어나게 하는 기능은 넣지 않는다. 그래서 지우기와 복제는 블록 전체에만 듣는다.
+- 블록 요소의 키는 `블록 번호 × ElementStride + 요소 번호`다. 변형은 선택한 요소의 꼭짓점들을 움직이고(`CollectVertices`), 포인트와 같은 코드(`XopsEditorTransform.cs`)를 쓴다.
+- 화면의 블록은 문서(`MapDocument.Blocks`)를 `MapLoader.LoadBlockData(BD2File)` 로 넘겨 만든다. 블록을 고친 뒤에는 `RebuildBlocks`. 옮기는 도중에는 메시를 다시 만들지 않고 덧그림(`BlockOverlay`)만 다시 그린다. 문서의 배열을 로더가 그대로 가리키므로 블록의 값은 배열을 바꾸지 않고 옮긴다 (`BlockChangeCommand.Copy`).
+- 블록의 값(`XopsEditorBlockInspector.cs`): 통과 플래그는 선택한 요소가 속한 블록에, 텍스처·재질·UV 는 면 단위면 선택한 면에, 블록 단위면 여섯 면 전부에 넣는다 (`TargetFaces`). 고칠 때는 `EditBlocks` / `EditFaces` 를 거쳐 되돌리기 기록과 다시 만들기를 함께 한다.
+- 텍스처 목록은 문서가 갖고(`MapDocument.Textures`) 블록과 함께 저장한다. 자리를 지우지 않는다 (번호가 밀린다). 다른 이름으로 저장하면 텍스처 목록도 블록 파일 옆의 `이름_textures.json` 으로 따로 쓴다. 로더에는 `LoadBlockData(BD2File, BlockTextureListData)` 로 문서의 목록을 넘긴다 (파일의 목록을 다시 읽지 않게).
+- 면을 고르는 레이는 문서의 블록에서 직접 계산한다 (`PickFace`). `MapLoader.RaycastBlock` 은 통과 플래그가 켜진 블록을 맞히지 못한다.
+- **플레이 테스트** (`XopsEditorPlay.cs`, F5): 문서를 `editor_temp/` 의 임시 파일 한 벌로 쓰고(`WritePlayFiles`. 문서의 경로와 "바뀜" 표시는 건드리지 않는다) `Game.LoadMissionFile` 로 로드한 뒤 `Game.HoldSceneAndChange` 로 메인게임에 넘어간다. **에디터 씬은 지우지 않고 트리에서 떼어 `GameBridge` 가 맡아 둔다** (`GameBridgeHold.cs`). 그래서 편집 내용·되돌리기 기록·시점이 그대로 돌아온다. 메인게임(`ui/maingame.gd`)은 `Game.HasHeldScene()` 이면 메뉴·결과 화면 대신 `Game.ReturnToHeldScene()` 으로 나간다. 에디터는 떨어져 있는 동안(`m_playing`) `_ExitTree` 에서 블록을 내리지 않고, 돌아오면 `ResumeFromPlay` 가 창과 3D 화면을 되돌린다. 미션의 설정은 문서가 든 미션 파일의 내용(`MapDocument.Mission`)을 그대로 쓴다.
+- **원본 가져오기**: BD1 / PD1 하나는 `MapLoader.ConvertBD1` / `ConvertPD1` 으로 바꿔 이름 없는 문서로 연다 (파일을 쓰지 않는다). 미션(MIF, 공식 미션)은 `ConvertMissionToExtended` 로 한 벌을 쓰고 그것을 연다 (미션 파일과 추가 사물의 데이터가 함께 있어야 해서).
+- 포인트 편집 (사용자 결정): 포인트 단위로만 선택한다. 여러 개를 선택하면 무엇을 고칠지 드롭다운으로 고른다.
+- 에디터는 안개를 끄고(`MapLoader.ClearFog`) 카메라의 far 를 늘린다. 게임의 안개와 far 는 맵 전체를 멀리서 보기에 짧다.
+- 표식처럼 단색으로 그리는 3D 는 `StandardMaterial3D` 를 반투명 패스(`Transparency = Alpha`)로 쓴다. 불투명 패스의 단색 머티리얼은 이 프로젝트에서 거의 검게 나온다 (원인은 확인하지 못했다).
+- 에디터를 고친 뒤에는 `-- --scene editor --selftest`(헤드리스 가능)를 돌리고, 화면은 `--open 미션.mif2 --select 번호 --focus --screenshot 경로.png` 로 직접 본다. 시험용 맵은 `mif2_check` 의 `--convert-official 번호 build/editor_sample` 로 만든다.
 
 ## 화면 (씬 UI)
 

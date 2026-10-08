@@ -24,7 +24,20 @@ namespace GodotXOPS
                 return false;
             }
 
-            BlockTextureListData list = LoadBlockTextureList(file.textureListPath);
+            ConvertBD2(file, null, out texturePaths, out rawBlocks);
+            return true;
+        }
+
+        /// <summary>
+        /// BD2 의 내용과 그것이 가리키는 텍스처 목록을 블록 원시 데이터로 바꾼다. 배열(정점, UV, 번호)은 BD2 의 것을 그대로 가리킨다.
+        /// </summary>
+        /// <param name="file">BD2 의 내용.</param>
+        /// <param name="textures">텍스처 목록. null 이면 BD2 가 가리키는 텍스처 목록 파일을 읽는다.</param>
+        /// <param name="texturePaths">텍스처 전체 경로. 목록의 항목 수만큼이고, 경로가 비었거나 exe 폴더를 벗어나면 빈 문자열.</param>
+        /// <param name="rawBlocks">블록 원시 데이터.</param>
+        private static void ConvertBD2(BD2File file, BlockTextureListData textures, out string[] texturePaths, out RawBlockData[] rawBlocks)
+        {
+            BlockTextureListData list = textures ?? LoadBlockTextureList(file.textureListPath);
             texturePaths = new string[list.blockTextureData.Count];
             for (int i = 0; i < texturePaths.Length; i++)
             {
@@ -45,8 +58,6 @@ namespace GodotXOPS
                     passFlags = block.flags,
                 };
             }
-
-            return true;
         }
 
         /// <summary>

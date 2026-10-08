@@ -43,6 +43,8 @@ namespace GodotXOPS
 
         // 로드된 맵의 모든 블록(충돌 없는 판형 블록 포함).
         public static IReadOnlyList<Block> Blocks => Instance.m_blocks;
+        // 면마다 정점 4개의 번호 (면 6개). 블록의 정점 8개가 어떻게 면을 이루는지 알아야 하는 도구(에디터)가 쓴다.
+        public static IReadOnlyList<int[]> BlockFaceVertices => s_faceVertexIndices;
 
         /// <summary>
         /// 한 판정에서 충돌하는 블록 목록을 얻는다.
@@ -84,6 +86,30 @@ namespace GodotXOPS
                 return false;
             }
 
+            BuildBlocks(texturePaths, rawBlocks);
+            return true;
+        }
+
+        /// <summary>
+        /// 메모리에 있는 BD2 의 내용으로 블록 메시와 판정을 만든다 (파일을 거치지 않는다). 이전에 로드된 블록은 먼저 제거한다.
+        /// 에디터가 블록을 고친 뒤 화면과 판정을 다시 맞출 때 쓴다.
+        /// </summary>
+        /// <param name="file">BD2 의 내용.</param>
+        /// <param name="textures">텍스처 목록. null 이면 BD2 가 가리키는 텍스처 목록 파일을 읽는다.</param>
+        public static void LoadBlockData(BD2File file, BlockTextureListData textures = null)
+        {
+            UnloadBlockData();
+            ConvertBD2(file, textures, out string[] texturePaths, out RawBlockData[] rawBlocks);
+            BuildBlocks(texturePaths, rawBlocks);
+        }
+
+        /// <summary>
+        /// 읽어 둔 텍스처 경로와 블록 원시 데이터로 머티리얼, 블록, 메시 노드를 만든다.
+        /// </summary>
+        /// <param name="texturePaths">텍스처 전체 경로 (슬롯 순서).</param>
+        /// <param name="rawBlocks">블록 원시 데이터.</param>
+        private static void BuildBlocks(string[] texturePaths, RawBlockData[] rawBlocks)
+        {
             MapLoader loader = Instance;
 
             // 텍스처 슬롯은 항상 머티리얼을 가진다. 경로가 비었거나 로드에 실패한 슬롯은 흰색 머티리얼이다.
@@ -118,8 +144,6 @@ namespace GodotXOPS
                 }
                 loader.m_blockRoot.AddChild(instance);
             }
-
-            return true;
         }
 
         /// <summary>
