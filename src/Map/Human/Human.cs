@@ -155,7 +155,7 @@ namespace GodotXOPS
             bool aliveChanged = (m_deadState == HumanDeadState.Alive) != (value == HumanDeadState.Alive);
             m_deadState = value;
 
-            // 생사가 바뀌면 팔을 다시 붙인다. 죽으면 조준 방향을 따르던 맨손 팔이 고정 자세로 돌아간다.
+            // 생사가 바뀌면 팔을 다시 붙인다. 죽으면 맨손 팔이 고정 자세에서 풀려 팔 각도를 따른다 (HumanController.TickDeadArm).
             if (aliveChanged && m_weapons[0] != null) ApplyActiveWeaponVisual();
         }
 

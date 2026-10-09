@@ -602,6 +602,7 @@ namespace GodotXOPS
         /// <summary>
         /// 활성 슬롯의 무기만 보이게 하고 팔 모델과 자세를 그 무기에 맞춘다.
         /// 맨손인데 AI 가 팔을 조준 방향으로 움직여야 하는 동작(좀비 공격, 항복) 중이면 팔을 조준 쪽에 붙인다.
+        /// 죽은 사람도 조준 쪽에 붙인다: 원본은 쓰러진 사람의 팔을 고정 자세가 아니라 팔 각도 그대로 그린다 (object.cpp:2177-2183).
         /// </summary>
         private void ApplyActiveWeaponVisual()
         {
@@ -613,7 +614,7 @@ namespace GodotXOPS
             Weapon weapon = CurrentWeapon;
             if (weapon == null) return;
 
-            bool forceDynamic = weapon.ModelData == null || (weapon.IsNone && Alive && m_unarmedArmDynamic);
+            bool forceDynamic = weapon.ModelData == null || (weapon.IsNone && (!Alive || m_unarmedArmDynamic));
             m_humanVisual.ApplyArmModel(weapon.ModelData, forceDynamic);
         }
     }

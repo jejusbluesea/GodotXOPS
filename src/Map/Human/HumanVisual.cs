@@ -209,6 +209,17 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 죽은 사람의 팔 각도를 DynamicArm 의 회전으로 반영한다. 팔 반동은 더하지 않는다.
+        /// 원본은 쓰러진 사람의 팔을 armrotation_y 그대로 그린다 (object.cpp:2177-2183).
+        /// </summary>
+        /// <param name="pitchDeg">pitch (도, 아래 +).</param>
+        public void SetDeadArmPitch(float pitchDeg)
+        {
+            m_armPitchDeg = pitchDeg;
+            m_dynamicArmRoot.Rotation = Coord.FromUnityEuler(new Vector3(-m_armPitchDeg, 0f, 0f));
+        }
+
+        /// <summary>
         /// 발사 반동 — 팔을 순간적으로 들어 올린 뒤 틱마다 절반씩 되돌린다. 원본 HumanMotionControl::ShotWeapon (object.cpp:3341-3362).
         /// </summary>
         /// <param name="angleDeg">들어 올릴 각도 (도, 위 +). 원본은 0.5° × 무기 반동값, 수류탄은 20°.</param>

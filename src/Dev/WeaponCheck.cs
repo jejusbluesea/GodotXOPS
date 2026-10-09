@@ -979,6 +979,29 @@ namespace GodotXOPS.Dev
             target.QueueWeaponInput(HumanWeaponAction.Fire);
             target.Controller.SimTick();
             Expect(BulletManager.SpawnCount == before, "죽은 사람이 발사함");
+
+            // 죽은 사람의 팔은 틱마다 6° 씩 움직여 ±90° 에서 멈춘다 (원본 object.cpp:1170-1180). 방향은 죽는 순간의 팔 각도가 정한다.
+            if (m_targets.Count < 3) { Expect(false, "사망: 팔 각도를 볼 표적이 모자람"); return; }
+            CheckDeadArm(m_targets[1], 30f, 90f);
+            CheckDeadArm(m_targets[2], -40f, -90f);
+        }
+
+        /// <summary>
+        /// 사람을 정해진 팔 각도로 죽이고 팔이 한 틱에 6° 씩 움직여 끝 각도에서 멈추는지 본다.
+        /// </summary>
+        /// <param name="target">죽일 사람.</param>
+        /// <param name="pitch">죽는 순간의 pitch (도, 아래 +).</param>
+        /// <param name="expected">멈춰야 하는 pitch (도).</param>
+        private void CheckDeadArm(Human target, float pitch, float expected)
+        {
+            target.Controller.SetInput(new HumanInput { moveFlag = HumanMoveFlag.None, yaw = target.Controller.Yaw, pitch = pitch });
+            target.ApplyDamage(target.HP);
+            target.Controller.SimTick();
+            float step = Mathf.Sign(expected) * 6f;
+            Expect(Mathf.IsEqualApprox(target.Controller.Pitch, pitch + step), $"죽은 틱의 팔 각도 {target.Controller.Pitch:0.0} (기대 {pitch + step:0.0})");
+
+            for (int i = 0; i < 12; i++) target.Controller.SimTick();
+            Expect(Mathf.IsEqualApprox(target.Controller.Pitch, expected), $"죽은 사람의 팔 각도 {target.Controller.Pitch:0.0} (기대 {expected:0.0})");
         }
     }
 }

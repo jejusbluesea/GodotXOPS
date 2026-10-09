@@ -50,6 +50,9 @@ namespace GodotXOPS
         private const float k_deadFlatLayPitch = 90f;
         private const float k_deadFreeFallEntryPitch = 135f;
         private const float k_deadPopupHeight = 0.1f; // 사망 진입 시 시체 함몰 방지 (원본 pos_y += 1.0)
+        // 죽은 사람의 팔이 틱마다 움직이는 각도와 멈추는 각도 (도). 원본 object.cpp:1172-1179 의 6° 와 ±90°.
+        private const float k_deadArmStep = 6f;
+        private const float k_deadArmLimit = 90f;
 
         private readonly Human m_human;
         private readonly ControllerSizeData m_size;
@@ -79,6 +82,8 @@ namespace GodotXOPS
         // 직전 틱의 사망 회전 각도. 화면에는 직전 틱과 현재 틱 사이를 보간해 보여 준다.
         private float m_prevDeadPitchAngle;
         private float m_deadDirection;
+        // 직전 틱의 팔 pitch. 죽은 뒤 팔이 틱마다 움직이는 것을 화면에서 보간하는 데만 쓴다.
+        private float m_prevArmRotationY;
 
         public Vector3 Position => m_position;
         public float Yaw => m_rotationX;
@@ -212,6 +217,7 @@ namespace GodotXOPS
         {
             m_prevPosition = m_position;
             m_prevDeadPitchAngle = m_deadPitchAngle;
+            m_prevArmRotationY = m_armRotationY;
 
             // 완전히 고정된 시체는 더 계산하지 않는다 (원본 deadstate == 5 조기 반환).
             if (m_human.DeadState == HumanDeadState.Done) return;
@@ -286,6 +292,21 @@ namespace GodotXOPS
             {
                 m_human.HumanVisual?.SetArmPitch(m_armRotationY);
             }
+            else
+            {
+                m_human.HumanVisual?.SetDeadArmPitch(Mathf.Lerp(m_prevArmRotationY, m_armRotationY, SimClock.InterpolationAlpha));
+            }
+        }
+
+        /// <summary>
+        /// 죽은 사람의 팔을 틱마다 조금씩 끝까지 보낸다. 원본 human::CheckAndProcessDead 앞부분 (object.cpp:1170-1180).
+        /// 죽는 순간 팔이 수평보다 아래였으면 아래로 90° 까지 내려가고, 수평이거나 위였으면 위로 90° 까지 올라간다 (항복하던 사람은 만세 자세로 쓰러진다).
+        /// </summary>
+        private void TickDeadArm()
+        {
+            // 시선 pitch 는 아래가 + 라 원본 armrotation_y 와 부호가 반대다.
+            if (m_armRotationY > 0f) m_armRotationY = Mathf.Min(m_armRotationY + k_deadArmStep, k_deadArmLimit);
+            else m_armRotationY = Mathf.Max(m_armRotationY - k_deadArmStep, -k_deadArmLimit);
         }
 
         private void Tick()
@@ -627,6 +648,8 @@ namespace GodotXOPS
         private void TickDeadState()
         {
             if (m_human.Alive) return;
+
+            TickDeadArm();
 
             float dt = SimClock.FrameTime;
             float deadlineY = DataManager.Instance.HumanParameterData.humanControllerData.deadlineY;
