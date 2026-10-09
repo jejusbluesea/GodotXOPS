@@ -466,8 +466,8 @@ namespace GodotXOPS.Editor
         private bool SavePointsTo(string relativePath)
         {
             if (!HasExtension(relativePath, PD2File.Extension)) relativePath += PD2File.Extension;
-            string fullPath = GamePath.Resolve(relativePath);
-            if (fullPath == null) return Fail($"The file must be inside the game folder: {relativePath}");
+            string fullPath = GamePath.ResolveForWrite(relativePath, PD2File.Extension, out string pathError);
+            if (fullPath == null) return Fail(pathError);
 
             try
             {

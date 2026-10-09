@@ -642,16 +642,17 @@ namespace GodotXOPS.Editor
         private bool SaveBlocksTo(string relativePath)
         {
             if (!HasExtension(relativePath, BD2File.Extension)) relativePath += BD2File.Extension;
-            string fullPath = GamePath.Resolve(relativePath);
-            if (fullPath == null) return Fail($"The file must be inside the game folder: {relativePath}");
+            string fullPath = GamePath.ResolveForWrite(relativePath, BD2File.Extension, out string pathError);
+            if (fullPath == null) return Fail(pathError);
 
+            // 텍스처 목록의 경로는 블록 파일에 적혀 있던 값이다. 받은 파일이 다른 파일을 가리킬 수 있으므로 쓰기 전에 확인한다.
             string textureListPath = m_document.Blocks.textureListPath;
             if (string.IsNullOrEmpty(textureListPath) || !string.Equals(relativePath, m_document.BlockPath, StringComparison.OrdinalIgnoreCase))
             {
                 textureListPath = TextureListPathFor(relativePath);
             }
-            string textureListFull = GamePath.Resolve(textureListPath);
-            if (textureListFull == null) return Fail($"The texture list must be inside the game folder: {textureListPath}");
+            string textureListFull = GamePath.ResolveForWrite(textureListPath, k_textureListExtension, out pathError);
+            if (textureListFull == null) return Fail($"Texture list: {pathError} (use Save As to write a new one)");
 
             try
             {

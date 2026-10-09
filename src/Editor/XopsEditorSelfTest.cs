@@ -364,7 +364,8 @@ namespace GodotXOPS.Editor
             SavePoints();
             Expect(File.Exists(savedFull + k_backupExtension) && !m_dirty, "덮어쓰면서 전의 파일을 .bak 으로 남기지 않음");
             Expect(!SavePointsTo("../outside.pd2"), "게임 폴더 밖에 저장함");
-        }
+            Expect(!SavePointsTo("godotdata/outside.pd2") && !SavePointsTo($"{k_selfTestFolder}/../../godotdata/outside.pd2"), "기본 데이터 폴더에 맵 파일을 저장함");
+            Expect(GamePath.Resolve("data/bad\0name.bmp") == null, "쓸 수 없는 글자가 든 경로를 거절하지 않음");        }
 
         /// <summary>
         /// 블록 편집을 확인한다: 모드 전환, 꼭짓점·모서리·면·블록 선택(클릭, 겹친 것, 사각형, X-RAY), 옮기기·돌리기·크기 바꾸기, 놓기·복제·지우기, 되돌리기, 저장.
@@ -660,6 +661,17 @@ namespace GodotXOPS.Editor
                 "다른 이름으로 저장했는데 텍스처 목록이 블록 파일 옆에 쓰이지 않음");
             Expect(OpenBlock(saved) && m_document.Textures.blockTextureData.Count == textureCount + 1 && m_document.Blocks.blocks.Count == added + 1
                 && m_document.Textures.blockTextureData[textureCount].diffusePath == secondTexture, "저장한 블록과 텍스처 목록을 다시 연 내용이 다름");
+
+            // 블록 파일에 적힌 텍스처 목록의 경로가 다른 파일을 가리키면 쓰지 않는다 (받은 파일이 설정이나 기본 데이터를 덮어쓰지 못하게).
+            string configFull = GamePath.Resolve("godotdata/config.json");
+            DateTime configTime = File.GetLastWriteTimeUtc(configFull);
+            m_document.Blocks.textureListPath = "godotdata/config.json";
+            Expect(!SaveBlocksTo(saved) && File.GetLastWriteTimeUtc(configFull) == configTime && !File.Exists(configFull + k_backupExtension),
+                "블록 파일에 적힌 경로대로 기본 데이터 폴더의 파일을 덮어씀");
+            m_document.Blocks.textureListPath = saved;
+            Expect(!SaveBlocksTo(saved), "텍스처 목록을 JSON 이 아닌 파일에 씀");
+            m_document.Blocks.textureListPath = savedTextures;
+            Expect(SaveBlocksTo(saved), "경로를 되돌린 뒤에 블록을 저장하지 못함");
 
             // 빈 맵에서 시작: 텍스처를 더하고, 블록을 놓고, 저장한 뒤 다시 열면 그려지는 블록 하나가 있다.
             NewMap();

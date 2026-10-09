@@ -26,6 +26,7 @@ namespace GodotXOPS.Editor
         private const int k_defaultMaterial = -1;
         private const string k_imageFilter = "*.bmp, *.dds, *.png, *.jpg, *.jpeg ; Images";
         private const string k_textureListSuffix = "_textures.json";
+        private const string k_textureListExtension = ".json";
         private const float k_textureListHeight = 110f;
 
         // 블록 모드의 값 칸들.

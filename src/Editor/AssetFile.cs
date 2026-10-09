@@ -197,6 +197,11 @@ namespace GodotXOPS.Editor
                 error = "the file must be inside the game folder";
                 return false;
             }
+            if (!string.Equals(System.IO.Path.GetExtension(fullPath), ".json", StringComparison.OrdinalIgnoreCase))
+            {
+                error = "the file must be a .json file";
+                return false;
+            }
             try
             {
                 Directory.CreateDirectory(System.IO.Path.GetDirectoryName(fullPath));

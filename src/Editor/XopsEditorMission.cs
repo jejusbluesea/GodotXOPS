@@ -280,8 +280,8 @@ namespace GodotXOPS.Editor
         private bool SaveMissionTo(string relativePath)
         {
             if (!HasExtension(relativePath, MIF2File.Extension)) relativePath += MIF2File.Extension;
-            string fullPath = GamePath.Resolve(relativePath);
-            if (fullPath == null) return Fail($"The file must be inside the game folder: {relativePath}");
+            string fullPath = GamePath.ResolveForWrite(relativePath, MIF2File.Extension, out string pathError);
+            if (fullPath == null) return Fail(pathError);
             if (string.IsNullOrEmpty(m_document.BlockPath) || string.IsNullOrEmpty(m_document.PointPath))
             {
                 return Fail("Save the blocks and the points first: the mission file points at those two files");

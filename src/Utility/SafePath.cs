@@ -31,8 +31,17 @@ namespace GodotXOPS
             allParts[0] = root;
             Array.Copy(paths, 0, allParts, 1, paths.Length);
 
-            string combined = Path.Combine(allParts);
-            string fullCombined = Path.GetFullPath(combined);
+            // 경로로 쓸 수 없는 글자(널 문자 등)가 든 값은 예외 대신 거절로 돌려준다. 외부 파일에 적힌 값이 그대로 들어온다.
+            string fullCombined;
+            try
+            {
+                fullCombined = Path.GetFullPath(Path.Combine(allParts));
+            }
+            catch (Exception e) when (e is ArgumentException or NotSupportedException or PathTooLongException)
+            {
+                Debugger.LogError($"Invalid path: '{string.Join(", ", paths).Replace("\0", "\\0")}' ({e.GetType().Name})");
+                return null;
+            }
 
             if (!fullCombined.StartsWith(fullRoot, s_pathComparison))
             {
