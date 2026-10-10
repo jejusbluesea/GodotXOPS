@@ -6,6 +6,8 @@
 bin/
 # Godot Sandbox 확장의 바이너리는 커밋한다 (버전 고정).
 !/addons/godot_sandbox/bin/
+# Godot 에디터가 확장을 로드하는 동안 만들어 두는 DLL 의 복사본 (에디터를 닫으면 지워진다).
+/addons/godot_sandbox/bin/~*
 obj/
 .vs/
 .idea/
