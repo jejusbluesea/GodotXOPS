@@ -102,8 +102,8 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `pelletCount` | 한 번에 나가는 탄 수 (산탄총) |
 | `burstMode` | 0 연발, 1 단발, 2 점사 |
 | `burstCount` | `burstMode`가 2 일 때, 발사 키를 한 번 누르고 있는 동안 나가는 최대 발 수 |
-| `reloadStyle` | 0 남은 탄을 버리고 재장전, 1 남은 탄을 유지하고 재장전, 2 한 발씩 장전, 3 자동 재장전 |
-| `reloadTime` | 재장전 시간 (초) |
+| `reloadStyle` | 0 남은 탄을 버리고 재장전, 1 남은 탄을 유지하고 재장전, 2 한 발씩 장전, 3 자동 재장전. 아래 설명 |
+| `reloadTime` | 재장전 시간 (초). 한 발씩 장전에서는 빈 탄창을 다 채우는 시간입니다 |
 | `recoil` | 쏠 때마다 늘어나는 조준 오차 |
 | `armReactionAngle` | 쏠 때 팔이 들리는 각도 |
 | `recoilAimVertical`, `recoilAimHorizontal` | 쏠 때 시점이 튀는 범위 (`min` ~ `max`) |
@@ -127,11 +127,32 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `modelData` | 모델 조각 목록. 조각마다 `modelPath`, `textureIndex`(위 목록의 번호), `position`, `rotation`, `scale` |
 | `muzzleFlashEffectIndex`, `muzzleFlashOffset`, `muzzleFlashSize` | 총구 화염 이펙트 번호, 위치, 크기 |
 | `gunfireSmokeEffectIndex` | 발사 연기 이펙트 번호 |
-| `shellEffectIndex`, `shellEjectOffset`, `shellEjectDirection`, `shellEjectSpeed`, `shellEjectDelay`, `shellSize` | 탄피 이펙트 번호, 나오는 위치·방향·속도·지연·크기 |
+| `shellEffectIndex`, `shellEjectOffset`, `shellEjectDirection`, `shellEjectSpeed`, `shellSize` | 탄피 이펙트 번호, 나오는 위치·방향·속도·크기. 위치와 방향은 무기 기준입니다 (아래로 떨어뜨리려면 방향의 `y` 를 음수로). 크기가 0 이면 탄피가 나오지 않습니다 |
+| `shellEjectMode` | 탄피가 나오는 때 (1.2.1). 0 쏠 때마다 하나, 1 재장전할 때 한꺼번에, 2 나오지 않음. 아래 설명 |
+| `shellEjectDelay` | 쏜 뒤 탄피가 나올 때까지의 시간 (초). `shellEjectMode` 가 0 일 때만 씁니다. 펌프액션이나 볼트액션처럼 쏘고 조금 뒤에 탄피가 나오는 무기에 씁니다. 발사 간격보다 길어도 쏜 만큼 전부 나옵니다 |
 | `leftArmIndex`, `rightArmIndex` | 이 무기를 들었을 때의 왼팔·오른팔 모양 번호 (`human/arm.json`의 `leftArms`, `rightArms` 안에서의 순서). -1 이면 그 팔을 그리지 않습니다 |
 | `fixLeftArm`, `fixedLeftArmAngle`, `fixRightArm`, `fixedRightArmAngle` | 팔을 조준 방향과 무관하게 고정할지와 그 각도 |
 
 모델 조각을 여러 개 넣으면 `.x` 파일 여러 개를 조립해 무기 하나로 만들 수 있습니다.
+
+**재장전 방식 (`reloadStyle`)**
+
+| 값 | 방식 | 동작 |
+|---|---|---|
+| 0 | 버리고 재장전 | 재장전 시간이 지나면 탄창에 남은 탄을 버리고 예비 탄에서 새로 채웁니다 (원본의 방식) |
+| 1 | 남기고 재장전 | 재장전 시간이 지나면 모자란 만큼만 채웁니다 |
+| 2 | 한 발씩 장전 | `reloadTime` ÷ `magazineSize` 초마다 한 발씩 들어갑니다. 탄창이 차거나 예비 탄이 떨어지면 끝납니다. **장전하는 도중에 발사 키를 누르면 장전이 거기서 끊깁니다** (그때까지 넣은 탄은 남습니다). 그 입력으로는 쏘지 않고, 발사 키를 뗐다가 다시 눌러야 나갑니다 (연발 무기를 누른 채로 있어도 장전만 끊깁니다). 탄창이 비어 있는 동안에는 끊기지 않습니다. AI 는 끊지 않고 끝까지 장전합니다 |
+| 3 | 자동 재장전 | 탄창의 마지막 발을 쏘는 순간 예비 탄에서 바로 채웁니다 (수류탄). **재장전 키로는 재장전할 수 없습니다.** 예비 탄까지 다 쓰면 `discardAfterAutoReloadIfNoAmmo` 가 참일 때 무기가 사라지고, 거짓이면 빈 채로 남습니다 |
+
+**탄피가 나오는 때 (`shellEjectMode`)**
+
+| 값 | 때 | 동작 |
+|---|---|---|
+| 0 | 쏠 때 | 한 발 쏠 때마다 `shellEjectDelay` 초 뒤에 하나 나옵니다 (기본 데이터의 모든 무기) |
+| 1 | 재장전할 때 | 쏠 때는 나오지 않고, 재장전을 시작하는 순간에 한꺼번에 나옵니다 (리볼버). 개수는 재장전 방식에 따라 다릅니다: 남은 탄을 두는 방식(1, 2)은 지난 재장전 뒤에 쏜 만큼, 그 밖의 방식(0, 3)은 장탄수만큼. 자동 재장전(3)은 자동으로 채워지는 발사에서 나옵니다 |
+| 2 | 없음 | 탄피가 나오지 않습니다 |
+
+탄피의 속도는 무기 모델의 `shellEjectDirection` × `shellEjectSpeed` 에 탄피 이펙트(`shellEffectIndex` 가 가리키는 [이펙트](#이펙트))의 `velocity` 와 `velocityRandomRange` 를 더한 것입니다. 무기 모델이 "어느 쪽으로 얼마나 빨리"를, 이펙트가 "얼마나 흩어지는지"를 정합니다. 기본 데이터의 탄피 이펙트는 위아래로만 조금 흩어지므로(`velocityRandomRange` 의 `y` 0.36), 한꺼번에 나오는 탄피를 옆으로도 퍼지게 하려면 `x` 와 `z` 에도 값을 줍니다. 다른 무기의 탄피까지 바뀌지 않게 하려면 탄피 이펙트를 하나 더 만들어 그 무기 모델만 가리키게 합니다.
 
 ### `weapon/bullet.json`
 

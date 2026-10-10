@@ -41,6 +41,7 @@ namespace GodotXOPS.Dev
             CheckPenetration();
             CheckFireRate();
             CheckReloadAndSwitch();
+            CheckReloadStyles();
             CheckAimError();
             CheckAllWeapons();
             CheckExplosion();
@@ -337,6 +338,150 @@ namespace GodotXOPS.Dev
                 if (bullet.IsActive) attacksOk &= bullet.Attacks == expectedAttacks;
             }
             Expect(active == shotgun.pelletCount && attacksOk, $"산탄 탄환 {active}발 (기대 {shotgun.pelletCount}발, 위력 {expectedAttacks})");
+        }
+
+        /// <summary>
+        /// 재장전 방식과 탄피가 나오는 시점: 자동 재장전 무기의 수동 재장전 차단, 한 발씩 장전(시간, 발사 입력으로 끊기, AI 는 끊지 않음),
+        /// 재장전할 때 한꺼번에 나오는 탄피의 수, 지연이 긴 탄피가 사라지지 않는지. MP5 의 데이터를 잠깐 바꿔서 보고 되돌린다.
+        /// </summary>
+        private void CheckReloadStyles()
+        {
+            if (!Reset()) { Expect(false, "재장전 방식: 준비 실패"); return; }
+
+            int slot = m_shooter.SelectWeapon;
+            int mp5 = FindWeapon("MP5");
+            m_shooter.SetWeapon(slot, mp5, 20, 60);
+            WeaponData data = m_shooter.CurrentWeapon.Data;
+            WeaponModelData model = m_shooter.CurrentWeapon.ModelData;
+            if (model == null || data.magazineSize < 4) { Expect(false, "재장전 방식: MP5 의 데이터가 점검에 맞지 않음"); return; }
+
+            WeaponReloadStyle savedStyle = data.reloadStyle;
+            ShellEjectMode savedMode = model.shellEjectMode;
+            float savedDelay = model.shellEjectDelay;
+            float savedSize = model.shellSize;
+            int size = data.magazineSize;
+
+            // 발사 입력을 넣으며 정해진 발 수가 나갈 때까지 틱을 돌린다.
+            void Fire(int shots)
+            {
+                int target = BulletManager.SpawnCount + shots;
+                for (int tick = 0; tick < 1000 && BulletManager.SpawnCount < target; tick++)
+                {
+                    m_shooter.QueueWeaponInput(HumanWeaponAction.Fire);
+                    m_shooter.TickWeapon();
+                }
+                m_shooter.ClearPendingWeaponInput();
+                // 발사 간격이 지나게 해 둔다.
+                for (int tick = 0; tick < 40; tick++) m_shooter.TickWeapon();
+            }
+
+            // 재장전 입력을 넣고 끝날 때까지 틱을 돌린다.
+            int Reload()
+            {
+                m_shooter.QueueWeaponInput(HumanWeaponAction.Reload);
+                int ticks = 0;
+                do
+                {
+                    m_shooter.TickWeapon();
+                    ticks++;
+                }
+                while (m_shooter.IsReloading && ticks < 5000);
+                return ticks;
+            }
+
+            try
+            {
+                model.shellSize = Mathf.Max(model.shellSize, 0.01f);
+
+                // 자동 재장전: 재장전 키는 듣지 않고, 탄창의 마지막 발을 쏘면 저절로 찬다.
+                data.reloadStyle = WeaponReloadStyle.AutoReload;
+                m_shooter.SetWeapon(slot, mp5, 20, 60);
+                m_shooter.QueueWeaponInput(HumanWeaponAction.Reload);
+                m_shooter.TickWeapon();
+                Expect(!m_shooter.IsReloading && m_shooter.CurrentWeapon.Magazine == 20 && !m_shooter.ReloadWeapon(), "자동 재장전 무기가 재장전 키로 재장전됨");
+                m_shooter.SetWeapon(slot, mp5, 1, 60);
+                Fire(1);
+                Expect(m_shooter.CurrentWeapon.Magazine == size && m_shooter.CurrentWeapon.Reserve == 60 - size,
+                    $"자동 재장전 뒤 탄약 {m_shooter.CurrentWeapon.Magazine}/{m_shooter.CurrentWeapon.Reserve}");
+
+                // 한 발씩 장전: 빈 탄창을 다 채우는 데 한 발의 시간 × 장탄수가 걸린다.
+                data.reloadStyle = WeaponReloadStyle.ShellByShellReload;
+                int perShell = Mathf.Max(1, Mathf.RoundToInt(data.reloadTime / size * SimClock.FrameRate));
+                m_shooter.SetWeapon(slot, mp5, 0, 60);
+                int reloadTicks = Reload();
+                Expect(reloadTicks == perShell * size + 1 && m_shooter.CurrentWeapon.Magazine == size && m_shooter.CurrentWeapon.Reserve == 60 - size,
+                    $"한 발씩 장전 {reloadTicks}틱 (기대 {perShell * size + 1}), 탄약 {m_shooter.CurrentWeapon.Magazine}/{m_shooter.CurrentWeapon.Reserve}");
+
+                // 예비 탄이 모자라면 있는 만큼만 넣고 끝난다.
+                m_shooter.SetWeapon(slot, mp5, 0, 2);
+                reloadTicks = Reload();
+                Expect(reloadTicks == perShell * 2 + 1 && m_shooter.CurrentWeapon.Magazine == 2 && m_shooter.CurrentWeapon.Reserve == 0, "한 발씩 장전이 예비 탄만큼만 넣고 끝나지 않음");
+
+                // 탄창이 비어 있을 때의 발사 입력은 장전을 끊지 못한다. 세 발이 들어간 뒤의 발사 입력은 장전을 끊는다.
+                m_shooter.SetWeapon(slot, mp5, 0, 60);
+                m_shooter.QueueWeaponInput(HumanWeaponAction.Reload);
+                m_shooter.TickWeapon();
+                m_shooter.QueueWeaponInput(HumanWeaponAction.Fire);
+                m_shooter.TickWeapon();
+                Expect(m_shooter.IsReloading && m_shooter.CurrentWeapon.Magazine == 0, "빈 탄창에서 발사 입력이 장전을 끊음");
+                for (int tick = 0; tick < 5000 && m_shooter.CurrentWeapon.Magazine < 3; tick++) m_shooter.TickWeapon();
+                // AI 의 발사 요청은 끊지 않는다.
+                Expect(!m_shooter.ShotWeapon() && m_shooter.IsReloading && m_shooter.CurrentWeapon.Magazine == 3, "AI 의 발사 요청이 한 발씩 장전을 끊음");
+                for (int tick = 0; tick < 40 && m_shooter.CurrentWeapon.Magazine < 4; tick++) m_shooter.TickWeapon();
+                int spawnBefore = BulletManager.SpawnCount;
+                int loaded = m_shooter.CurrentWeapon.Magazine;
+                m_shooter.QueueWeaponInput(HumanWeaponAction.Fire);
+                m_shooter.TickWeapon();
+                // 끊는 입력으로는 쏘지 않는다. 장전만 끊기고, 조작하는 쪽에 끊겼다고 알린다.
+                Expect(!m_shooter.IsReloading && BulletManager.SpawnCount == spawnBefore && m_shooter.CurrentWeapon.Magazine == loaded
+                    && m_shooter.CurrentWeapon.Reserve == 60 - loaded, $"발사 입력이 한 발씩 장전을 끊지 않았거나 그 입력으로 쏨 (탄약 {m_shooter.CurrentWeapon.Magazine}/{m_shooter.CurrentWeapon.Reserve})");
+                Expect(m_shooter.ConsumeReloadInterrupt() && !m_shooter.ConsumeReloadInterrupt(), "장전이 끊긴 것이 조작하는 쪽에 한 번만 전해지지 않음");
+                for (int tick = 0; tick < 40; tick++) m_shooter.TickWeapon();
+                Expect(!m_shooter.IsReloading && m_shooter.CurrentWeapon.Magazine == loaded, "끊긴 장전이 다시 이어짐");
+                // 다시 누른 발사 입력은 평소처럼 나간다.
+                m_shooter.QueueWeaponInput(HumanWeaponAction.Fire);
+                m_shooter.TickWeapon();
+                Expect(BulletManager.SpawnCount == spawnBefore + 1 && m_shooter.CurrentWeapon.Magazine == loaded - 1 && !m_shooter.ConsumeReloadInterrupt(), "장전을 끊은 뒤 다시 누른 발사가 나가지 않음");
+
+                // 재장전할 때 나오는 탄피: 남기고 재장전은 쏜 만큼, 버리고 재장전은 장탄수만큼. 쏠 때는 나오지 않는다.
+                model.shellEjectMode = ShellEjectMode.OnReload;
+                data.reloadStyle = WeaponReloadStyle.RetainAndReload;
+                m_shooter.SetWeapon(slot, mp5, size, 60);
+                int pending = m_shooter.PendingShellCount;
+                Fire(3);
+                Expect(m_shooter.PendingShellCount == pending, "재장전할 때 탄피가 나오는 무기가 쏠 때 탄피를 냄");
+                Reload();
+                Expect(m_shooter.PendingShellCount == pending + 3 && m_shooter.CurrentWeapon.Magazine == size, $"남기고 재장전의 탄피 {m_shooter.PendingShellCount - pending}개 (기대 3)");
+
+                data.reloadStyle = WeaponReloadStyle.DiscardAndReload;
+                m_shooter.SetWeapon(slot, mp5, size, 60);
+                pending = m_shooter.PendingShellCount;
+                Fire(3);
+                Reload();
+                Expect(m_shooter.PendingShellCount == pending + size, $"버리고 재장전의 탄피 {m_shooter.PendingShellCount - pending}개 (기대 {size})");
+
+                // 쏠 때 나오는 탄피: 지연이 발사 간격보다 길어도 쏜 만큼 전부 기다린다. None 은 내지 않는다.
+                model.shellEjectMode = ShellEjectMode.OnFire;
+                model.shellEjectDelay = 30f;
+                m_shooter.SetWeapon(slot, mp5, size, 60);
+                pending = m_shooter.PendingShellCount;
+                Fire(3);
+                Expect(m_shooter.PendingShellCount == pending + 3, $"지연 중인 탄피 {m_shooter.PendingShellCount - pending}개 (기대 3. 앞의 탄피가 사라지면 안 된다)");
+
+                model.shellEjectMode = ShellEjectMode.None;
+                pending = m_shooter.PendingShellCount;
+                Fire(2);
+                Reload();
+                Expect(m_shooter.PendingShellCount == pending, "탄피를 내지 않는 무기가 탄피를 냄");
+            }
+            finally
+            {
+                data.reloadStyle = savedStyle;
+                model.shellEjectMode = savedMode;
+                model.shellEjectDelay = savedDelay;
+                model.shellSize = savedSize;
+                m_shooter.ClearPendingWeaponInput();
+            }
         }
 
         /// <summary>

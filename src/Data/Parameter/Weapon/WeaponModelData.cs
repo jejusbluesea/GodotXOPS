@@ -23,6 +23,7 @@ namespace GodotXOPS
         public Vector3 shellEjectDirection;
         public float shellEjectSpeed;
         public float shellEjectDelay;
+        public ShellEjectMode shellEjectMode;
         public float shellSize;
         public int leftArmIndex;
         public bool fixLeftArm;
@@ -34,6 +35,7 @@ namespace GodotXOPS
 
     /// <summary>
     /// 탄피 배출 시점을 정의하는 열거형.
+    /// OnFire 는 쏠 때마다 shellEjectDelay 뒤에 하나, OnReload 는 재장전을 시작할 때 한꺼번에(리볼버), None 은 나오지 않는다.
     /// </summary>
     public enum ShellEjectMode
     {

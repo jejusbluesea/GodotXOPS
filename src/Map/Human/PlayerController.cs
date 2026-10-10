@@ -236,8 +236,10 @@ namespace GodotXOPS
             HumanWeaponAction weapon = HumanWeaponAction.None;
 
             // 발사가 잠긴 동안 누르고 있던 버튼은 풀린 뒤에 한 번 떼야 발사로 받는다.
+            // 발사 입력이 한 발씩 장전을 끊었으면, 누르고 있던 버튼을 한 번 떼야 다시 발사로 받는다 (연발 무기를 누른 채여도 장전만 끊긴다).
+            bool interrupted = m_player.ConsumeReloadInterrupt();
             if (!input.IsPressed(InputManager.Fire)) m_fireReady = true;
-            else if ((locks & EventManager.LockFire) != 0) m_fireReady = false;
+            else if (interrupted || (locks & EventManager.LockFire) != 0) m_fireReady = false;
             if (m_fireReady && (locks & EventManager.LockFire) == 0)
             {
                 bool semiAuto = m_player.CurrentWeapon.Data.burstMode == WeaponBurstMode.SemiAuto;
@@ -445,6 +447,7 @@ namespace GodotXOPS
                 m_deathCamInitialized = false;
                 m_fireReady = false;
                 m_cameraDetached = false;
+                player.ConsumeReloadInterrupt();
 
                 var initial = new HumanInput { moveFlag = HumanMoveFlag.None, yaw = m_yaw, pitch = m_pitch };
                 m_controller.SetInput(in initial);
