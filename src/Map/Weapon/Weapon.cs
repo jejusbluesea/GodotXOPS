@@ -22,6 +22,8 @@ namespace GodotXOPS
         private WeaponModelData m_modelData;
         private int m_magazine;
         private int m_reserve;
+        // 지난 재장전 뒤에 쏜 발 수. 재장전할 때 탄피를 내는 무기(ShellEjectMode.OnReload)가 몇 개를 낼지 정하는 데 쓴다.
+        private int m_spentShells;
 
         public int WeaponIndex => m_weaponIndex;
         public WeaponData Data => m_data;
@@ -59,6 +61,8 @@ namespace GodotXOPS
             if (reserve < 0) reserve = magazineSize * (DefaultAutoBulletMultiplier - 1);
             m_magazine = clampMagazine ? Mathf.Clamp(magazine, 0, magazineSize) : magazine;
             m_reserve = reserve;
+            // 탄창에서 비어 있는 만큼을 쏜 것으로 친다 (주운 무기, 종류를 바꾼 무기).
+            m_spentShells = Mathf.Clamp(magazineSize - m_magazine, 0, magazineSize);
         }
 
         /// <summary>
@@ -84,20 +88,24 @@ namespace GodotXOPS
         /// 자동 재장전 방식(수류탄)은 쏜 직후 예비 탄에서 바로 채우고, 예비 탄도 없으면 소진된 것으로 알린다.
         /// </summary>
         /// <param name="depleted">자동 재장전 무기가 탄을 다 써서 무기째 사라져야 하면 true.</param>
+        /// <param name="autoReloaded">이 발사로 자동 재장전이 일어났으면 true.</param>
         /// <returns>탄약을 소비했으면 true. 장전된 탄이 없거나 쏠 수 없는 무기면 false.</returns>
-        public bool ConsumeShot(out bool depleted)
+        public bool ConsumeShot(out bool depleted, out bool autoReloaded)
         {
             depleted = false;
+            autoReloaded = false;
             if (m_magazine <= 0) return false;
             if (m_data.pelletCount <= 0) return false;
 
             m_magazine--;
+            m_spentShells++;
 
             if (m_magazine <= 0 && m_data.reloadStyle == WeaponReloadStyle.AutoReload)
             {
                 if (m_reserve > 0)
                 {
                     RunReload();
+                    autoReloaded = true;
                 }
                 else if (m_data.discardAfterAutoReloadIfNoAmmo)
                 {
@@ -110,11 +118,43 @@ namespace GodotXOPS
         /// <summary>
         /// 재장전을 시작할 수 있는지 본다. 원본 weapon::StartReload (object.cpp:2371-2379) 는 예비 탄이 없을 때만 막는다.
         /// 탄창이 가득 찬 경우도 막는다. 원본은 허용해서 남은 탄을 통째로 버리게 된다.
+        /// 자동 재장전 무기는 직접 재장전할 수 없다 (쏘면 저절로 채워진다).
         /// </summary>
         /// <returns>재장전할 수 있으면 true.</returns>
         public bool CanReload()
         {
+            if (m_data.reloadStyle == WeaponReloadStyle.AutoReload) return false;
             return m_data.magazineSize > 0 && m_reserve > 0 && m_magazine < m_data.magazineSize;
+        }
+
+        // 한 발씩 장전하는 무기인지.
+        public bool ShellByShell => m_data.reloadStyle == WeaponReloadStyle.ShellByShellReload;
+
+        /// <summary>
+        /// 예비 탄에서 한 발을 탄창에 넣는다 (한 발씩 장전하는 무기). 한 발을 넣을 시간이 지날 때마다 사람이 호출한다.
+        /// </summary>
+        /// <returns>더 넣을 수 있으면 true. 탄창이 찼거나 예비 탄이 떨어졌으면 false.</returns>
+        public bool LoadShell()
+        {
+            if (m_reserve > 0 && m_magazine < m_data.magazineSize)
+            {
+                m_magazine++;
+                m_reserve--;
+            }
+            return m_reserve > 0 && m_magazine < m_data.magazineSize;
+        }
+
+        /// <summary>
+        /// 재장전할 때 한꺼번에 나올 탄피의 수를 돌려주고, 쏜 발 수를 0 으로 되돌린다. 재장전이 시작될 때마다 부른다.
+        /// 남은 탄을 두는 방식(남기고 재장전, 한 발씩 장전)은 지난 재장전 뒤에 쏜 만큼, 그 밖에는 장탄수만큼이다.
+        /// </summary>
+        /// <returns>탄피 수.</returns>
+        public int TakeReloadShells()
+        {
+            int spent = Mathf.Min(m_spentShells, m_data.magazineSize);
+            m_spentShells = 0;
+            bool retains = m_data.reloadStyle == WeaponReloadStyle.RetainAndReload || m_data.reloadStyle == WeaponReloadStyle.ShellByShellReload;
+            return retains ? spent : m_data.magazineSize;
         }
 
         /// <summary>

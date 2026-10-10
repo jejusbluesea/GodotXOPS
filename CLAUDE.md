@@ -146,6 +146,10 @@ dotnet build GodotXOPS.csproj
 - 무기 동작은 데이터 필드로만 가른다. 코드에 무기 번호를 직접 쓰지 않는다 (`weaponGeneralData`의 `noneWeaponIndex`, `grenadeWeaponIndex`만 참조). 유저가 JSON 수정만으로 새 무기를 만들 수 있어야 한다.
 - 총알 판정은 원본 `ObjectManager::CollideBullet` 방식이다: 한 틱 경로를 0.25 m 간격 점으로 나눠 점마다 사람(`HumanHitbox.Contains`, 수직 원기둥) → 소물 → 맵(`MapLoader.IsInsideBlock`) 순으로 검사한다. 선분-도형 교차로 바꾸지 않는다 (스치는 탄의 명중률과 벽 관통 결과가 달라진다).
 - `BulletManager`(Autoload)가 탄환 풀 160개와 모델 노드를 갖는다. 탄환 모델은 보간된 위치가 총구에서 `bulletBoundAdjust`만큼 멀어진 뒤부터 보인다 (높은 프레임에서 사수의 머리를 뚫고 보이는 것을 막는 UnityXOPS의 연출, 판정과 무관).
+- **재장전 방식과 탄피** (`reloadStyle`, `shellEjectMode`. 데이터의 모양은 UnityXOPS 0.4 그대로이고, 이름만 있고 동작이 없던 것을 1.2.1 에서 채웠다. 사용자 결정 2026-10-11: enum 을 합치지 않고 `discardAfterAutoReloadIfNoAmmo` 도 그대로 둔다):
+  - 자동 재장전 무기는 `Weapon.CanReload` 가 거절한다 (재장전 키와 AI 둘 다). 채워지는 것은 `ConsumeShot` 안에서뿐이다.
+  - 한 발씩 장전은 `Human.m_reloadTicks` 가 한 발의 시간(`ShellReloadTicks` = `reloadTime` ÷ 장탄수)만 세고, 0 이 될 때마다 `Weapon.LoadShell` 로 한 발을 넣고 다시 센다. **플레이어의 발사 입력만 장전을 끊는다** (`ShotWeapon(interruptReload: true)`, `ApplyWeaponAction` 이 켠다. 탄창이 비어 있으면 끊지 않는다). **끊는 입력으로는 쏘지 않고, 버튼을 뗐다가 다시 눌러야 나간다** (사용자 결정. 연발 무기를 누른 채여도 장전만 끊긴다): `Human.ConsumeReloadInterrupt` 를 `PlayerController` 가 보고 `m_fireReady` 를 끈다. AI 는 겨눠지면 매 틱 `ShotWeapon()` 을 부르므로 끊게 하면 한 발마다 끊긴다 (내가 정했다).
+  - 탄피는 `Human.m_pendingShells`(묶음의 목록, 상한 64)에 표시해 두고 `_Process` 가 지연이 지난 것을 낸다. 재장전할 때의 탄피는 **재장전을 시작하는 틱**에 표시한다. 개수는 `Weapon.TakeReloadShells`: 남은 탄을 두는 방식(남기고 재장전, 한 발씩)은 지난 재장전 뒤에 쏜 만큼, 그 밖에는 장탄수만큼 (사용자 결정).
 - 무기·총알에서 원본대로 고친 것: 점 샘플링 판정, 피격 데미지의 부위별 난수 가산, 조준 오차·산탄 확산의 정수 난수, 연속 발사 수 제한(단발), 입력 처리 순서(발사 → 재장전 → 슬롯 → 종류 전환 → 스코프), 수류탄 이동 순서(이동 → 감쇠·중력)와 반사 시 위치 유지, 초기 예비 탄(장탄수 × (배수 − 1)).
 - 원본이 아니라 UnityXOPS가 고친 동작을 따르는 것 (사용자 결정): 피격 시 조준 흐트러짐은 더 큰 쪽 유지(원본은 대입), 가득 찬 탄창은 재장전 불가(원본은 허용), 폭풍은 항상 멀어지는 쪽(원본 식은 폭발이 위에 있으면 끌어당김), 반동 오차는 항상 누적(원본은 조준선이 보일 때만).
 

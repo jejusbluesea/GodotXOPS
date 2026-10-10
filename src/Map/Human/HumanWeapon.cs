@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace GodotXOPS
@@ -13,6 +14,8 @@ namespace GodotXOPS
         private const float k_dropHeight = 1.6f;
         // 사망 시 무기가 흩어지는 수평 속도 (m/s). 원본 Dropoff(..., 1.5f) = 프레임당 1.5.
         private const float k_deathDropSpeed = 1.5f * Coord.Scale * SimClock.FrameRate;
+        // 기다리는 탄피 묶음의 상한. 넘으면 새 탄피를 내지 않는다 (지연을 아주 길게 준 데이터가 목록을 끝없이 키우지 않게).
+        private const int k_maxPendingShells = 64;
 
         private readonly Weapon[] m_weapons = new Weapon[WeaponSlotCount];
         private readonly WeaponVisual[] m_weaponVisuals = new WeaponVisual[WeaponSlotCount];
@@ -26,14 +29,27 @@ namespace GodotXOPS
         // 발사 입력이 이어지는 동안 쏜 발 수와, 이번 틱에 발사 입력이 있었는지 (원본 weaponburstmodecnt / weaponshotframe).
         private int m_burstShots;
         private bool m_shotRequested;
+        // 발사 입력이 한 발씩 장전을 끊었는지. 조작하는 쪽이 확인하면 지워진다.
+        private bool m_reloadInterrupted;
 
         // 다음 틱이 소비할 무기 입력. 렌더 프레임마다 OR 로 쌓인다.
         private HumanWeaponAction m_pendingWeapon;
 
         // 틱에서 쏜 뒤 화면 갱신 때 낼 발사 이펙트. 무기 모델이 틱 사이를 보간해 움직이므로, 이펙트도 그 프레임의 모델 위치에서 낸다.
         private WeaponModelData m_fireEffectModel;
-        private WeaponModelData m_shellEffectModel;
-        private float m_shellEffectDelay;
+        // 나오기를 기다리는 탄피들. 지연이 발사 간격보다 길어도 앞의 탄피가 사라지지 않게 전부 들고 있는다.
+        private readonly List<PendingShell> m_pendingShells = new List<PendingShell>();
+
+        /// <summary>
+        /// 나오기를 기다리는 탄피 한 묶음.
+        /// </summary>
+        private sealed class PendingShell
+        {
+            public WeaponModelData model;
+            // 남은 시간 (초).
+            public float delay;
+            public int count;
+        }
 
         public Weapon CurrentWeapon => m_weapons[m_selectWeapon];
         public int SelectWeapon => m_selectWeapon;
@@ -101,7 +117,12 @@ namespace GodotXOPS
             if (m_reloadTicks > 0)
             {
                 m_reloadTicks--;
-                if (m_reloadTicks == 0 && !CurrentWeapon.IsNone) CurrentWeapon.RunReload();
+                if (m_reloadTicks == 0 && !CurrentWeapon.IsNone)
+                {
+                    // 한 발씩 장전하는 무기는 한 발을 넣고, 더 넣을 것이 있으면 다음 한 발의 시간을 다시 센다.
+                    if (!CurrentWeapon.ShellByShell) CurrentWeapon.RunReload();
+                    else if (CurrentWeapon.LoadShell()) m_reloadTicks = ShellReloadTicks(CurrentWeapon.Data);
+                }
             }
 
             TickGunsightErrorRange();
@@ -114,7 +135,7 @@ namespace GodotXOPS
         /// <param name="action">무기 입력 플래그.</param>
         public void ApplyWeaponAction(HumanWeaponAction action)
         {
-            if ((action & HumanWeaponAction.Fire) != 0) ShotWeapon();
+            if ((action & HumanWeaponAction.Fire) != 0) ShotWeapon(true);
             if ((action & HumanWeaponAction.Reload) != 0) ReloadWeapon();
             if ((action & HumanWeaponAction.SelectFirst) != 0) SetSelectWeapon(0);
             if ((action & HumanWeaponAction.SelectSecond) != 0) SetSelectWeapon(1);
@@ -128,8 +149,12 @@ namespace GodotXOPS
         /// 현재 무기를 쏜다. 원본 human::ShotWeapon (object.cpp:658-739) 과 ObjectManager::ShotWeapon (objectmanager.cpp:1926-2060) 을 합친 것이다.
         /// 발사 위치와 방향은 반동이 더해지기 전의 값을 쓴다.
         /// </summary>
+        /// <param name="interruptReload">
+        /// true 면 한 발씩 장전하는 도중의 발사 입력이 장전을 거기서 끊는다 (그때까지 넣은 탄은 남고, 그 입력으로는 쏘지 않는다). 플레이어의 발사 입력이 켠다.
+        /// AI 는 켜지 않는다: 겨눠지면 매 틱 발사를 요청하므로 켜면 한 발 넣을 때마다 장전이 끊긴다.
+        /// </param>
         /// <returns>실제로 쐈으면 true.</returns>
-        public bool ShotWeapon()
+        public bool ShotWeapon(bool interruptReload = false)
         {
             Vector3 shotPosition = m_controller.Position + Vector3.Up * m_controller.CameraHeight;
             float yaw = m_controller.Yaw;
@@ -142,6 +167,15 @@ namespace GodotXOPS
 
             // 발사 입력 자체는 받아들인 것으로 친다. 간격에 걸려 못 쏴도 연속 발사 수가 초기화되지 않는다.
             m_shotRequested = true;
+
+            // 한 발씩 장전하는 도중의 발사 입력은 장전만 끊는다. 이 입력으로는 쏘지 않고, 발사 버튼을 뗐다가 다시 눌러야 나간다 (PlayerController 가 ConsumeReloadInterrupt 를 보고 막는다).
+            // 탄창에 쏠 탄이 있을 때만 끊는다. 비어 있으면 끊어도 쏠 수 없다.
+            if (interruptReload && m_reloadTicks > 0 && weapon.ShellByShell && weapon.Magazine > 0)
+            {
+                m_reloadTicks = 0;
+                m_reloadInterrupted = true;
+                return false;
+            }
 
             if (m_shotTicks > 0 || m_reloadTicks > 0) return false;
 
@@ -156,7 +190,7 @@ namespace GodotXOPS
 
             // 무한 탄약: 쏠 때마다 예비 탄에 한 발을 먼저 더한다. 탄창은 그대로 줄어서 재장전은 한다. 먼저 더해야 수류탄 같은 자동 재장전 무기가 마지막 한 발에서 사라지지 않는다.
             if (m_infiniteAmmo && weapon.CanConsumeShot()) weapon.AddReserve(1);
-            if (!weapon.ConsumeShot(out bool depleted)) return false;
+            if (!weapon.ConsumeShot(out bool depleted, out bool autoReloaded)) return false;
 
             m_burstShots++;
             // 원본 weaponshotcnt = blazings (프레임 수). 데이터는 초당 발사 수라 틱 수로 되돌린다.
@@ -192,8 +226,12 @@ namespace GodotXOPS
 
             // 총구 화염·연기·탄피는 다음 화면 갱신 때 낸다. 탄피는 무기별 지연 뒤에 나온다 (원본 yakkyou_delay).
             m_fireEffectModel = weapon.ModelData;
-            m_shellEffectModel = weapon.ModelData;
-            m_shellEffectDelay = weapon.ModelData != null ? weapon.ModelData.shellEjectDelay : 0f;
+            if (weapon.ModelData != null)
+            {
+                // 쏠 때 나오는 탄피는 한 발에 하나, 재장전할 때 나오는 탄피는 자동 재장전이 일어난 발사에서 한꺼번에 낸다.
+                if (weapon.ModelData.shellEjectMode == ShellEjectMode.OnFire) QueueShells(weapon.ModelData, 1, weapon.ModelData.shellEjectDelay);
+                else if (autoReloaded && weapon.ModelData.shellEjectMode == ShellEjectMode.OnReload) QueueShells(weapon.ModelData, weapon.TakeReloadShells(), 0f);
+            }
 
             // 다 쓴 수류탄은 무기째 사라진다 (원본 object.cpp:733-736).
             if (depleted) SetWeapon(m_selectWeapon, parameter.weaponGeneralData.noneWeaponIndex, 0, 0);
@@ -217,9 +255,47 @@ namespace GodotXOPS
             DisableScope();
 
             // 원본 weaponreloadcnt = reloads + 1. 같은 틱의 카운터 감소로 1 이 바로 빠진다.
-            m_reloadTicks = Mathf.RoundToInt(weapon.Data.reloadTime * SimClock.FrameRate) + 1;
+            // 한 발씩 장전하는 무기는 한 발을 넣는 시간만 세고, 넣을 때마다 다시 센다 (TickWeapon).
+            m_reloadTicks = (weapon.ShellByShell ? ShellReloadTicks(weapon.Data) : Mathf.RoundToInt(weapon.Data.reloadTime * SimClock.FrameRate)) + 1;
             m_burstShots = 0;
+
+            // 재장전할 때 탄피가 나오는 무기(리볼버)는 재장전을 시작하는 순간에 한꺼번에 낸다.
+            int shells = weapon.TakeReloadShells();
+            if (weapon.ModelData != null && weapon.ModelData.shellEjectMode == ShellEjectMode.OnReload) QueueShells(weapon.ModelData, shells, 0f);
             return true;
+        }
+
+        /// <summary>
+        /// 발사 입력이 한 발씩 장전을 끊었는지 확인하고 표시를 지운다. 끊은 뒤에는 발사 버튼을 뗐다가 다시 눌러야 쏘게 하려고 PlayerController 가 본다.
+        /// </summary>
+        /// <returns>지난 확인 뒤에 끊었으면 true.</returns>
+        public bool ConsumeReloadInterrupt()
+        {
+            bool interrupted = m_reloadInterrupted;
+            m_reloadInterrupted = false;
+            return interrupted;
+        }
+
+        /// <summary>
+        /// 한 발씩 장전하는 무기가 한 발을 넣는 데 걸리는 틱 수. 재장전 시간(reloadTime)이 빈 탄창을 다 채우는 시간이라서 장탄수로 나눈다.
+        /// </summary>
+        /// <param name="data">무기 데이터.</param>
+        /// <returns>틱 수 (1 이상).</returns>
+        private static int ShellReloadTicks(WeaponData data)
+        {
+            return Mathf.Max(1, Mathf.RoundToInt(data.reloadTime / Mathf.Max(1, data.magazineSize) * SimClock.FrameRate));
+        }
+
+        /// <summary>
+        /// 탄피를 낼 것을 표시해 둔다. 실제로는 다음 화면 갱신부터 지연이 지난 것을 무기 모델의 자리에서 낸다.
+        /// </summary>
+        /// <param name="model">무기 모델 데이터.</param>
+        /// <param name="count">탄피 수.</param>
+        /// <param name="delay">나올 때까지의 시간 (초).</param>
+        private void QueueShells(WeaponModelData model, int count, float delay)
+        {
+            if (count <= 0 || model.shellSize <= 0f || m_pendingShells.Count >= k_maxPendingShells) return;
+            m_pendingShells.Add(new PendingShell { model = model, count = count, delay = delay });
         }
 
         /// <summary>
@@ -330,11 +406,11 @@ namespace GodotXOPS
         /// <param name="dt">프레임 시간.</param>
         private void PlayPendingFireEffects(float dt)
         {
-            if (m_fireEffectModel == null && m_shellEffectModel == null) return;
+            if (m_fireEffectModel == null && m_pendingShells.Count == 0) return;
             if (!EffectManager.Loaded || !Alive)
             {
                 m_fireEffectModel = null;
-                m_shellEffectModel = null;
+                m_pendingShells.Clear();
                 return;
             }
 
@@ -352,21 +428,35 @@ namespace GodotXOPS
                 }
             }
 
-            if (m_shellEffectModel != null)
+            // 기다리는 탄피들. 먼저 쏜 것부터 차례로 보고, 지연이 지난 것을 낸다.
+            for (int i = 0; i < m_pendingShells.Count; i++)
             {
-                m_shellEffectDelay -= dt;
-                if (m_shellEffectDelay > 0f) return;
+                PendingShell shell = m_pendingShells[i];
+                shell.delay -= dt;
+                if (shell.delay > 0f) continue;
 
-                WeaponModelData model = m_shellEffectModel;
-                m_shellEffectModel = null;
-                if (model.shellSize > 0f)
+                m_pendingShells.RemoveAt(i--);
+                WeaponModelData model = shell.model;
+                Node3D attach = model.fixRightArm ? m_humanVisual.FixedWeaponAttachRoot : m_humanVisual.DynamicWeaponAttachRoot;
+                Basis orientation = attach.GlobalBasis.Orthonormalized();
+                Vector3 position = attach.GlobalTransform * Coord.FromUnity(model.shellEjectOffset);
+                Vector3 velocity = orientation * Coord.FromUnity(model.shellEjectDirection.Normalized()) * model.shellEjectSpeed;
+                // 한꺼번에 나오는 탄피는 같은 자리에서 여러 번 낸다. 흩어지는 정도는 이펙트 데이터의 난수 범위가 정한다.
+                for (int n = 0; n < shell.count; n++)
                 {
-                    Node3D attach = model.fixRightArm ? m_humanVisual.FixedWeaponAttachRoot : m_humanVisual.DynamicWeaponAttachRoot;
-                    Basis orientation = attach.GlobalBasis.Orthonormalized();
-                    Vector3 position = attach.GlobalTransform * Coord.FromUnity(model.shellEjectOffset);
-                    Vector3 velocity = orientation * Coord.FromUnity(model.shellEjectDirection.Normalized()) * model.shellEjectSpeed;
                     EffectManager.Instance.Play(model.shellEffectIndex, position, orientation, model.shellSize, velocity);
                 }
+            }
+        }
+
+        // 나오기를 기다리는 탄피 수 (점검 도구용).
+        public int PendingShellCount
+        {
+            get
+            {
+                int total = 0;
+                foreach (PendingShell shell in m_pendingShells) total += shell.count;
+                return total;
             }
         }
 
