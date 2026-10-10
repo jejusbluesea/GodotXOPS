@@ -62,6 +62,24 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 지금 쏠 수 있는 탄이 장전돼 있는지 본다 (ConsumeShot 이 성공할 조건).
+        /// </summary>
+        /// <returns>쏠 수 있으면 true.</returns>
+        public bool CanConsumeShot()
+        {
+            return m_magazine > 0 && m_data.pelletCount > 0;
+        }
+
+        /// <summary>
+        /// 예비 탄을 더한다 (이벤트의 무한 탄약).
+        /// </summary>
+        /// <param name="count">더할 탄 수.</param>
+        public void AddReserve(int count)
+        {
+            if (count > 0) m_reserve += count;
+        }
+
+        /// <summary>
         /// 한 발 쏠 탄약을 소비한다. 원본 weapon::Shot (object.cpp:2325-2366).
         /// 자동 재장전 방식(수류탄)은 쏜 직후 예비 탄에서 바로 채우고, 예비 탄도 없으면 소진된 것으로 알린다.
         /// </summary>

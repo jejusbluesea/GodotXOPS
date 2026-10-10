@@ -118,6 +118,8 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 - 시간 카운터는 정수 틱으로 셉니다. 데이터의 초 단위 값은 `RoundToInt(초 × SimClock.FrameRate)`로 바꿉니다.
 - 게임 결과에 영향을 주는 난수는 `GameRandom.Gameplay`(틱에서만), 연출용은 `GameRandom.Visual`.
 - 이펙트, 소리 볼륨, 모델 위치 보간 같은 연출은 렌더 프레임에서 합니다.
+- **게임 정지** (`SimClock.WorldPaused`, 이벤트 Pause World): 켜져 있으면 순서 300 보다 앞선 대상이 돌지 않습니다. 이벤트는 계속 돌아야 정지를 풀 수 있어서 300 부터는 멈추지 않습니다. 그동안 `SimClock.InterpolationAlpha` 는 1 이고 (세계의 틱이 돌지 않으므로), 정지 중에도 움직이는 것(이벤트의 카메라, 암전, 레터박스)은 `SimClock.EventAlpha` 로 보간합니다. 이펙트와 부서진 오브젝트의 움직임도 멈춥니다.
+- 이벤트의 연출 상태(조작 잠금, HUD 감추기, 암전, 레터박스, 뗀 카메라)는 `EventManager` 가 들고 (`EventManagerStage.cs`) 틱 300 에서 진행합니다. `PlayerController` 와 메인게임 화면이 읽어 가고, 미션을 시작하거나 맵을 내리면 처음으로 돌아갑니다.
 
 ### 한 프레임의 순서 (`ProcessPriority`)
 
@@ -165,7 +167,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `mif2_check.tscn` | — | 모든 공식 미션을 확장 형식(BD2, PD2, MIF2)으로 바꿔 미션 정보와 같은 난수 씨앗으로 돌린 100틱의 결과가 원본과 같은지, 에드온 데이터와 10000 번호 규칙, MIF2 의 형식 오류, 미션 목록 스캔, MIF 추가 오브젝트의 변환 |
 | `pd2_check.tscn` | — | 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰된 사람·무기·오브젝트가 같은지, 255 를 넘는 번호, 추가 파라미터, 방향, 이벤트 줄 수, 깨진 파일 |
 | `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠, 면 위 재생(데칼의 방향과 띄우는 거리) |
-| `event_check.tscn` | — | 스크립트 이벤트: 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 화면 글자와 Interact, 실패한 줄만 멈추는지, 로드 때 거절되는 경우, 기본 제공 묶음의 이벤트 전부 |
+| `event_check.tscn` | — | 스크립트 이벤트: 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 화면 글자와 Interact, 실패한 줄만 멈추는지, 로드 때 거절되는 경우, 기본 제공 묶음의 이벤트 전부 (연출 이벤트 포함). `-- --stage-sample 미션.pd2` 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더합니다 (눈으로 확인하는 용도. `mif2_check` 의 `--convert-official` 로 만든 미션에 씁니다) |
 | `script_probe.tscn` | — | Godot Sandbox 의 격리와 자원 제한 (아래) |
 
 눈으로 확인하는 도구 (`--headless` 없이 실행):

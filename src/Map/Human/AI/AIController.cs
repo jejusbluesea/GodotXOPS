@@ -31,7 +31,15 @@ namespace GodotXOPS
 
                 // 소리 신호는 듣는 쪽이 쓰든 말든 매 틱 비운다. 원본의 소리 목록은 한 프레임만 유지된다.
                 bool heard = human.ConsumeThreatHeard();
-                if (!Enabled || human == player || human.Brain == null) continue;
+                if (human.Brain == null) continue;
+                // 이벤트의 지시를 받는 사람은 AI 가 멈춰 있어도, 플레이어여도 그 지시대로 움직인다.
+                if (!human.Brain.Directed)
+                {
+                    // 플레이어가 조작하는 사람은 AI 가 돌지 않아서, AI 가 켜 둔 맨손 팔의 조준 따르기(좀비 공격, 항복)를 끌 기회가 없다.
+                    // 전투 중이던 맨손의 사람으로 조작 대상을 바꾸면(치트 F8) 팔이 고정 자세로 돌아오지 않으므로 여기서 끈다.
+                    if (human == player) human.SetUnarmedArmDynamic(false);
+                    if (!Enabled || human == player) continue;
+                }
 
                 human.Brain.Tick(heard);
             }

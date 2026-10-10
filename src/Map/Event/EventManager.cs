@@ -108,6 +108,7 @@ namespace GodotXOPS
                 m_lines[i] = new EventLine(i, entryIds[i]);
             }
             ResetHud();
+            ResetStage();
             m_variables.Clear();
             m_autoJudge = true;
             m_missionTicks = 0;
@@ -127,6 +128,7 @@ namespace GodotXOPS
         {
             m_running = false;
             ResetHud();
+            ResetStage();
         }
 
         /// <summary>
@@ -156,6 +158,7 @@ namespace GodotXOPS
             }
 
             TickHud();
+            TickStage();
 
             if (m_messageId != -1 && m_messageCnt < (int)(k_messageSeconds * SimClock.FrameRate))
             {

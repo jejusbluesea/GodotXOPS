@@ -75,11 +75,32 @@ namespace GodotXOPS
                 ["move_block"] = Callable.From((int index, float x, float y, float z, float pitch, float roll, float yaw, float seconds, bool ease) =>
                     Enter() && MoveBlock(index, new Vector3(x, y, z), new Vector3(pitch, yaw, roll), seconds, ease)),
                 ["toggle_block"] = Callable.From((int index, bool enabled) => Enter() && MapLoader.SetBlockEnabled(index, enabled)),
+                ["tween_block"] = Callable.From((int index, float x, float y, float z, float pitch, float roll, float yaw, float seconds, bool ease) =>
+                    Enter() && TweenBlock(index, new Vector3(x, y, z), new Vector3(pitch, yaw, roll), seconds, ease)),
                 ["set_path_mode"] = Callable.From((int pathId, int mode) => { if (Enter()) SetPathMode(pathId, mode); }),
                 ["effect"] = Callable.From((int effect, float x, float y, float z) => { if (Enter()) PlayEffect(effect, new Vector3(x, y, z)); }),
                 ["play_sound"] = Callable.From((int slot, int sound, float volume, bool loop, bool everywhere, float x, float y, float z) =>
                     Enter() && PlaySound(slot, sound, volume, loop, everywhere, new Vector3(x, y, z))),
                 ["stop_sound"] = Callable.From((int slot) => { if (Enter() && SoundManager.Loaded) SoundManager.Instance.StopSlot(slot); }),
+
+                // 연출
+                ["stage"] = Callable.From(() => Enter() ? m_events.StageInfo() : new Godot.Collections.Dictionary()),
+                ["pause_world"] = Callable.From((bool paused) => { if (Enter()) SimClock.WorldPaused = paused; }),
+                ["pause_ai"] = Callable.From((bool paused) => { if (Enter()) m_events.SetAiPaused(paused); }),
+                ["lock_player"] = Callable.From((int flags) => { if (Enter()) m_events.SetPlayerLock(flags); }),
+                ["set_invincible"] = Callable.From((int index, bool enabled) => { if (Enter()) MapLoader.GetHuman(index)?.SetInvincible(enabled); }),
+                ["set_infinite_ammo"] = Callable.From((int index, bool enabled) => { if (Enter()) MapLoader.GetHuman(index)?.SetInfiniteAmmo(enabled); }),
+                ["show_hud"] = Callable.From((bool visible) => { if (Enter()) m_events.SetHudVisible(visible); }),
+                ["fade"] = Callable.From((int color, float alpha, float seconds) => { if (Enter()) m_events.FadeScreen(color, alpha, seconds); }),
+                ["letterbox"] = Callable.From((float height, float seconds) => { if (Enter()) m_events.SetLetterbox(height, seconds); }),
+                ["camera_detach"] = Callable.From((float x, float y, float z, float yaw, float pitch, float roll, float fov) =>
+                    Enter() && m_events.DetachCamera(new Vector3(x, y, z), yaw, pitch, roll, fov)),
+                ["camera_attach"] = Callable.From(() => { if (Enter()) m_events.AttachCamera(); }),
+                ["camera_tween"] = Callable.From((float x, float y, float z, float yaw, float pitch, float roll, float fov, float seconds, bool ease) =>
+                    Enter() && m_events.TweenCamera(new Vector3(x, y, z), yaw, pitch, roll, fov, seconds, ease)),
+                ["ai_look"] = Callable.From((int index, float x, float y, float z) => Enter() && DirectAI(index, new Vector3(x, y, z), 0)),
+                ["ai_fire"] = Callable.From((int index, float x, float y, float z, int shots) => Enter() && DirectAI(index, new Vector3(x, y, z), Mathf.Max(1, shots))),
+                ["ai_release"] = Callable.From((int index) => { if (Enter()) MapLoader.GetHuman(index)?.Brain?.ClearDirect(); }),
 
                 // 미션
                 ["message"] = Callable.From((int id) => { if (Enter()) m_events.ShowMessage(id); }),
@@ -123,7 +144,10 @@ namespace GodotXOPS
         /// 사람 하나의 상태를 값만 담은 사전으로 만든다.
         /// </summary>
         /// <param name="index">MapLoader.Humans 의 인덱스.</param>
-        /// <returns>alive, hp, team, x, y, z, yaw, pitch, weapon(든 무기의 번호), id(식별번호). 없는 인덱스면 빈 사전.</returns>
+        /// <returns>
+        /// alive, hp, team, x, y, z, yaw, pitch, weapon(든 무기의 번호), id(식별번호), invincible, infinite_ammo,
+        /// directed(이벤트의 지시를 받는 중인지), shots_left(지시받은 사격에서 남은 발 수). 없는 인덱스면 빈 사전.
+        /// </returns>
         private static Godot.Collections.Dictionary HumanInfo(int index)
         {
             var result = new Godot.Collections.Dictionary();
@@ -141,6 +165,10 @@ namespace GodotXOPS
             result["pitch"] = human.Controller.Pitch;
             result["weapon"] = human.CurrentWeapon.WeaponIndex;
             result["id"] = human.Identifier;
+            result["invincible"] = human.Invincible;
+            result["infinite_ammo"] = human.InfiniteAmmo;
+            result["directed"] = human.Brain != null && human.Brain.Directed;
+            result["shots_left"] = human.Brain != null ? human.Brain.DirectShotsLeft : 0;
             return result;
         }
 
@@ -245,6 +273,38 @@ namespace GodotXOPS
 
             int ticks = Mathf.RoundToInt(Mathf.Clamp(seconds, 0f, k_maxTweenSeconds) * SimClock.FrameRate);
             return MapLoader.MoveBlock(index, offset, angles, ticks, ease);
+        }
+
+        /// <summary>
+        /// 블록의 가운데가 한 자리에 오도록 옮기고, 처음 모양 기준으로 돌린다. 다른 블록과 사람을 무시한다.
+        /// </summary>
+        /// <param name="index">블록 번호 (파일 안의 순번).</param>
+        /// <param name="target">블록의 가운데가 도착할 자리.</param>
+        /// <param name="angles">처음 모양에서의 회전 (UnityXOPS 오일러 x pitch, y yaw, z roll, 도).</param>
+        /// <param name="seconds">걸리는 시간 (초). 0 이하면 바로 옮긴다.</param>
+        /// <param name="ease">true 면 천천히 출발해 천천히 멈춘다.</param>
+        /// <returns>시작했으면 true.</returns>
+        private static bool TweenBlock(int index, Vector3 target, Vector3 angles, float seconds, bool ease)
+        {
+            if (index < 0 || index >= MapLoader.Blocks.Count) return false;
+            return MoveBlock(index, target - MapLoader.Blocks[index].basePosition, angles, seconds, ease);
+        }
+
+        /// <summary>
+        /// 사람이 한 점을 바라보게 하거나(shots 가 0) 바라보고 쏘게 한다. 풀 때까지 그 사람의 평소 AI 는 돌지 않는다. 플레이어에게도 걸 수 있다.
+        /// </summary>
+        /// <param name="index">사람 인덱스.</param>
+        /// <param name="target">바라볼 점.</param>
+        /// <param name="shots">쏠 발 수. 0 이면 바라보기만 한다.</param>
+        /// <returns>걸었으면 true. 없는 사람, 죽은 사람, 올바르지 않은 수면 false.</returns>
+        private static bool DirectAI(int index, Vector3 target, int shots)
+        {
+            Human human = MapLoader.GetHuman(index);
+            if (human == null || !human.Alive || human.Brain == null || !target.IsFinite()) return false;
+
+            if (shots > 0) human.Brain.SetDirectFire(target, shots);
+            else human.Brain.SetDirectLook(target);
+            return true;
         }
 
         /// <summary>

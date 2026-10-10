@@ -1054,6 +1054,405 @@
           "kind": "event"
         }
       ]
+    },
+    {
+      "type": 80,
+      "name": "Pause World",
+      "function": "pause_world",
+      "parameters": [
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 81,
+      "name": "Pause AI",
+      "function": "pause_ai",
+      "parameters": [
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 82,
+      "name": "Lock Player",
+      "function": "lock_player",
+      "parameters": [
+        {
+          "name": "move",
+          "slot": "e0",
+          "kind": "bool"
+        },
+        {
+          "name": "jump",
+          "slot": "e1",
+          "kind": "bool"
+        },
+        {
+          "name": "look",
+          "slot": "e2",
+          "kind": "bool"
+        },
+        {
+          "name": "fire",
+          "slot": "e3",
+          "kind": "bool"
+        },
+        {
+          "name": "weapon",
+          "slot": "e4",
+          "kind": "bool"
+        },
+        {
+          "name": "view",
+          "slot": "e5",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 83,
+      "name": "Set Invincible",
+      "function": "set_invincible",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 84,
+      "name": "Set Infinite Ammo",
+      "function": "set_infinite_ammo",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 85,
+      "name": "Letterbox",
+      "function": "letterbox",
+      "parameters": [
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        },
+        {
+          "name": "height",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "time",
+          "slot": "e2",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 86,
+      "name": "Show HUD",
+      "function": "show_hud",
+      "parameters": [
+        {
+          "name": "enable",
+          "slot": "e0",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 87,
+      "name": "Fade Screen",
+      "function": "fade_screen",
+      "parameters": [
+        {
+          "name": "color",
+          "slot": "e0",
+          "kind": "color"
+        },
+        {
+          "name": "alpha",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "time",
+          "slot": "e2",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 88,
+      "name": "Detach Camera",
+      "function": "detach_camera",
+      "parameters": [
+        {
+          "name": "pitch",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "roll",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "fov",
+          "slot": "e2",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 89,
+      "name": "Attach Camera",
+      "function": "attach_camera",
+      "parameters": [],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 90,
+      "name": "Tween Camera",
+      "function": "tween_camera",
+      "parameters": [
+        {
+          "name": "pitch",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "roll",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "fov",
+          "slot": "e2",
+          "kind": "float"
+        },
+        {
+          "name": "time",
+          "slot": "e3",
+          "kind": "float"
+        },
+        {
+          "name": "ease",
+          "slot": "e4",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 91,
+      "name": "AI Look At",
+      "function": "ai_look_at",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 92,
+      "name": "AI Fire At",
+      "function": "ai_fire_at",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "shots",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 93,
+      "name": "AI Release",
+      "function": "ai_release",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 94,
+      "name": "Tween Block",
+      "function": "tween_block",
+      "parameters": [
+        {
+          "name": "block",
+          "slot": "p2",
+          "kind": "block"
+        },
+        {
+          "name": "path",
+          "slot": "e0",
+          "kind": "path"
+        },
+        {
+          "name": "pitch",
+          "slot": "e1",
+          "kind": "float"
+        },
+        {
+          "name": "roll",
+          "slot": "e2",
+          "kind": "float"
+        },
+        {
+          "name": "turn",
+          "slot": "e3",
+          "kind": "float"
+        },
+        {
+          "name": "time",
+          "slot": "e4",
+          "kind": "float"
+        },
+        {
+          "name": "ease",
+          "slot": "e5",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
     }
   ]
 }

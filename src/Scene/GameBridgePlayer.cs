@@ -151,7 +151,7 @@ namespace GodotXOPS
         public bool IsFirstPerson()
         {
             PlayerController controller = PlayerController.Current;
-            return controller != null && controller.ViewMode == ViewMode.FirstPerson;
+            return controller != null && controller.FirstPersonView;
         }
 
         /// <summary>

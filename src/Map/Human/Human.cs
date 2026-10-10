@@ -33,6 +33,8 @@ namespace GodotXOPS
         private bool m_threatHeard;
         // 데미지를 받지 않는지 (원본 human::Invincible). 점검 도구가 켠다.
         private bool m_invincible;
+        // 쏠 때마다 예비 탄이 한 발씩 채워지는지 (이벤트 Set Infinite Ammo). 원본에 없는 동작이다.
+        private bool m_infiniteAmmo;
 
         public float HP => m_hp;
         public int Team => m_team;
@@ -51,6 +53,7 @@ namespace GodotXOPS
         public int Identifier => m_identifier;
         public float HitYaw => m_hitYaw;
         public bool Invincible => m_invincible;
+        public bool InfiniteAmmo => m_infiniteAmmo;
         public float CameraHeight => m_controller.CameraHeight;
 
         // AI 레벨 = HumanData.aiIndex (원본 HumanParameter.AIlevel).
@@ -108,7 +111,7 @@ namespace GodotXOPS
         public override void _Process(double delta)
         {
             m_controller?.ApplyVisual();
-            PlayPendingFireEffects((float)delta);
+            if (!SimClock.WorldPaused) PlayPendingFireEffects((float)delta);
         }
 
         public override void _ExitTree()
@@ -132,6 +135,15 @@ namespace GodotXOPS
         public void SetInvincible(bool value)
         {
             m_invincible = value;
+        }
+
+        /// <summary>
+        /// 무한 탄약 여부를 정한다. 켜면 한 발 쏠 때마다 예비 탄이 한 발 늘어서 탄이 떨어지지 않는다. 탄창은 줄어들므로 재장전은 그대로 한다.
+        /// </summary>
+        /// <param name="value">true 면 무한 탄약.</param>
+        public void SetInfiniteAmmo(bool value)
+        {
+            m_infiniteAmmo = value;
         }
 
         /// <summary>

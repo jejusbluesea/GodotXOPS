@@ -154,6 +154,8 @@ namespace GodotXOPS
             int burstLimit = BurstLimit(data);
             if (burstLimit > 0 && m_burstShots >= burstLimit) return false;
 
+            // 무한 탄약: 쏠 때마다 예비 탄에 한 발을 먼저 더한다. 탄창은 그대로 줄어서 재장전은 한다. 먼저 더해야 수류탄 같은 자동 재장전 무기가 마지막 한 발에서 사라지지 않는다.
+            if (m_infiniteAmmo && weapon.CanConsumeShot()) weapon.AddReserve(1);
             if (!weapon.ConsumeShot(out bool depleted)) return false;
 
             m_burstShots++;

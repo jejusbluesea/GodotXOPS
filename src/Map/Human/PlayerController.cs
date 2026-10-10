@@ -60,12 +60,16 @@ namespace GodotXOPS
         private bool m_fireReady;
         // 스코프를 쓰지 않을 때의 시야각 (설정값).
         private float m_baseFov;
+        // 지난 프레임에 카메라가 플레이어에게서 떨어져 있었는지 (이벤트 Detach Camera).
+        private bool m_cameraDetached;
 
         // 지금 씬에서 조작을 맡은 컨트롤러. 없으면 null.
         public static PlayerController Current { get; private set; }
 
         public Camera3D Camera => m_camera;
         public ViewMode ViewMode => m_viewMode;
+        // 카메라가 플레이어의 눈에 있는지. 3인칭이거나 이벤트가 카메라를 뗐으면 false 다.
+        public bool FirstPersonView => m_viewMode == ViewMode.FirstPerson && !m_cameraDetached;
         public float Yaw => m_yaw;
         public float Pitch => m_pitch;
 
@@ -115,10 +119,14 @@ namespace GodotXOPS
                 else if (input.WasKeyPressed(Key.Down)) SpawnClone(false);
             }
 
+            // 이벤트의 조작 잠금. 플레이어가 이벤트의 지시(AI Look At / AI Fire At)를 받는 동안에는 전부 잠긴 것으로 친다.
+            int locks = EventManager.Loaded ? EventManager.Instance.PlayerLock : 0;
+            if (m_player.Brain != null && m_player.Brain.Directed) locks = EventManager.LockAll;
+
             if (m_player.Alive)
             {
                 // F1 — 1인칭 ↔ 3인칭 (원본 gamemain.cpp:2293-2304).
-                if (input.WasKeyPressed(Key.F1)) ToggleViewMode();
+                if (input.WasKeyPressed(Key.F1) && (locks & EventManager.LockView) == 0) ToggleViewMode();
 
                 // 치트 F6 — F6 을 누른 채 Enter 로 현재 무기의 예비 탄을 장탄수만큼 추가 (원본 gamemain.cpp:2336-2341).
                 if (input.IsKeyPressed(Key.F6) && input.WasKeyPressed(Key.Enter)) m_player.CheatAddMagazine();
@@ -130,7 +138,7 @@ namespace GodotXOPS
                     else if (input.WasKeyPressed(Key.Right)) m_player.CheatCycleWeapon(-1);
                 }
 
-                ReadInput(input, dt);
+                ReadInput(input, dt, locks);
             }
 
             UpdateCamera(dt);
@@ -154,7 +162,8 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="input">입력 매니저.</param>
         /// <param name="dt">프레임 시간.</param>
-        private void ReadInput(InputManager input, float dt)
+        /// <param name="locks">이벤트가 잠근 조작 (EventManager.Lock* 비트의 합).</param>
+        private void ReadInput(InputManager input, float dt, int locks)
         {
             ConfigManager config = ConfigManager.Instance;
             float sensitivity = config.MouseSensitivity;
@@ -164,12 +173,26 @@ namespace GodotXOPS
             m_yaw = m_controller.Yaw;
             m_pitch = Mathf.Clamp(m_controller.Pitch, -k_pitchLimit, k_pitchLimit);
 
-            Vector2 look = input.ReadVector(InputManager.Look);
-            m_yaw += look.X * sensitivity;
-            m_pitch = Mathf.Clamp(m_pitch - look.Y * sensitivity * invertY, -k_pitchLimit, k_pitchLimit);
+            // Interact 는 사람이 아니라 미션 이벤트가 받는다. 다음 틱의 이벤트가 소비한다. 조작 잠금으로 막지 않는다.
+            if (input.WasPressed(InputManager.Interact) && EventManager.Loaded) EventManager.Instance.QueueInteract();
+
+            // 전부 잠겼으면 사람에게 아무 입력도 넣지 않는다. 게임 정지 중에는 틱이 입력을 소비하지 않고, 지시를 받는 중이면 AI 가 넣은 입력을 덮어쓰면 안 된다.
+            if (locks == EventManager.LockAll)
+            {
+                m_fireReady = false;
+                return;
+            }
+
+            bool lookLocked = (locks & EventManager.LockLook) != 0;
+            if (!lookLocked)
+            {
+                Vector2 look = input.ReadVector(InputManager.Look);
+                m_yaw += look.X * sensitivity;
+                m_pitch = Mathf.Clamp(m_pitch - look.Y * sensitivity * invertY, -k_pitchLimit, k_pitchLimit);
+            }
 
             // 3인칭 카메라 시선 오프셋 — 넘버패드로 조정 (원본 gamemain.cpp:2307-2320, 프레임당 2°).
-            if (m_viewMode == ViewMode.ThirdPerson)
+            if (m_viewMode == ViewMode.ThirdPerson && !lookLocked)
             {
                 float step = k_thirdPersonNumpadDegPerFrame * dt * k_referenceFps;
                 if (input.IsKeyPressed(Key.Kp8)) m_viewPitchOffset += step;
@@ -178,18 +201,19 @@ namespace GodotXOPS
                 if (input.IsKeyPressed(Key.Kp6)) m_viewYawOffset += step;
             }
 
-            Vector2 move = input.ReadVector(InputManager.Move);
             HumanMoveFlag moveFlag = HumanMoveFlag.None;
-            if (move.Y > 0f) moveFlag |= HumanMoveFlag.Forward;
-            if (move.Y < 0f) moveFlag |= HumanMoveFlag.Back;
-            if (move.X < 0f) moveFlag |= HumanMoveFlag.Left;
-            if (move.X > 0f) moveFlag |= HumanMoveFlag.Right;
-            if (input.IsPressed(InputManager.Walk)) moveFlag |= HumanMoveFlag.Walk;
-            if (input.WasPressed(InputManager.Jump)) moveFlag |= HumanMoveFlag.Jump;
+            if ((locks & EventManager.LockMove) == 0)
+            {
+                Vector2 move = input.ReadVector(InputManager.Move);
+                if (move.Y > 0f) moveFlag |= HumanMoveFlag.Forward;
+                if (move.Y < 0f) moveFlag |= HumanMoveFlag.Back;
+                if (move.X < 0f) moveFlag |= HumanMoveFlag.Left;
+                if (move.X > 0f) moveFlag |= HumanMoveFlag.Right;
+                if (input.IsPressed(InputManager.Walk)) moveFlag |= HumanMoveFlag.Walk;
+            }
+            if (input.WasPressed(InputManager.Jump) && (locks & EventManager.LockJump) == 0) moveFlag |= HumanMoveFlag.Jump;
 
-            HumanWeaponAction weapon = ReadWeaponInput(input);
-            // Interact 는 사람이 아니라 미션 이벤트가 받는다. 다음 틱의 이벤트가 소비한다.
-            if (input.WasPressed(InputManager.Interact) && EventManager.Loaded) EventManager.Instance.QueueInteract();
+            HumanWeaponAction weapon = ReadWeaponInput(input, locks);
 
             var frameInput = new HumanInput { moveFlag = moveFlag, yaw = m_yaw, pitch = m_pitch, weapon = weapon };
             m_controller.SetInput(in frameInput);
@@ -205,17 +229,22 @@ namespace GodotXOPS
         /// 발사는 단발 무기면 누른 순간만, 그 밖에는 누르고 있는 동안 계속 받는다.
         /// </summary>
         /// <param name="input">입력 매니저.</param>
+        /// <param name="locks">이벤트가 잠근 조작. LockFire 는 발사를, LockWeapon 은 그 밖의 무기 조작을 막는다.</param>
         /// <returns>이번 프레임의 무기 입력 플래그.</returns>
-        private HumanWeaponAction ReadWeaponInput(InputManager input)
+        private HumanWeaponAction ReadWeaponInput(InputManager input, int locks)
         {
             HumanWeaponAction weapon = HumanWeaponAction.None;
 
+            // 발사가 잠긴 동안 누르고 있던 버튼은 풀린 뒤에 한 번 떼야 발사로 받는다.
             if (!input.IsPressed(InputManager.Fire)) m_fireReady = true;
-            if (m_fireReady)
+            else if ((locks & EventManager.LockFire) != 0) m_fireReady = false;
+            if (m_fireReady && (locks & EventManager.LockFire) == 0)
             {
                 bool semiAuto = m_player.CurrentWeapon.Data.burstMode == WeaponBurstMode.SemiAuto;
                 if (semiAuto ? input.WasPressed(InputManager.Fire) : input.IsPressed(InputManager.Fire)) weapon |= HumanWeaponAction.Fire;
             }
+
+            if ((locks & EventManager.LockWeapon) != 0) return weapon;
 
             if (input.WasPressed(InputManager.Reload)) weapon |= HumanWeaponAction.Reload;
             if (input.WasPressed(InputManager.First)) weapon |= HumanWeaponAction.SelectFirst;
@@ -234,6 +263,30 @@ namespace GodotXOPS
         /// <param name="dt">프레임 시간.</param>
         private void UpdateCamera(float dt)
         {
+            // 이벤트가 카메라를 뗐으면 그 자리에 놓는다. 바깥에서 보는 시점이라 플레이어의 몸통과 다리를 보이게 한다.
+            if (EventManager.Loaded && EventManager.Instance.CameraDetached)
+            {
+                if (!m_cameraDetached)
+                {
+                    m_cameraDetached = true;
+                    m_player.HumanVisual.SetBodyVisible(true);
+                }
+                EventManager.Instance.GetStageCamera(out Vector3 position, out Vector3 angles, out float fov);
+                m_camera.Fov = fov > 0f ? fov : m_baseFov;
+                m_camera.Position = position;
+                m_camera.Rotation = Coord.FromUnityEuler(angles);
+                return;
+            }
+            if (m_cameraDetached)
+            {
+                // 다시 붙었다. 3인칭 카메라는 관성 없이 지금 시선에서 출발하고, 죽어 있었으면 사망 카메라가 처음부터 다시 돈다.
+                m_cameraDetached = false;
+                m_camYaw = m_yaw + m_viewYawOffset;
+                m_camPitch = m_pitch + m_viewPitchOffset;
+                m_deathCamInitialized = false;
+                ApplyViewpoint();
+            }
+
             if (!m_player.Alive)
             {
                 ApplyDeathCamera(dt);
@@ -315,7 +368,7 @@ namespace GodotXOPS
         /// </summary>
         private void ApplyViewpoint()
         {
-            m_player?.HumanVisual.SetBodyVisible(m_viewMode != ViewMode.FirstPerson);
+            m_player?.HumanVisual.SetBodyVisible(m_viewMode != ViewMode.FirstPerson || m_cameraDetached);
         }
 
         /// <summary>
@@ -391,6 +444,7 @@ namespace GodotXOPS
                 m_viewPitchOffset = m_viewMode == ViewMode.ThirdPerson ? k_thirdPersonInitialPitch : 0f;
                 m_deathCamInitialized = false;
                 m_fireReady = false;
+                m_cameraDetached = false;
 
                 var initial = new HumanInput { moveFlag = HumanMoveFlag.None, yaw = m_yaw, pitch = m_pitch };
                 m_controller.SetInput(in initial);

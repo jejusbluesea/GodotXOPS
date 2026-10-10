@@ -174,7 +174,7 @@ namespace GodotXOPS
         public override void _Process(double delta)
         {
             if (m_tweening && !m_destroyed) Position = m_previousPosition.Lerp(m_position, SimClock.InterpolationAlpha);
-            if (!m_destroyed || !Visible) return;
+            if (!m_destroyed || !Visible || SimClock.WorldPaused) return;
 
             float dt = (float)delta;
             m_destroyVelocity.Y -= k_destroyGravity * dt;

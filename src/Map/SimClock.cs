@@ -43,8 +43,30 @@ namespace GodotXOPS
         // 틱 발행 여부. 브리핑/결과 같은 정지 화면에서는 false 로 둬 중력·AI 를 모두 멈춘다.
         public static bool TickEnabled { get; set; }
 
+        // 게임 정지 중에도 도는 틱 대상의 첫 순서. 미션 판정·이벤트(300)부터는 멈추지 않는다 (이벤트가 멈춰 버리면 정지를 풀 수 없다).
+        public const int PausedOrderFrom = 300;
+
+        private static bool s_worldPaused;
+        // 정지가 풀린 뒤 세계의 첫 틱이 돌 때까지 true. 그동안 세계의 시각 보간을 멈춘 자리에 붙여 둔다.
+        private static bool s_worldHeld;
+        private static float s_alpha = 1f;
+
+        // 게임 정지 (이벤트 Pause World). 켜져 있으면 PausedOrderFrom 보다 앞선 틱 대상(블록, 사람, 무기, 소물, 총알, 충돌, AI)이 돌지 않는다.
+        public static bool WorldPaused
+        {
+            get => s_worldPaused;
+            set
+            {
+                s_worldPaused = value;
+                if (value) s_worldHeld = true;
+            }
+        }
+
         // 다음 틱까지의 진행 비율 0~1. 렌더레이트 소비자가 직전 틱→현재 틱 사이를 이 값으로 보간한다.
-        public static float InterpolationAlpha { get; private set; } = 1f;
+        // 게임 정지 중에는 1 이다 (세계의 틱이 돌지 않으므로 그대로 두면 직전 틱과 지금 틱 사이를 되풀이해 오간다).
+        public static float InterpolationAlpha => s_worldHeld ? 1f : s_alpha;
+        // 게임 정지와 무관한 진행 비율. 정지 중에도 움직이는 것(이벤트의 카메라, 화면 암전, 레터박스)이 쓴다.
+        public static float EventAlpha => s_alpha;
 
         /// <summary>
         /// 시뮬레이션 틱 대상을 등록한다. SimOrder 오름차순 정렬 삽입 — 낮은 값이 먼저 호출된다. 중복 등록은 무시.
@@ -80,7 +102,7 @@ namespace GodotXOPS
             if (!TickEnabled)
             {
                 m_accum = 0f;
-                InterpolationAlpha = 1f;
+                s_alpha = 1f;
                 return;
             }
 
@@ -92,7 +114,7 @@ namespace GodotXOPS
                 Step();
             }
             if (m_accum > FrameTime) m_accum = 0f;
-            InterpolationAlpha = m_accum / FrameTime;
+            s_alpha = m_accum / FrameTime;
         }
 
         /// <summary>
@@ -102,8 +124,12 @@ namespace GodotXOPS
         {
             // 틱 도중 등록/해제(스폰·사망)가 일어나도 순회가 깨지지 않게 사본을 돈다.
             ISimTickable[] snapshot = s_tickables.ToArray();
+            // 정지 여부는 틱의 처음에 정한다. 이번 틱의 이벤트가 정지를 켜거나 꺼도 다음 틱부터 듣는다.
+            bool paused = s_worldPaused;
+            if (!paused) s_worldHeld = false;
             for (int i = 0; i < snapshot.Length; i++)
             {
+                if (paused && snapshot[i].SimOrder < PausedOrderFrom) continue;
                 snapshot[i].SimTick();
             }
         }

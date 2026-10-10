@@ -266,3 +266,125 @@ func countdown(p, state):
 		return 0
 	api["hud_text"].call(p["slot"], format_value(left, p["format"]), text_options(p, 0.1))
 	return -1
+
+# ---- staging
+
+# Stops everything but the events: humans, bullets, dropped weapons, objects, blocks, AI and effects. The player cannot do anything either.
+# Event lines, screen text, the fade, the letterbox and the detached camera keep going.
+func pause_world(p, state):
+	api["pause_world"].call(p["enable"])
+	return 0
+
+# Stops every AI. A human under AI Look At / AI Fire At still follows that order.
+func pause_ai(p, state):
+	api["pause_ai"].call(p["enable"])
+	return 0
+
+# Each box that is on locks that part of the player's controls; all off unlocks everything. Leaving the mission and Interact are never locked.
+# weapon = reload, switch, drop, fire mode and scope. view = the first / third person key.
+func lock_player(p, state):
+	var flags = 0
+	if p["move"]:
+		flags += 1
+	if p["jump"]:
+		flags += 2
+	if p["look"]:
+		flags += 4
+	if p["fire"]:
+		flags += 8
+	if p["weapon"]:
+		flags += 16
+	if p["view"]:
+		flags += 32
+	api["lock_player"].call(flags)
+	return 0
+
+# A human below 0 means every human there is now (humans spawned later are not included).
+func set_invincible(p, state):
+	if p["human"] < 0:
+		var count = api["human_count"].call()
+		var i = 0
+		while i < count:
+			api["set_invincible"].call(i, p["enable"])
+			i += 1
+		return 0
+	api["set_invincible"].call(api["find_human"].call(p["human"]), p["enable"])
+	return 0
+
+# Every shot adds one bullet to the reserve, so the human never runs out but still reloads. A human below 0 means every human there is now.
+func set_infinite_ammo(p, state):
+	if p["human"] < 0:
+		var count = api["human_count"].call()
+		var i = 0
+		while i < count:
+			api["set_infinite_ammo"].call(i, p["enable"])
+			i += 1
+		return 0
+	api["set_infinite_ammo"].call(api["find_human"].call(p["human"]), p["enable"])
+	return 0
+
+# Black bars at the top and the bottom, drawn under the HUD. height is one bar on a screen 480 high (0 or less: 60). They slide in or out over "time" seconds.
+func letterbox(p, state):
+	var height = 0.0
+	if p["enable"]:
+		height = p["height"]
+		if height <= 0:
+			height = 60.0
+	api["letterbox"].call(height, p["time"])
+	return 0
+
+# Off hides the HUD. The event message and the text placed by events stay.
+func show_hud(p, state):
+	api["show_hud"].call(p["enable"])
+	return 0
+
+# Covers the screen with a color, under the HUD: alpha 1 is fully covered, 0 is clear. It goes from what it is now to "alpha" over "time" seconds.
+func fade_screen(p, state):
+	api["fade"].call(p["color"], p["alpha"], p["time"])
+	return 0
+
+# Takes the camera off the player and puts it at this point, looking the way the point faces. pitch: down is positive. fov 0 or less: the configured one.
+# The player's body is shown. Controls, HUD and so on are not touched: use the other events for those.
+func detach_camera(p, state):
+	api["camera_detach"].call(p["x"], p["y"], p["z"], p["yaw"], p["pitch"], p["roll"], p["fov"])
+	return 0
+
+func attach_camera(p, state):
+	api["camera_attach"].call()
+	return 0
+
+# Moves the detached camera to this point over "time" seconds. Nothing stops it. The line goes on at once.
+func tween_camera(p, state):
+	api["camera_tween"].call(p["x"], p["y"], p["z"], p["yaw"], p["pitch"], p["roll"], p["fov"], p["time"], p["ease"])
+	return 0
+
+# The human turns to this point (yaw and pitch) and keeps looking at it until AI Release. Its own AI does not run meanwhile. Works on the player too.
+func ai_look_at(p, state):
+	api["ai_look"].call(api["find_human"].call(p["human"]), p["x"], p["y"], p["z"])
+	return 0
+
+# The human aims at this point and fires "shots" times (0 or less: once), then keeps looking at it until AI Release.
+func ai_fire_at(p, state):
+	api["ai_fire"].call(api["find_human"].call(p["human"]), p["x"], p["y"], p["z"], p["shots"])
+	return 0
+
+# A human below 0 means every human.
+func ai_release(p, state):
+	if p["human"] < 0:
+		var count = api["human_count"].call()
+		var i = 0
+		while i < count:
+			api["ai_release"].call(i)
+			i += 1
+		return 0
+	api["ai_release"].call(api["find_human"].call(p["human"]))
+	return 0
+
+# Moves a block so that its center comes to the path point, over "time" seconds. pitch, roll, turn (degrees; turn is the yaw) are measured
+# from the block as it is in the file, like Move Block. The line goes on at once.
+func tween_block(p, state):
+	var point = api["path_point"].call(p["path"])
+	if not point.get("exists", false):
+		return 0
+	api["tween_block"].call(p["block"], point["x"], point["y"], point["z"], p["pitch"], p["roll"], p["turn"], p["time"], p["ease"])
+	return 0

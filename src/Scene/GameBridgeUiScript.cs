@@ -191,6 +191,7 @@ namespace GodotXOPS
                 { "message_id", events.MessageId },
                 { "message_text", events.MessageText },
                 { "message_alpha", events.MessageAlpha },
+                { "hud_visible", events.HudVisible },
             };
         }
 

@@ -92,6 +92,9 @@ namespace GodotXOPS
 
         public override void _Process(double delta)
         {
+            // 게임 정지 중에는 이펙트도 그 자리에 멈춘다.
+            if (SimClock.WorldPaused) return;
+
             Camera3D camera = GetViewport().GetCamera3D();
             Vector3 cameraPosition = camera != null ? camera.GlobalPosition : Vector3.Zero;
             float dt = (float)delta;

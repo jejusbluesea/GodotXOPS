@@ -111,6 +111,15 @@ namespace GodotXOPS
             m_turnLeft = m_turnRight = m_turnUp = m_turnDown = false;
             m_moveIntent = HumanMoveFlag.None;
 
+            // 이벤트의 지시를 받는 동안에는 평소의 판단과 무기 운용을 하지 않는다.
+            if (m_directed)
+            {
+                DirectMain();
+                // 맨손의 팔은 고정 자세 그대로 둔다. 바라보기만 하는데 팔이 그 점을 따라 올라가면 안 된다 (팔이 조준을 따르는 것은 좀비 공격과 항복뿐이다).
+                m_self.SetUnarmedArmDynamic(false);
+                return;
+            }
+
             if (m_mode == AIBattleMode.Action) CombatMoveCancel();
 
             if (m_mode == AIBattleMode.Action || m_mode == AIBattleMode.Caution) HaveWeapon();

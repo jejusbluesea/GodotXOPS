@@ -29,6 +29,11 @@ const SIMPLE_ORDER := 10
 const FADE_ORDER := 11
 const ENDING_ORDER := 12
 
+# 이벤트가 HUD 를 끄면(Show HUD) 감추는 층. 벽 블라인드, 이벤트 메시지와 글자, FPS, 미션의 암전과 종료 문구는 남는다.
+const HUD_LAYERS := [CENTER_ORDER, SCOPE_ORDER, FLASH_ORDER, CROSSHAIR_ORDER, FRAME_ORDER, WEAPON_ORDER, HUD_ORDER, SIMPLE_ORDER]
+# 이벤트의 화면 암전과 레터박스를 그리는 캔버스 층. HUD(_ui, 1)보다 아래다.
+const STAGE_CANVAS_LAYER := 0
+
 const MODES := ["normal", "simple", "off"]
 
 # ----- 아래쪽 장식 테두리 (일반 표시 전용): char.dds 의 테두리 글리프 -----
@@ -92,6 +97,9 @@ const FPS := {"x": -10, "y": -10, "font": Vector2(18, 24), "color": Color(1, 0, 
 const DEFAULT_SCOPE_ASPECT := 4.0 / 3.0
 
 var _ui: CanvasLayer
+# 이벤트의 화면 암전과 레터박스 (EventManager.StageFadeColor, LetterboxHeight). 화면 스크립트와 무관하게 늘 여기서 그린다.
+var _stage_fade: ColorRect
+var _stage_bars: Array[ColorRect] = []
 # 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
 var _script: XopsScriptScreen
 var _script_view := {
@@ -157,6 +165,8 @@ func _ready() -> void:
 	InputManager.MouseCursorMode(true, true, true)
 	Game.BeginMission()
 
+	_build_stage()
+
 	_ui = CanvasLayer.new()
 	add_child(_ui)
 
@@ -197,6 +207,8 @@ func _exit_tree() -> void:
 func _process(delta: float) -> void:
 	if _left:
 		return
+
+	_update_stage()
 
 	if _script != null:
 		_update_event_texts()
@@ -259,6 +271,41 @@ func _layer(order: int, scaled: bool) -> XopsLayer:
 	if not _layers.has(order):
 		_layers[order] = XopsUI.layer(_ui, order, scaled)
 	return _layers[order]
+
+
+## 이벤트의 화면 암전과 레터박스. HUD 보다 아래의 캔버스 층에, 화면 높이 480 기준으로 그린다. 암전 위에 띠가 온다.
+func _build_stage() -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = STAGE_CANVAS_LAYER
+	add_child(canvas)
+	var layer := XopsUI.layer(canvas, 0, true)
+	_stage_fade = XopsUI.panel_stretch(layer, XopsUI.Stretch.FULL, 0, 0, 0, 0, Color.BLACK)
+	_stage_fade.visible = false
+	for mode in [XopsUI.Stretch.TOP, XopsUI.Stretch.BOTTOM]:
+		var bar := XopsUI.panel_stretch(layer, mode, 0, 0, 0, 0, Color.BLACK)
+		bar.visible = false
+		_stage_bars.append(bar)
+
+
+## 이벤트의 연출을 화면에 맞춘다: 암전, 레터박스, HUD 감추기.
+func _update_stage() -> void:
+	var fade: Color = EventManager.StageFadeColor
+	_stage_fade.visible = fade.a > 0.0
+	if fade.a > 0.0:
+		_stage_fade.color = fade
+
+	var height: float = EventManager.LetterboxHeight
+	XopsUI.place_stretch(_stage_bars[0], XopsUI.Stretch.TOP, 0, 0, 0, height)
+	XopsUI.place_stretch(_stage_bars[1], XopsUI.Stretch.BOTTOM, 0, 0, 0, height)
+	for bar in _stage_bars:
+		bar.visible = height > 0.0
+
+	var hud_visible: bool = EventManager.HudVisible
+	for order in HUD_LAYERS:
+		if _layers.has(order):
+			(_layers[order] as XopsLayer).visible = hud_visible
+	if _script != null:
+		_script.set_hud_visible(hud_visible)
 
 
 ## 이벤트가 놓는 글자를 담을 자리. 메시지와 같은 층(화면 높이 480 기준으로 확대)에 둔다.

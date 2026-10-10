@@ -91,19 +91,19 @@ func build(ctx):
 	if ctx["mode"] == "simple" or ctx["mode"] == "off":
 		mode = ctx["mode"]
 
-	var blind_layer = api["layer"].call(0, true)
+	var blind_layer = api["layer"].call(0, true, true)
 	var center_layer = api["layer"].call(1, true)
 	var scope_layer = api["layer"].call(2, true)
-	var message_layer = api["layer"].call(3, true)
-	var fps_layer = api["layer"].call(4, false)
+	var message_layer = api["layer"].call(3, true, true)
+	var fps_layer = api["layer"].call(4, false, true)
 	var flash_layer = api["layer"].call(5, false)
 	var cross_layer = api["layer"].call(6, false)
 	var frame_layer = api["layer"].call(7, false)
 	var weapon_layer = api["layer"].call(8, false)
 	var hud_layer = api["layer"].call(9, false)
 	var simple_layer = api["layer"].call(10, false)
-	var fade_layer = api["layer"].call(11, true)
-	var ending_layer = api["layer"].call(12, true)
+	var fade_layer = api["layer"].call(11, true, true)
+	var ending_layer = api["layer"].call(12, true, true)
 
 	# Decorative frame at the bottom: border glyphs of char.dds.
 	var lines = [

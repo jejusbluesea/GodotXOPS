@@ -10,7 +10,8 @@ namespace GodotXOPS.Dev
     /// 개발용 점검 씬 스크립트. 스크립트 이벤트(SafeGDScript)를 수치로 확인한다.
     /// 점검용 묶음(등록 JSON 과 .sgd)과 PD2, MIF2 를 게임 폴더의 build/event_check/ 에 만들어 로드하고 틱을 직접 돌린다:
     /// 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 실패한 줄만 멈추는지, 로드 때 거절되는 경우.
-    /// 이어서 기본 제공 묶음(godotdata/event/base.json)의 이벤트 전부를 한 미션에서 돌려 본다 (화면 글자, Interact, 카운트다운 포함).
+    /// 이어서 기본 제공 묶음(godotdata/event/base.json)의 이벤트 전부를 한 미션에서 돌려 본다 (화면 글자, Interact, 카운트다운, 연출 포함).
+    /// 명령행 인자("--" 뒤): --stage-sample 미션.pd2 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더하고 종료한다 (눈으로 확인하는 용도).
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/event_check.tscn
     /// </summary>
     public partial class EventCheck : Node
@@ -161,6 +162,16 @@ func bump(p, state):
 
         public override void _Ready()
         {
+            string[] args = OS.GetCmdlineUserArgs();
+            int sampleArg = Array.IndexOf(args, "--stage-sample");
+            if (sampleArg >= 0)
+            {
+                bool ok = sampleArg + 1 < args.Length && WriteStageSample(args[sampleArg + 1]);
+                if (!ok) GD.Print("사용법: --stage-sample 미션.pd2 (경로는 exe 폴더 기준. 그 파일에 시험용 컷신 줄을 더해 덮어쓴다)");
+                GetTree().Quit(ok ? 0 : 1);
+                return;
+            }
+
             AIController.Enabled = false;
             m_folder = GamePath.Resolve(k_workFolder);
             Directory.CreateDirectory(m_folder);
@@ -174,6 +185,7 @@ func bump(p, state):
                 CheckFlow();
                 CheckRejected();
                 CheckBasePack();
+                CheckStaging();
                 CheckScreenText();
                 CheckDocumentExample();
             }
@@ -687,6 +699,271 @@ func bump(p, state):
             Vector3 brokenAt = moved != null ? moved.LogicPosition : Vector3.Zero;
             SimClock.Step();
             Expect(moved != null && moved.IsDestroyed && !moved.IsTweening && moved.LogicPosition.DistanceTo(brokenAt) < 0.001f, "움직이다 부서진 오브젝트가 계속 움직임");
+        }
+
+        /// <summary>
+        /// 연출 이벤트(기본 묶음 80~94): 게임 정지, AI 정지, 조작 잠금, 무적, 무한 탄약, 레터박스, HUD, 암전, 카메라 떼기·옮기기·붙이기, AI 가 바라보고 쏘기, 블록을 포인트로 옮기기.
+        /// 정지 중에 세계가 멈추고 이벤트와 화면 연출만 가는지, 풀면 이어지는지, 미션을 다시 시작하면 전부 처음으로 돌아가는지를 본다.
+        /// </summary>
+        private void CheckStaging()
+        {
+            const int waitVar = 20, pauseWorld = 80, pauseAi = 81, lockPlayer = 82, setInvincible = 83, setInfiniteAmmo = 84, letterbox = 85, showHud = 86;
+            const int fadeScreen = 87, detachCamera = 88, attachCamera = 89, tweenCamera = 90, aiLookAt = 91, aiFireAt = 92, aiRelease = 93, tweenBlock = 94;
+            const int greaterEqual = 5, blockPathId = 78, shots = 2, fadeColor = 0x102030;
+            const float seconds = 0.3f;
+            const int ticks = 10;
+
+            PD2File file = BaseFile();
+            file.eventEntryIds.Add(1000);
+            file.points.Add(new PD2Point { type = MapLoader.PointAIPath, param1 = 0, param2 = -1, id = blockPathId, position = new Vector3(0f, 6f, 3f) });
+            // 조작 잠금: move, look, weapon 만 켠다.
+            file.points.Add(Event(lockPlayer, 1000, 0, 1001, 1, 0, 1, 0, 1, 0));
+            file.points.Add(Event(setInvincible, 1001, k_enemyId, 1002, 1));
+            file.points.Add(Event(setInfiniteAmmo, 1002, 0, 1003, 1));
+            file.points.Add(Event(letterbox, 1003, 0, 1004, 1, PD2File.FloatCell(0f), PD2File.FloatCell(seconds)));
+            file.points.Add(Event(showHud, 1004, 0, 1005, 0));
+            file.points.Add(Event(fadeScreen, 1005, 0, 1006, fadeColor, PD2File.FloatCell(1f), PD2File.FloatCell(seconds)));
+            // 카메라를 (5, 501, 6) 에 yaw 90, pitch 10, 시야각 40 으로 떼고, (15, 501, 6) 의 yaw 180, pitch 20, 시야각 60 으로 옮긴다.
+            PD2Point detach = Event(detachCamera, 1006, 0, 1007, PD2File.FloatCell(10f), PD2File.FloatCell(0f), PD2File.FloatCell(40f));
+            detach.position = new Vector3(5f, 501f, 6f);
+            detach.direction = 90f;
+            file.points.Add(detach);
+            PD2Point tween = Event(tweenCamera, 1007, 0, 1008, PD2File.FloatCell(20f), PD2File.FloatCell(0f), PD2File.FloatCell(60f), PD2File.FloatCell(seconds), 0);
+            tween.position = new Vector3(15f, 501f, 6f);
+            tween.direction = 180f;
+            file.points.Add(tween);
+            file.points.Add(Event(pauseAi, 1008, 0, 1009, 1));
+            // 블록 0 의 가운데를 경로 포인트로, 세로축 둘레로 90°.
+            file.points.Add(Event(tweenBlock, 1009, 0, 1010, blockPathId, PD2File.FloatCell(0f), PD2File.FloatCell(0f), PD2File.FloatCell(90f), PD2File.FloatCell(seconds), 0));
+            file.points.Add(Event(pauseWorld, 1010, 0, 1011, 1));
+            file.points.Add(Event(waitVar, 1011, 3, 1012, greaterEqual, 1));
+            file.points.Add(Event(pauseWorld, 1012, 0, 1013, 0));
+            // 적은 위쪽 뒤의 점을 바라보고, 플레이어는 옆의 점을 두 발 쏜다.
+            PD2Point look = Event(aiLookAt, 1013, k_enemyId, 1014);
+            look.position = new Vector3(100f, 520f, 50f);
+            file.points.Add(look);
+            PD2Point fire = Event(aiFireAt, 1014, 0, 1015, shots);
+            fire.position = new Vector3(50f, 500f, 0f);
+            file.points.Add(fire);
+            file.points.Add(Event(waitVar, 1015, 4, 1016, greaterEqual, 1));
+            // 전부 되돌린다.
+            file.points.Add(Event(aiRelease, 1016, -1, 1017));
+            file.points.Add(Event(attachCamera, 1017, 0, 1018));
+            file.points.Add(Event(lockPlayer, 1018, 0, 1019, 0, 0, 0, 0, 0, 0));
+            file.points.Add(Event(showHud, 1019, 0, 1020, 1));
+            file.points.Add(Event(letterbox, 1020, 0, 1021, 0, PD2File.FloatCell(0f), PD2File.FloatCell(0f)));
+            file.points.Add(Event(fadeScreen, 1021, 0, 1022, fadeColor, PD2File.FloatCell(0f), PD2File.FloatCell(0f)));
+            file.points.Add(Event(pauseAi, 1022, 0, 1023, 0));
+            file.points.Add(Event(setInvincible, 1023, -1, 1024, 0));
+            file.points.Add(Event(setInfiniteAmmo, 1024, -1, 1025, 0));
+            file.points.Add(Event(waitVar, 1025, 5, 1026, greaterEqual, 1));
+
+            int errors = Debugger.ErrorCount;
+            if (!WriteAndLoad(BuildPack(), k_script, file))
+            {
+                Expect(false, $"연출 이벤트를 쓰는 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+                return;
+            }
+
+            var blockFile = new BD2File { textureListPath = string.Empty };
+            blockFile.blocks.Add(CheckBox(new Vector3(0f, 0f, 0f), new Vector3(2f, 0.5f, 1f)));
+            MapLoader.LoadBlockData(blockFile);
+
+            Human player = MapLoader.Player;
+            Human enemy = MapLoader.SearchHuman(k_enemyId);
+            if (player == null || enemy == null)
+            {
+                Expect(false, "연출 이벤트 점검에 사람이 없음");
+                return;
+            }
+            // 떨어지지 않게 띄워 두고, 플레이어에게 연발 총을 쥐여 준다 (탄창만 차 있고 예비 탄은 없다).
+            player.Controller.SetFlight(true);
+            enemy.Controller.SetFlight(true);
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            int weapon = 0;
+            while (parameter.weaponData.Has(weapon) && (weapon == parameter.weaponGeneralData.noneWeaponIndex || weapon == parameter.weaponGeneralData.grenadeWeaponIndex
+                || parameter.weaponData[weapon].fireRate <= 0f || parameter.weaponData[weapon].magazineSize < shots + 1
+                || parameter.weaponData[weapon].reloadStyle == WeaponReloadStyle.AutoReload))
+            {
+                weapon++;
+            }
+            int magazine = parameter.weaponData.Has(weapon) ? parameter.weaponData[weapon].magazineSize : 0;
+            player.SetWeapon(player.SelectWeapon, weapon, magazine, 0);
+            float enemyHp = enemy.HP;
+
+            EventManager events = EventManager.Instance;
+            events.BeginMission();
+            SimClock.Step();
+            Godot.Collections.Dictionary stage = events.StageInfo();
+            Expect(events.LineCursor(0) == 1011, $"연출 이벤트들을 지나 변수 기다리기에 가지 않음 (지금 {events.LineCursor(0)})");
+            Expect(events.PlayerLock == EventManager.LockAll && stage["lock"].AsInt32() == (EventManager.LockMove | EventManager.LockLook | EventManager.LockWeapon),
+                "조작 잠금의 칸이 다르거나 게임 정지 중에 전부 잠기지 않음");
+            enemy.ApplyDamage(10f);
+            Expect(enemy.Invincible && enemy.HP == enemyHp && !player.Invincible && player.InfiniteAmmo && !enemy.InfiniteAmmo, "무적이나 무한 탄약이 지정한 사람에게 걸리지 않음");
+            Expect(!events.HudVisible && !stage["hud"].AsBool(), "HUD 끄기가 듣지 않음");
+            Expect(SimClock.WorldPaused && stage["paused"].AsBool() && !AIController.Enabled && stage["ai_paused"].AsBool(), "게임 정지나 AI 정지가 듣지 않음");
+            Expect(events.CameraDetached && events.CameraMoving, "카메라 떼기나 옮기기가 시작되지 않음");
+            events.GetStageCamera(out Vector3 cameraPosition, out Vector3 cameraAngles, out float cameraFov);
+            Expect(cameraPosition.DistanceTo(new Vector3(6f, 501f, 6f)) < 0.001f && Mathf.Abs(cameraAngles.Y - 99f) < 0.001f && Mathf.Abs(cameraAngles.X - 11f) < 0.001f
+                && Mathf.Abs(cameraFov - 42f) < 0.001f, $"카메라가 한 틱 뒤에 출발과 도착 사이의 1/10 자리에 있지 않음 ({cameraPosition}, {cameraAngles}, {cameraFov})");
+            Expect(Mathf.Abs(events.StageFadeColor.A - 0.1f) < 0.001f && Mathf.Abs(events.StageFadeColor.R - 0x10 / 255f) < 0.001f
+                && events.LetterboxHeight > 0f && events.LetterboxHeight < 60f, "암전이나 레터박스가 시간에 걸쳐 진행되지 않음");
+            Expect(MapLoader.IsBlockMoving(0), "블록을 포인트로 옮기기가 시작되지 않음");
+
+            // 정지 중: 이벤트 틱과 화면 연출은 가고, 세계(블록, 사람)는 멈춘다.
+            int ticksBefore = events.MissionTicks;
+            Vector3 playerAt = player.Controller.Position;
+            for (int tick = 0; tick < ticks + 2; tick++) SimClock.Step();
+            events.GetStageCamera(out cameraPosition, out cameraAngles, out cameraFov);
+            Expect(events.MissionTicks == ticksBefore + ticks + 2, "게임 정지 중에 이벤트 틱이 돌지 않음");
+            Expect(!events.CameraMoving && cameraPosition.DistanceTo(new Vector3(15f, 501f, 6f)) < 0.001f && Mathf.Abs(cameraAngles.Y - 180f) < 0.001f
+                && Mathf.Abs(cameraAngles.X - 20f) < 0.001f && Mathf.Abs(cameraFov - 60f) < 0.001f, "게임 정지 중에 카메라가 도착하지 않음");
+            Expect(Mathf.Abs(events.StageFadeColor.A - 1f) < 0.001f && Mathf.Abs(events.LetterboxHeight - 60f) < 0.001f, "게임 정지 중에 암전이나 레터박스가 끝나지 않음");
+            Expect(MapLoader.IsBlockMoving(0) && MapLoader.Blocks[0].position.DistanceTo(Vector3.Zero) < 0.001f && player.Controller.Position == playerAt, "게임 정지 중에 블록이나 사람이 움직임");
+            Expect(SimClock.InterpolationAlpha == 1f, "게임 정지 중에 세계의 보간 비율이 1 이 아님");
+
+            // 정지를 풀면 블록이 이어서 가고, 지시받은 사람들이 돌아보고 쏜다. AI 는 멈춰 있다.
+            events.SetVariable(3, 1);
+            SimClock.Step();
+            Expect(!SimClock.WorldPaused && events.PlayerLock == (EventManager.LockMove | EventManager.LockLook | EventManager.LockWeapon), "게임 정지 풀기가 듣지 않음");
+            Expect(enemy.Brain.Directed && player.Brain.Directed && player.Brain.DirectShotsLeft == shots, "AI 지시가 걸리지 않음");
+            for (int tick = 0; tick < 600 && (player.Brain.DirectShotsLeft > 0 || tick < ticks + 2); tick++) SimClock.Step();
+            Expect(!MapLoader.IsBlockMoving(0) && MapLoader.Blocks[0].position.DistanceTo(new Vector3(0f, 6f, 3f)) < 0.001f
+                && MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(0f, 6f, 4.5f)) && !MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(1.5f, 6f, 3f)),
+                "포인트로 옮긴 블록이 그 자리에 돌아서 도착하지 않음");
+            Expect(player.Brain.DirectShotsLeft == 0 && player.CurrentWeapon.Magazine == magazine - shots && player.CurrentWeapon.Reserve == shots,
+                $"지시받은 사격의 발 수나 무한 탄약이 다름 (남은 발 {player.Brain.DirectShotsLeft}, 탄창 {player.CurrentWeapon.Magazine}, 예비 {player.CurrentWeapon.Reserve})");
+            Expect(Mathf.Abs(Coord.DeltaAngle(player.Controller.Yaw, 90f)) < 5f, $"사격을 지시받은 사람이 그 점을 향하지 않음 (yaw {player.Controller.Yaw})");
+            for (int tick = 0; tick < 300; tick++) SimClock.Step();
+            Vector3 toLook = new Vector3(100f, 520f, 50f) - (enemy.Controller.Position + Vector3.Up * enemy.Controller.CameraHeight);
+            float lookPitch = -Mathf.RadToDeg(Mathf.Atan2(toLook.Y, new Vector2(toLook.X, toLook.Z).Length()));
+            Expect(Mathf.Abs(Coord.DeltaAngle(enemy.Controller.Yaw, 180f)) < 0.01f && Mathf.Abs(enemy.Controller.Pitch - lookPitch) < 0.01f,
+                $"바라보기를 지시받은 사람의 yaw 나 pitch 가 그 점에 맞지 않음 (yaw {enemy.Controller.Yaw}, pitch {enemy.Controller.Pitch}, 기대 {lookPitch})");
+            Expect(enemy.Controller.Position.DistanceTo(new Vector3(100f, 500f, 0f)) < 0.01f, "바라보기를 지시받은 사람이 자리를 벗어남");
+            // 맨손인 사람이 지시를 받아도 팔은 고정 자세다. 위를 바라본다고 팔이 따라 올라가지 않는다.
+            int none = parameter.weaponGeneralData.noneWeaponIndex;
+            enemy.SetWeapon(0, none, 0, 0);
+            enemy.SetWeapon(1, none, 0, 0);
+            SimClock.Step();
+            Expect(enemy.CurrentWeapon.IsNone && enemy.Brain.Directed && !enemy.UnarmedArmDynamic, "지시받은 맨손의 사람이 팔로 조준 방향을 따름");
+
+            // 전부 되돌리는 이벤트들.
+            events.SetVariable(4, 1);
+            SimClock.Step();
+            stage = events.StageInfo();
+            Expect(events.LineCursor(0) == 1025, $"되돌리는 이벤트들을 지나지 않음 (지금 {events.LineCursor(0)})");
+            Expect(!enemy.Brain.Directed && !player.Brain.Directed && !events.CameraDetached && events.PlayerLock == 0 && events.HudVisible, "AI 풀기, 카메라 붙이기, 잠금 풀기, HUD 켜기 가운데 듣지 않는 것이 있음");
+            Expect(events.StageFadeColor.A == 0f && events.LetterboxHeight == 0f && AIController.Enabled && !stage["ai_paused"].AsBool(), "시간 0 의 암전·레터박스가 바로 걷히지 않거나 AI 가 다시 돌지 않음");
+            Expect(!enemy.Invincible && !player.InfiniteAmmo, "전원에게 건 무적·무한 탄약 끄기가 듣지 않음");
+            // AI 가 켜 둔 맨손 팔의 조준 따르기는 플레이어가 조작하는 동안 남아 있지 않는다 (플레이어는 AI 가 돌지 않아 끌 기회가 없다).
+            player.SetWeapon(player.SelectWeapon, none, 0, 0);
+            player.SetUnarmedArmDynamic(true);
+            SimClock.Step();
+            Expect(player.CurrentWeapon.IsNone && !player.UnarmedArmDynamic, "플레이어가 조작하는 맨손의 사람에게 팔의 조준 따르기가 남아 있음");
+
+            // 미션이 끝나면 HUD 가 다시 보이고, 미션을 다시 시작하면 전부 처음으로 돌아간다.
+            events.SetHudVisible(false);
+            events.SetPlayerLock(EventManager.LockFire);
+            events.SetAiPaused(true);
+            events.FadeScreen(0, 1f, 0f);
+            events.SetLetterbox(40f, 0f);
+            events.DetachCamera(Vector3.Zero, 0f, 0f, 0f, 0f);
+            SimClock.WorldPaused = true;
+            Expect(!events.TweenCamera(new Vector3(float.NaN, 0f, 0f), 0f, 0f, 0f, 0f, 1f, false) && !events.HudVisible, "올바르지 않은 수로 카메라가 움직임");
+            events.ForceEnd(false);
+            Expect(events.HudVisible && events.CameraDetached, "미션이 끝난 뒤 HUD 가 보이지 않거나 연출 상태가 풀림");
+            events.BeginMission();
+            Expect(!SimClock.WorldPaused && AIController.Enabled && events.PlayerLock == 0 && events.HudVisible && !events.CameraDetached
+                && events.StageFadeColor.A == 0f && events.LetterboxHeight == 0f, "미션을 다시 시작했는데 연출 상태가 남아 있음");
+            Expect(!events.TweenCamera(Vector3.Zero, 0f, 0f, 0f, 0f, 1f, false), "붙어 있는 카메라가 움직이기 시작함");
+            AIController.Enabled = false;
+        }
+
+        /// <summary>
+        /// PD2 하나에 연출 이벤트(80~93)로 만든 시험용 컷신 줄을 더해 덮어쓴다. 눈으로 확인하는 용도다 (mif2_check 의 --convert-official 로 만든 미션에 쓴다).
+        /// 미션이 시작하면: 검은 화면에서 밝아지며 카메라가 플레이어 둘레를 돌고, 플레이어가 앞쪽 위를 세 발 쏘고, 게임이 멈춘 채 카메라가 다가온 뒤 원래대로 돌아온다.
+        /// </summary>
+        /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
+        /// <returns>썼으면 true.</returns>
+        private static bool WriteStageSample(string path)
+        {
+            const int waitTicks = 25, pauseWorld = 80, lockPlayer = 82, setInvincible = 83, setInfiniteAmmo = 84, letterbox = 85, showHud = 86;
+            const int fadeScreen = 87, detachCamera = 88, attachCamera = 89, tweenCamera = 90, aiFireAt = 92, aiRelease = 93;
+            // 더하는 이벤트의 첫 식별번호와 카메라가 바라보는 높이 (플레이어 발밑에서, m).
+            const int firstId = 30000;
+            const float focusHeight = 1.5f;
+
+            string full = GamePath.Resolve(path);
+            if (full == null || !PD2File.Read(full, out PD2File file, out string error))
+            {
+                GD.Print($"PD2 를 읽지 못함: {path}");
+                return false;
+            }
+            PD2Point player = file.points.Find(point => point.type == MapLoader.PointHuman && point.id == 0);
+            if (player == null || file.points.Exists(point => point.id >= firstId))
+            {
+                GD.Print("플레이어 포인트(식별번호 0)가 없거나 이미 시험용 줄이 들어 있음");
+                return false;
+            }
+
+            Vector3 origin = player.position;
+            Vector3 forward = Coord.YawForward(player.direction);
+            Vector3 right = Coord.YawRight(player.direction);
+            int next = firstId;
+            file.eventEntryIds.Add(firstId);
+
+            // 이벤트 하나를 줄의 끝에 잇는다.
+            void Add(int type, int p2, Vector3 position, float direction, params int[] extra)
+            {
+                file.points.Add(new PD2Point { type = type, id = next, param1 = p2, param2 = next + 1, extra = extra, position = position, direction = direction });
+                next++;
+            }
+
+            // 플레이어를 바라보는 카메라 포인트 하나: 자리, yaw, pitch.
+            void Camera(int type, Vector3 offset, float fov, params int[] tail)
+            {
+                Vector3 position = origin + right * offset.X + Vector3.Up * offset.Y + forward * offset.Z;
+                Vector3 toFocus = origin + Vector3.Up * focusHeight - position;
+                float yaw = Mathf.RadToDeg(Mathf.Atan2(toFocus.X, -toFocus.Z));
+                float pitch = -Mathf.RadToDeg(Mathf.Atan2(toFocus.Y, new Vector2(toFocus.X, toFocus.Z).Length()));
+                var extra = new List<int> { PD2File.FloatCell(pitch), PD2File.FloatCell(0f), PD2File.FloatCell(fov) };
+                extra.AddRange(tail);
+                Add(type, 0, position, yaw, extra.ToArray());
+            }
+
+            Add(fadeScreen, 0, origin, 0f, 0x000000, PD2File.FloatCell(1f), PD2File.FloatCell(0f));
+            Add(lockPlayer, 0, origin, 0f, 1, 1, 1, 1, 1, 1);
+            Add(showHud, 0, origin, 0f, 0);
+            Add(setInvincible, -1, origin, 0f, 1);
+            Add(setInfiniteAmmo, 0, origin, 0f, 1);
+            Camera(detachCamera, new Vector3(2.5f, 2.2f, 3f), 0f);
+            Add(letterbox, 0, origin, 0f, 1, PD2File.FloatCell(0f), PD2File.FloatCell(0.5f));
+            Add(fadeScreen, 0, origin, 0f, 0x000000, PD2File.FloatCell(0f), PD2File.FloatCell(1f));
+            Camera(tweenCamera, new Vector3(-2.5f, 1.8f, 3f), 0f, PD2File.FloatCell(3f), 1);
+            Add(waitTicks, 40, origin, 0f);
+            Add(aiFireAt, 0, origin + forward * 10f + right * 6f + Vector3.Up * 4f, 0f, 3);
+            Add(waitTicks, 80, origin, 0f);
+            Add(pauseWorld, 0, origin, 0f, 1);
+            Camera(tweenCamera, new Vector3(0.6f, 1.7f, 1.6f), 45f, PD2File.FloatCell(1.5f), 1);
+            Add(waitTicks, 70, origin, 0f);
+            Add(pauseWorld, 0, origin, 0f, 0);
+            Add(waitTicks, 30, origin, 0f);
+            Add(aiRelease, -1, origin, 0f);
+            Add(letterbox, 0, origin, 0f, 0, PD2File.FloatCell(0f), PD2File.FloatCell(0.5f));
+            Add(attachCamera, 0, origin, 0f);
+            Add(showHud, 0, origin, 0f, 1);
+            Add(lockPlayer, 0, origin, 0f, 0, 0, 0, 0, 0, 0);
+            Add(setInvincible, -1, origin, 0f, 0);
+            Add(setInfiniteAmmo, 0, origin, 0f, 0);
+            // 마지막 이벤트의 출구는 없는 번호다. 줄이 거기서 끝난다.
+
+            if (!file.Write(full, out error))
+            {
+                GD.Print($"PD2 를 쓰지 못함: {error}");
+                return false;
+            }
+            GD.Print($"시험용 컷신 줄을 더함: {path} (이벤트 {next - firstId}개, 줄 번호 {file.eventEntryIds.Count - 1})");
+            return true;
         }
 
         /// <summary>

@@ -57,6 +57,8 @@ var _screen := ""
 # 화면이 내주는 이미지: 이름 → 텍스처를 돌려주는 Callable. 스크립트는 요소의 source 에 그 이름을 적는다.
 var _sources := {}
 var _frame_count := 0
+# 이벤트가 HUD 를 꺼 두었는지 (메인게임). 꺼져 있으면 overlay 가 아닌 층을 감춘다.
+var _hud_visible := true
 var _frame_usec := 0
 
 
@@ -137,6 +139,17 @@ func apply_ui_scale() -> void:
 		var item: Dictionary = _items[id]
 		if item["kind"] == KIND_LAYER and not (item["node"] as XopsLayer).scaled:
 			(item["node"] as XopsLayer).ui_scale = ui_scale
+
+
+## 이벤트가 HUD 를 켜거나 껐을 때 (메인게임): overlay 로 만들지 않은 층을 전부 감추거나 다시 보인다. 스크립트에 맡기지 않고 게임이 한다.
+func set_hud_visible(visible: bool) -> void:
+	if visible == _hud_visible:
+		return
+	_hud_visible = visible
+	for id in _items:
+		var item: Dictionary = _items[id]
+		if item["kind"] == KIND_LAYER and not item.get("overlay", false) and is_instance_valid(item["node"]):
+			(item["node"] as Control).visible = visible
 
 
 ## 스크립트가 만든 것을 전부 지우고 샌드박스를 내린다.
@@ -244,11 +257,16 @@ func _api_extra(arguments = null, target: Callable = Callable()) -> Variant:
 # ============================================================
 
 ## 층을 만든다. order 가 클수록 위. scaled 가 참이면 화면 높이 480 기준으로 확대하고, 거짓이면 픽셀 × UIScale 이다.
-func _api_layer(order = 0, scaled = false) -> int:
+## overlay 가 참이면 HUD 가 아닌 층이다: 이벤트가 HUD 를 꺼도(Show HUD) 남는다 (이벤트 메시지, 미션의 암전과 종료 문구 같은 것).
+func _api_layer(order = 0, scaled = false, overlay = false) -> int:
 	if not _enter() or not _has_room():
 		return 0
 	var layer := XopsUI.layer(_root, clampi(_int(order), -LAYER_ORDER_LIMIT, LAYER_ORDER_LIMIT), _bool(scaled))
-	return _register(KIND_LAYER, layer, 0)
+	var id := _register(KIND_LAYER, layer, 0)
+	if id > 0:
+		_items[id]["overlay"] = _bool(overlay)
+		layer.visible = _hud_visible or _bool(overlay)
+	return id
 
 
 func _api_create(layer_id = 0, props = null, kind: String = "") -> int:

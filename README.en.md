@@ -20,7 +20,7 @@ The goal is to reproduce the feel of the original. Movement, collision, and bull
 - Human, weapon, small object, and effect values editable through JSON files in `godotdata/`
 - Multiple addon folders registered as separate pages through `addon.json`
 - Extended file formats (BD2, PD2, MIF2): no limits on the number of textures, point numbers, or event lines, and a mission can bring its own humans, weapons, small objects, effects, materials, and sounds. The original formats (BD1, PD1, MIF) are still supported
-- Script events: in addition to the ten original events, 36 more are included (variables and branches, spawning, on-screen text, moving small objects and blocks, playing sounds, and so on), and you can add your own event packs. Scripts only run inside a sandbox
+- Script events: in addition to the ten original events, more are included (variables and branches, spawning, on-screen text, moving small objects and blocks, playing sounds, cutscene staging such as the camera, fades, letterbox and pausing the game, and so on), and you can add your own event packs. Scripts only run inside a sandbox
 - Screen scripts: the opening, menu, briefing, in-game screen (HUD), result, and option screens can each be redrawn by a script. The built-in screens stay as they are and only the screens you register are replaced; samples that rewrite all six built-in screens are included. Scripts only run inside a sandbox
 - [Editor](#editor): edit blocks, points and events, missions, and data, and play-test right away
 - Debug console (set `AllowConsole` to `"true"` in `godotdata/config.json`, then press F11)
