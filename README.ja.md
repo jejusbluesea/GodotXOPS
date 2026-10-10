@@ -21,6 +21,7 @@
 - `addon.json` でアドオンフォルダを複数のページに分けて登録
 - 拡張ファイル形式（BD2、PD2、MIF2）: テクスチャの数、ポイント番号、イベントラインの数に制限がなく、ミッションが独自の人・武器・小物・エフェクト・材質・サウンドを持ち込めます。オリジナルの形式（BD1、PD1、MIF）もそのまま読み込めます
 - スクリプトイベント: オリジナルの 10 種類のイベントに加えて、変数と分岐、スポーン、画面の文字、小物やブロックの移動、サウンドの再生など 36 種類が入っており、自作のイベントパックも追加できます。スクリプトは隔離された環境でのみ動きます
+- 画面スクリプト: オープニング、メニュー、ブリーフィング、ゲーム画面（HUD）、リザルト、設定画面をスクリプトで描き替えられます。標準の画面はそのままで、登録した画面だけが置き換わります。標準の 6 画面をそのまま書き直したサンプルが入っています。スクリプトは隔離された環境でのみ動きます
 - [エディタ](#エディタ): ブロック、ポイントとイベント、ミッション、データを編集し、その場でテストプレイできます
 - デバッグコンソール（`godotdata/config.json` の `AllowConsole` を `"true"` にすると F11 で開きます）
 
@@ -40,7 +41,7 @@ GodotXOPS/
 ├─ GodotXOPS.exe
 ├─ GodotXOPS_Editor.bat             (エディタの起動)
 ├─ GodotXOPS.pck
-├─ libgodot_riscv.windows.template_release.x86_64.dll   (スクリプトイベントの実行)
+├─ libgodot_riscv.windows.template_release.x86_64.dll   (スクリプトの実行)
 ├─ data_GodotXOPS_windows_x86_64/   (.NET ランタイム。ゲームデータではありません)
 ├─ godotdata/                       (設定とゲーム数値の JSON)
 ├─ addon.json
@@ -103,7 +104,7 @@ GodotXOPS/
 
 ドキュメントは韓国語で書かれています。
 
-- [モディング文書](docs/modding.md) — `godotdata/` の JSON で武器・人・小物・エフェクト・ミッションを変更する方法、拡張ファイル形式、スクリプトイベント、アドオンページ
+- [モディング文書](docs/modding.md) — `godotdata/` の JSON で武器・人・小物・エフェクト・ミッションを変更する方法、拡張ファイル形式、スクリプトイベント、画面スクリプト、アドオンページ
 - [開発文書](docs/development.md) — ソースからのビルド、コードの構成、点検ツール、エディタ、デバッグコンソール、オリジナルと異なる動作
 
 ## オリジナルとの違い
@@ -112,13 +113,13 @@ GodotXOPS/
 
 ## 今後の予定
 
-1.0.0 で移植を終え、1.1.0 で拡張ファイル形式、スクリプトイベント、エディタを追加しました。次のバージョンの内容は、決まりしだい[ロードマップ](ROADMAP.md)に書きます（韓国語）。
+1.0.0 で移植を終え、1.1.0 で拡張ファイル形式、スクリプトイベント、エディタを、1.2.0 で画面スクリプトを追加しました。次のバージョンの内容は、決まりしだい[ロードマップ](ROADMAP.md)に書きます（韓国語）。
 
 ## ライセンスと告知
 
 - このリポジトリのコードは [MIT License](LICENSE) です。
 - XOPS のアセット（`data`、`addon`）は原作者のものであり、このリポジトリには含まれていません。
-- [Godot Engine](https://godotengine.org)（MIT）で作られており、スクリプトイベントの実行には [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60（Alf-André Walla、BSD-3-Clause）を使用しています。ライセンスの全文はリリースファイルの `THIRD_PARTY_NOTICES.txt`（[リポジトリ内のもの](dist/THIRD_PARTY_NOTICES.txt)）にあります。
+- [Godot Engine](https://godotengine.org)（MIT）で作られており、スクリプト（イベント、画面）の実行には [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60（Alf-André Walla、BSD-3-Clause）を使用しています。ライセンスの全文はリリースファイルの `THIRD_PARTY_NOTICES.txt`（[リポジトリ内のもの](dist/THIRD_PARTY_NOTICES.txt)）にあります。
 - コーディングと翻訳に AI を使用しました。2D・3D・サウンドのアセットは AI 生成物ではありません。
 
 ## 参考にしたプロジェクト

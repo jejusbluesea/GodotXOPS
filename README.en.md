@@ -21,6 +21,7 @@ The goal is to reproduce the feel of the original. Movement, collision, and bull
 - Multiple addon folders registered as separate pages through `addon.json`
 - Extended file formats (BD2, PD2, MIF2): no limits on the number of textures, point numbers, or event lines, and a mission can bring its own humans, weapons, small objects, effects, materials, and sounds. The original formats (BD1, PD1, MIF) are still supported
 - Script events: in addition to the ten original events, 36 more are included (variables and branches, spawning, on-screen text, moving small objects and blocks, playing sounds, and so on), and you can add your own event packs. Scripts only run inside a sandbox
+- Screen scripts: the opening, menu, briefing, in-game screen (HUD), result, and option screens can each be redrawn by a script. The built-in screens stay as they are and only the screens you register are replaced; samples that rewrite all six built-in screens are included. Scripts only run inside a sandbox
 - [Editor](#editor): edit blocks, points and events, missions, and data, and play-test right away
 - Debug console (set `AllowConsole` to `"true"` in `godotdata/config.json`, then press F11)
 
@@ -40,7 +41,7 @@ GodotXOPS/
 ├─ GodotXOPS.exe
 ├─ GodotXOPS_Editor.bat             (starts the editor)
 ├─ GodotXOPS.pck
-├─ libgodot_riscv.windows.template_release.x86_64.dll   (runs the script events)
+├─ libgodot_riscv.windows.template_release.x86_64.dll   (runs the scripts)
 ├─ data_GodotXOPS_windows_x86_64/   (.NET runtime, not game data)
 ├─ godotdata/                       (settings and game value JSON)
 ├─ addon.json
@@ -103,7 +104,7 @@ The `addon` folder is the first page of the addon list by default. To register m
 
 The documents are written in Korean.
 
-- [Modding guide](docs/modding.md) — how to edit weapons, humans, small objects, effects, and missions through the `godotdata/` JSON files, the extended file formats, script events, and addon pages
+- [Modding guide](docs/modding.md) — how to edit weapons, humans, small objects, effects, and missions through the `godotdata/` JSON files, the extended file formats, script events, screen scripts, and addon pages
 - [Development guide](docs/development.md) — building from source, code structure, check tools, the editor, the debug console, and behavior that differs from the original
 
 ## Differences from the original
@@ -112,13 +113,13 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
+The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, and 1.2.0 added screen scripts. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
 
 ## License and notices
 
 - The code in this repository is under the [MIT License](LICENSE).
 - The XOPS assets (`data`, `addon`) belong to their original authors and are not included in this repository.
-- Made with [Godot Engine](https://godotengine.org) (MIT). Script events run on [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60 (Alf-André Walla, BSD-3-Clause). The full license texts are in `THIRD_PARTY_NOTICES.txt` in the release files ([the copy in this repository](dist/THIRD_PARTY_NOTICES.txt)).
+- Made with [Godot Engine](https://godotengine.org) (MIT). Scripts (events and screens) run on [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60 (Alf-André Walla, BSD-3-Clause). The full license texts are in `THIRD_PARTY_NOTICES.txt` in the release files ([the copy in this repository](dist/THIRD_PARTY_NOTICES.txt)).
 - AI was used for coding and translation. The 2D, 3D, and sound assets are not AI-generated.
 
 ## Credits

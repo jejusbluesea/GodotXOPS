@@ -19,6 +19,7 @@
 - `addon.json`으로 에드온 폴더를 여러 페이지로 나누어 등록
 - 확장 파일 형식 (BD2, PD2, MIF2): 텍스처 개수, 포인트 번호, 이벤트 줄 수의 제한이 없고, 미션이 자기만의 사람·무기·오브젝트·이펙트·재질·소리를 들고 올 수 있습니다. 원본 형식(BD1, PD1, MIF)도 그대로 읽습니다
 - 스크립트 이벤트: 원본의 이벤트 열 가지에 더해 변수와 분기, 스폰, 화면 글자, 오브젝트와 블록 움직이기, 소리 재생 등 36종이 들어 있고, 직접 만든 이벤트 묶음을 더할 수 있습니다. 스크립트는 격리된 환경에서만 돕니다
+- 화면 스크립트: 오프닝, 메뉴, 브리핑, 게임 화면(HUD), 결과, 설정 화면을 스크립트로 바꿔 그릴 수 있습니다. 기본 화면은 그대로이고 등록한 화면만 바뀌며, 기본 화면 여섯 개를 그대로 옮긴 예제가 들어 있습니다. 스크립트는 격리된 환경에서만 돕니다
 - [에디터](#에디터): 블록, 포인트와 이벤트, 미션, 데이터를 고치고 바로 플레이해 봅니다
 - 디버그 콘솔 (`godotdata/config.json`의 `AllowConsole`을 `"true"`로 바꾸면 F11)
 
@@ -38,7 +39,7 @@ GodotXOPS/
 ├─ GodotXOPS.exe
 ├─ GodotXOPS_Editor.bat             (에디터 실행)
 ├─ GodotXOPS.pck
-├─ libgodot_riscv.windows.template_release.x86_64.dll   (스크립트 이벤트의 실행기)
+├─ libgodot_riscv.windows.template_release.x86_64.dll   (스크립트의 실행기)
 ├─ data_GodotXOPS_windows_x86_64/   (.NET 런타임. 게임 데이터가 아닙니다)
 ├─ godotdata/                       (설정과 게임 수치 JSON)
 ├─ addon.json
@@ -99,7 +100,7 @@ GodotXOPS/
 
 ## 문서
 
-- [모딩 문서](docs/modding.md) — `godotdata/` JSON 으로 무기·사람·오브젝트·이펙트·미션을 고치는 방법, 확장 파일 형식, 스크립트 이벤트, 에드온 페이지
+- [모딩 문서](docs/modding.md) — `godotdata/` JSON 으로 무기·사람·오브젝트·이펙트·미션을 고치는 방법, 확장 파일 형식, 스크립트 이벤트, 화면 스크립트, 에드온 페이지
 - [개발 문서](docs/development.md) — 소스에서 빌드, 코드 구조, 점검 도구, 에디터, 디버그 콘솔, 원본과 다르게 한 동작
 
 ## 원본과의 차이
@@ -108,13 +109,13 @@ GodotXOPS/
 
 ## 앞으로 할 것
 
-1.0.0 으로 포팅을 마쳤고, 1.1.0 에서 확장 파일 형식과 스크립트 이벤트, 에디터를 넣었습니다. 다음 버전에 넣을 것은 정해지는 대로 [로드맵](ROADMAP.md)에 적습니다.
+1.0.0 으로 포팅을 마쳤고, 1.1.0 에서 확장 파일 형식과 스크립트 이벤트, 에디터를, 1.2.0 에서 화면 스크립트를 넣었습니다. 다음 버전에 넣을 것은 정해지는 대로 [로드맵](ROADMAP.md)에 적습니다.
 
 ## 라이선스와 고지
 
 - 이 저장소의 코드는 [MIT License](LICENSE) 입니다.
 - XOPS 의 에셋(`data`, `addon`)은 원저작자의 것이며 이 저장소에 포함되어 있지 않습니다.
-- [Godot Engine](https://godotengine.org) (MIT) 으로 만들었고, 스크립트 이벤트의 실행에 [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60 (Alf-André Walla, BSD-3-Clause) 을 씁니다. 라이선스 전문은 릴리즈 파일의 `THIRD_PARTY_NOTICES.txt`([저장소의 것](dist/THIRD_PARTY_NOTICES.txt))에 있습니다.
+- [Godot Engine](https://godotengine.org) (MIT) 으로 만들었고, 스크립트(이벤트, 화면)의 실행에 [Godot Sandbox](https://github.com/libriscv/godot-sandbox) 0.60 (Alf-André Walla, BSD-3-Clause) 을 씁니다. 라이선스 전문은 릴리즈 파일의 `THIRD_PARTY_NOTICES.txt`([저장소의 것](dist/THIRD_PARTY_NOTICES.txt))에 있습니다.
 - 코드 작성과 번역에 AI 를 사용했습니다. 2D·3D·사운드 에셋은 AI 생성물이 아닙니다.
 
 ## 참고한 프로젝트
