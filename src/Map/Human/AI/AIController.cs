@@ -14,6 +14,8 @@ namespace GodotXOPS
         public static bool Enabled { get; set; } = true;
         // 플레이어가 조작하는 사람도 AI 가 움직일지 (원본 PlayerAI). 조작자가 없는 메뉴 데모 화면에서 켠다.
         public static bool DrivePlayer { get; set; }
+        // 전원 비전투가 켜져 있는지 (디버그 치트). 켜진 뒤에 스폰되는 사람(이벤트의 스폰, 복제)도 비전투로 시작한다. 맵을 내리면 꺼진다.
+        public static bool NoFightAll { get; private set; }
 
         // 원본 AI 판단 — 인간간 충돌 뒤, 미션 판정·이벤트 앞.
         public int SimOrder => 200;
@@ -47,10 +49,12 @@ namespace GodotXOPS
 
         /// <summary>
         /// 모든 AI 의 비전투 여부를 정한다 (디버그 치트). 원본 콘솔 명령 (gamemain.cpp:4517-4531).
+        /// 원본은 그 순간에 있는 사람에게만 걸지만, 여기서는 켜 둔 동안 새로 스폰되는 사람에게도 건다 (AIBrain 이 만들어질 때 NoFightAll 을 읽는다).
         /// </summary>
         /// <param name="value">true 면 아무도 싸우지 않는다.</param>
         public static void SetNoFightAll(bool value)
         {
+            NoFightAll = value;
             foreach (Human human in MapLoader.Humans)
             {
                 human.Brain?.SetNoFight(value);

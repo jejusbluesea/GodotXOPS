@@ -629,7 +629,7 @@ namespace GodotXOPS
                 }
 
                 if (BulletManager.Instance.Spawn(bulletData, this, m_team, attacks, data.penetration,
-                    shotPosition, pelletYaw, pelletPitch, speedPerTick, muzzle, onTargetWeight) == null)
+                    shotPosition, pelletYaw, pelletPitch, speedPerTick, muzzle, onTargetWeight, data.armorPointDecay, data.helmetPointDecay) == null)
                 {
                     // 풀이 가득 차면 남은 탄환은 버린다 (원본 GetNewBulletObject 실패 시 return).
                     return;

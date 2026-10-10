@@ -50,6 +50,9 @@ namespace GodotXOPS
         private int m_team;
         private int m_attacks;
         private int m_penetration;
+        // 맞은 사람의 방어구 / 헬멧 포인트를 데미지의 몇 배만큼 깎는지 (쏜 무기의 값).
+        private float m_armorPointDecay;
+        private float m_helmetPointDecay;
         private Vector3 m_position;
         private Vector3 m_prevPosition;
         private Vector3 m_direction;
@@ -97,9 +100,14 @@ namespace GodotXOPS
         /// <param name="speedPerTick">틱당 이동 거리 (m).</param>
         /// <param name="visualOrigin">총구 위치.</param>
         /// <param name="onTargetWeight">명중 통계 가중치.</param>
+        /// <param name="armorPointDecay">맞은 사람의 방어구 포인트를 데미지의 몇 배만큼 깎는지.</param>
+        /// <param name="helmetPointDecay">맞은 사람의 헬멧 포인트를 데미지의 몇 배만큼 깎는지.</param>
         public void Spawn(BulletData data, Human owner, int team, int attacks, int penetration,
-            Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin, float onTargetWeight)
+            Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin, float onTargetWeight,
+            float armorPointDecay, float helmetPointDecay)
         {
+            m_armorPointDecay = armorPointDecay;
+            m_helmetPointDecay = helmetPointDecay;
             m_data = data;
             m_owner = owner;
             m_team = team;
@@ -336,7 +344,7 @@ namespace GodotXOPS
         private void HitHuman(Human human, HumanHitPart part, float attenuation, Vector3 point)
         {
             float hpBefore = human.HP;
-            int baseDamage = human.HitBullet(part, m_attacks);
+            int baseDamage = human.HitBullet(part, m_attacks, m_armorPointDecay, m_helmetPointDecay, out bool armored);
             human.Controller.AddKnockback(m_yaw, 0f, k_hitKnockbackSpeed);
             human.SetHitYaw(m_yaw);
 
@@ -354,6 +362,8 @@ namespace GodotXOPS
             m_lastHitHuman = human;
             m_attacks = (int)(m_attacks * attenuation);
             m_penetration--;
+            // 방어구나 헬멧은 총알이 뚫고 나가는 것만 막는다 (원본에 없는 동작): 사람은 맞지만 뒤로 나가려면 관통력이 하나 더 든다.
+            if (armored) m_penetration--;
         }
 
         /// <summary>

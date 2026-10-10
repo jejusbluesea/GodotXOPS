@@ -12,6 +12,9 @@ namespace GodotXOPS
         public const int VisualProcessPriority = 50;
 
         private float m_hp;
+        // 남은 방어구 / 헬멧 포인트. 0 이면 없는 것이다 (원본에 없는 동작. 기본 데이터는 전부 0 이다).
+        private float m_armor;
+        private float m_helmet;
         private int m_team;
         private HumanDeadState m_deadState = HumanDeadState.Alive;
 
@@ -37,6 +40,13 @@ namespace GodotXOPS
         private bool m_infiniteAmmo;
 
         public float HP => m_hp;
+        public float Armor => m_armor;
+        public float Helmet => m_helmet;
+        // 사람 데이터에 적힌 처음의 HP.
+        public float MaxHP => m_humanData != null ? Mathf.Max(0f, m_humanData.hp) : 0f;
+        // 사람 데이터에 적힌 처음의 방어구 / 헬멧 포인트.
+        public float MaxArmor => m_humanData != null ? Mathf.Max(0f, m_humanData.armor) : 0f;
+        public float MaxHelmet => m_humanData != null ? Mathf.Max(0f, m_humanData.helmet) : 0f;
         public int Team => m_team;
         public HumanDeadState DeadState => m_deadState;
         public bool Alive => m_deadState == HumanDeadState.Alive;
@@ -97,6 +107,8 @@ namespace GodotXOPS
             m_hitboxSize = parameter.humanHitboxSizeData.GetClamped(hitboxIndex);
 
             m_hp = m_humanData != null ? m_humanData.hp : 0f;
+            m_armor = MaxArmor;
+            m_helmet = MaxHelmet;
             m_team = humanDataParam.param2;
             m_deadState = m_hp > 0f ? HumanDeadState.Alive : HumanDeadState.Done;
 
@@ -147,6 +159,36 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 살아 있는 사람의 HP 를 정한다 (이벤트 Set HP / Add HP). 무적 여부와 방어구를 거치지 않는다.
+        /// 0 이하로 정하면 데미지로 0 이 된 것과 같이 다음 틱에 쓰러진다. 죽은 사람은 되살리지 않는다.
+        /// </summary>
+        /// <param name="value">새 HP.</param>
+        public void SetHP(float value)
+        {
+            if (!Alive || !float.IsFinite(value)) return;
+
+            m_hp = Mathf.Max(0f, value);
+        }
+
+        /// <summary>
+        /// 남은 방어구 포인트를 정한다.
+        /// </summary>
+        /// <param name="value">방어구 포인트. 0 이하면 방어구가 없는 것이 된다.</param>
+        public void SetArmor(float value)
+        {
+            m_armor = float.IsFinite(value) ? Mathf.Max(0f, value) : 0f;
+        }
+
+        /// <summary>
+        /// 남은 헬멧 포인트를 정한다.
+        /// </summary>
+        /// <param name="value">헬멧 포인트. 0 이하면 헬멧이 없는 것이 된다.</param>
+        public void SetHelmet(float value)
+        {
+            m_helmet = float.IsFinite(value) ? Mathf.Max(0f, value) : 0f;
+        }
+
+        /// <summary>
         /// 살아 있는 사람의 HP 를 사람 데이터의 처음 값으로 되돌린다 (디버그 콘솔의 treat, 원본 gamemain.cpp:4326-4343).
         /// </summary>
         /// <returns>되돌렸으면 true. 죽었거나 사람 데이터가 없으면 false.</returns>
@@ -187,11 +229,16 @@ namespace GodotXOPS
         /// <summary>
         /// 총알에 맞은 데미지와 조준 흐트러짐을 적용한다. 원본 human::HitBulletHead / HitBulletUp / HitBulletLeg (object.cpp:1032-1061):
         /// 데미지 = (int)(위력 × 부위 배율) + 부위별 난수. 배율과 난수 범위는 사람 종류 데이터에서 온다.
+        /// 맞은 부위에 방어구(몸통·다리)나 헬멧(머리)이 남아 있으면 그 데미지를 줄여서 받고, 포인트는 줄이기 전의 데미지 × 무기의 배율만큼 깎인다 (원본에 없는 동작).
+        /// 포인트가 0 이하가 되면 부서진 것이다. 부서지는 그 한 발까지는 줄여서 받는다.
         /// </summary>
         /// <param name="part">맞은 부위.</param>
         /// <param name="attacks">총알의 현재 위력.</param>
-        /// <returns>난수를 뺀 기본 데미지. 혈흔이 튀는 양을 정하는 데 쓴다.</returns>
-        public int HitBullet(HumanHitPart part, int attacks)
+        /// <param name="armorPointDecay">방어구 포인트를 데미지의 몇 배만큼 깎는지 (0 에서 1).</param>
+        /// <param name="helmetPointDecay">헬멧 포인트를 데미지의 몇 배만큼 깎는지 (0 에서 1).</param>
+        /// <param name="armored">맞은 부위에 방어구나 헬멧이 있었으면 true. 총알이 이 사람을 뚫고 나가는 데 관통력을 하나 더 쓴다.</param>
+        /// <returns>난수를 뺀 기본 데미지 (방어구가 있었으면 줄인 값). 혈흔이 튀는 양을 정하는 데 쓴다.</returns>
+        public int HitBullet(HumanHitPart part, int attacks, float armorPointDecay, float helmetPointDecay, out bool armored)
         {
             HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
             float multiplier = 1f;
@@ -227,7 +274,26 @@ namespace GodotXOPS
             }
 
             int baseDamage = (int)(attacks * multiplier);
-            ApplyDamage(baseDamage + GameRandom.Gameplay.Range(randomAdd.min, randomAdd.max));
+            int damage = baseDamage + GameRandom.Gameplay.Range(randomAdd.min, randomAdd.max);
+
+            bool head = part == HumanHitPart.Head;
+            armored = (head ? m_helmet : m_armor) > 0f;
+            if (armored)
+            {
+                float decrease = m_humanData != null ? (head ? m_humanData.helmetDamageDecrease : m_humanData.armorDamageDecrease) : 0f;
+                float keep = 1f - Mathf.Clamp(decrease, 0f, 1f);
+                // 무적인 사람은 HP 처럼 포인트도 깎이지 않는다.
+                if (Alive && !m_invincible && damage > 0)
+                {
+                    float loss = damage * Mathf.Clamp(head ? helmetPointDecay : armorPointDecay, 0f, 1f);
+                    if (head) m_helmet = Mathf.Max(0f, m_helmet - loss);
+                    else m_armor = Mathf.Max(0f, m_armor - loss);
+                }
+                baseDamage = (int)(baseDamage * keep);
+                damage = (int)(damage * keep);
+            }
+
+            ApplyDamage(damage);
             SetHitReaction(reaction);
             return baseDamage;
         }

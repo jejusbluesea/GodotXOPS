@@ -180,6 +180,165 @@
       ]
     },
     {
+      "type": 30,
+      "name": "Set HP",
+      "function": "set_hp",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "value",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 31,
+      "name": "Add HP",
+      "function": "add_hp",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "amount",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "limit",
+          "slot": "e1",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 32,
+      "name": "Set Armor",
+      "function": "set_armor",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "value",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 33,
+      "name": "Add Armor",
+      "function": "add_armor",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "amount",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "limit",
+          "slot": "e1",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 34,
+      "name": "Set Helmet",
+      "function": "set_helmet",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "value",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 35,
+      "name": "Add Helmet",
+      "function": "add_helmet",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "amount",
+          "slot": "e0",
+          "kind": "float"
+        },
+        {
+          "name": "limit",
+          "slot": "e1",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
       "type": 40,
       "name": "Set Variable",
       "function": "set_var",

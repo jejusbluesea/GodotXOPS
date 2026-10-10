@@ -169,12 +169,17 @@ namespace GodotXOPS
         public Godot.Collections.Dictionary HudValues()
         {
             EventManager events = EventManager.Instance;
+            Human player = Player;
             return new Godot.Collections.Dictionary
             {
                 { "exists", PlayerExists() },
                 { "alive", PlayerAlive() },
                 { "index", PlayerIndex() },
                 { "hp", PlayerHP() },
+                { "armor", player != null ? player.Armor : 0f },
+                { "armor_max", player != null ? player.MaxArmor : 0f },
+                { "helmet", player != null ? player.Helmet : 0f },
+                { "helmet_max", player != null ? player.MaxHelmet : 0f },
                 { "magazine", Magazine() },
                 { "reserve", Reserve() },
                 { "weapon", WeaponName() },

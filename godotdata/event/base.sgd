@@ -95,6 +95,78 @@ func wait_interact(p, state):
 	api["hud_text"].call(31, text, {"font": 1, "anchor": 4, "x": 0.0, "y": -40.0, "size": 16.0, "seconds": 0.1})
 	return -1
 
+# ---- human state
+
+# Sets or adds to one of a human's values. kind: 0 HP, 1 armor, 2 helmet. Dead humans are left alone.
+# When adding, limit caps the result: above 0 is the cap itself, 0 is the value the human started with, below 0 is no cap.
+# A value already above the cap is not pulled down.
+func change_value(index, kind, add, amount, limit):
+	var h = api["human"].call(index)
+	if not h.has("alive"):
+		return
+	if not h["alive"]:
+		return
+	var value = amount
+	if add:
+		var current = h["hp"]
+		var cap = h["hp_max"]
+		if kind == 1:
+			current = h["armor"]
+			cap = h["armor_max"]
+		if kind == 2:
+			current = h["helmet"]
+			cap = h["helmet_max"]
+		if limit > 0.0:
+			cap = limit
+		value = current + amount
+		if amount > 0.0 and limit >= 0.0 and value > cap:
+			value = cap
+			if current > cap:
+				value = current
+	if value < 0.0:
+		value = 0.0
+	if kind == 0:
+		api["set_hp"].call(index, value)
+	if kind == 1:
+		api["set_armor"].call(index, value)
+	if kind == 2:
+		api["set_helmet"].call(index, value)
+
+# A human below 0 means every human there is now.
+func change_humans(human, kind, add, amount, limit):
+	if human < 0:
+		var count = api["human_count"].call()
+		var i = 0
+		while i < count:
+			change_value(i, kind, add, amount, limit)
+			i += 1
+		return
+	change_value(api["find_human"].call(human), kind, add, amount, limit)
+
+func set_hp(p, state):
+	change_humans(p["human"], 0, false, p["value"], 0.0)
+	return 0
+
+func add_hp(p, state):
+	change_humans(p["human"], 0, true, p["amount"], p["limit"])
+	return 0
+
+func set_armor(p, state):
+	change_humans(p["human"], 1, false, p["value"], 0.0)
+	return 0
+
+func add_armor(p, state):
+	change_humans(p["human"], 1, true, p["amount"], p["limit"])
+	return 0
+
+func set_helmet(p, state):
+	change_humans(p["human"], 2, false, p["value"], 0.0)
+	return 0
+
+func add_helmet(p, state):
+	change_humans(p["human"], 2, true, p["amount"], p["limit"])
+	return 0
+
 # ---- action
 
 func set_var(p, state):

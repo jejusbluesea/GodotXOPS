@@ -85,6 +85,7 @@ namespace GodotXOPS
         {
             m_self = self;
             m_controller = self.Controller;
+            m_noFight = AIController.NoFightAll;
             m_nav.Init(self.HumanParam);
             m_nav.Refresh();
         }

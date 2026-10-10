@@ -24,6 +24,12 @@ namespace GodotXOPS.Dev
         private const int k_waitFrames = 5;
         private const int k_benchCalls = 2000;
         private const int k_compileCount = 30;
+        // 틱 비용 측정: 사람 수의 상한, 평균을 낼 틱 수, 한 틱의 길이 (ms, 33.333Hz).
+        private const int k_tickHumansMax = 128;
+        private const int k_tickRounds = 200;
+        private const double k_tickMs = 30.0;
+        // 이보다 오래 걸린 틱을 "튄 틱"으로 센다 (ms).
+        private const double k_tickSlowMs = 10.0;
         private const string k_processSource = "var frames : int = 0\n\nfunc _process(_delta):\n\tframes += 1\n\nfunc _physics_process(_delta):\n\tframes += 1\n\nfunc get_frames() -> int:\n\treturn frames\n";
 
         private int m_checks;
@@ -58,6 +64,7 @@ namespace GodotXOPS.Dev
             CheckOutsideTree();
             CheckApiBudget();
             CheckFrameCost();
+            CheckTickCost();
 
             // 샌드박스 안의 _process 가 도는지, 끄는 두 방법이 듣는지는 몇 프레임 뒤에 본다.
             m_processControl = Load("process.sgd", k_processSource, out _, out _);
@@ -514,6 +521,199 @@ func push_batch(v, force):
             Measure("사전으로 12개 받기, 12개 전부 고침", () => node.Call("push", values, true));
             Measure("사전으로 12개 받기, 12개를 한 번에 고침", () => node.Call("push_batch", values, true));
             node.Free();
+        }
+
+        /// <summary>
+        /// 사람마다 틱마다 한 번씩 스크립트를 부를 때의 비용을 잰다 (측정이라 실패로 치지 않는다. 사람 종류·무기에 스크립트를 붙이는 설계의 전제).
+        /// 사람 수, 샌드박스를 나누는 방법(하나를 모두가 같이 쓰기 / 사람마다 하나), 값을 주고받는 모양을 바꿔 가며 한 틱의 합계를 본다.
+        /// API 쪽 함수는 값만 돌려주는 빈 껍데기라, 여기서 나오는 시간은 스크립트를 부르고 값을 건네는 비용뿐이다 (레이캐스트 같은 게임 쪽 계산은 들어 있지 않다).
+        /// </summary>
+        private void CheckTickCost()
+        {
+            const string source = @"var api
+
+func init(a):
+	api = a
+
+func empty(id):
+	return 0
+
+func regen_value(hp, max_hp, since_hit):
+	if since_hit >= 100 and hp < max_hp:
+		return hp + 1
+	return hp
+
+func regen_dict(h, state):
+	var t = 0
+	if state.has(""t""):
+		t = state[""t""]
+	t += 1
+	state[""t""] = t
+	if t >= 10 and h[""hp""] < h[""max_hp""]:
+		state[""t""] = 0
+		return h[""hp""] + 1
+	return -1
+
+func regen_api(id):
+	var h = api[""human""].call(id)
+	if h[""alive""] and h[""hp""] < h[""max_hp""]:
+		api[""set_hp""].call(id, h[""hp""] + 1)
+	return 0
+
+func regen_all(hps, max_hp):
+	var out = []
+	for i in range(hps.size()):
+		var hp = hps[i]
+		if hp < max_hp:
+			hp += 1
+		out.append(hp)
+	return out
+
+func ai_host(id):
+	var target = api[""nearest_enemy""].call(id)
+	if target < 0:
+		return 0
+	if api[""can_see""].call(id, target):
+		api[""input""].call(id, 1.0, 0.0, true)
+	return 1
+
+func ai_script(id, xs, zs, teams):
+	var best = -1
+	var best_d = 1.0e30
+	var mx = xs[id]
+	var mz = zs[id]
+	var team = teams[id]
+	for i in range(xs.size()):
+		if teams[i] != team:
+			var dx = xs[i] - mx
+			var dz = zs[i] - mz
+			var d = dx * dx + dz * dz
+			if d < best_d:
+				best_d = d
+				best = i
+	if best < 0:
+		return 0
+	if api[""can_see""].call(id, best):
+		api[""input""].call(id, atan2(xs[best] - mx, zs[best] - mz), 0.0, true)
+	return 1
+";
+            GodotObject script = ClassDB.Instantiate("SafeGDScript").AsGodotObject();
+            script.Call("set_source_code", source);
+            string error = script.Call("get_compile_error").AsString();
+            if (!string.IsNullOrEmpty(error))
+            {
+                GD.Print($"[틱] 컴파일 실패: {FirstLine(error)}");
+                return;
+            }
+
+            int apiCalls = 0;
+            var info = new Godot.Collections.Dictionary { ["alive"] = true, ["hp"] = 80f, ["max_hp"] = 100f, ["x"] = 1f, ["y"] = 2f, ["z"] = 3f };
+            var api = new Godot.Collections.Dictionary
+            {
+                ["human"] = Callable.From((int id) => { apiCalls++; return info; }),
+                ["set_hp"] = Callable.From((int id, float hp) => { apiCalls++; }),
+                ["nearest_enemy"] = Callable.From((int id) => { apiCalls++; return id ^ 1; }),
+                ["can_see"] = Callable.From((int id, int target) => { apiCalls++; return true; }),
+                ["input"] = Callable.From((int id, float yaw, float pitch, bool fire) => { apiCalls++; }),
+            };
+
+            var nodes = new List<Node>();
+            var sandboxes = new List<GodotObject>();
+            long before = Process.GetCurrentProcess().PrivateMemorySize64;
+            var buildWatch = Stopwatch.StartNew();
+            for (int i = 0; i < k_tickHumansMax; i++)
+            {
+                var node = new Node();
+                node.SetScript(script);
+                node.Set("restrictions", true);
+                node.Set("execution_timeout", 200);
+                node.Set("memory_max", k_memoryMax);
+                Variant found = script.Call("get_sandbox_for", node);
+                sandboxes.Add(found.VariantType == Variant.Type.Object ? found.AsGodotObject() : null);
+                node.Call("init", api);
+                nodes.Add(node);
+            }
+            long grown = Process.GetCurrentProcess().PrivateMemorySize64 - before;
+            GD.Print($"[틱] 같은 스크립트의 샌드박스 {k_tickHumansMax}개 만들기: 개당 {buildWatch.Elapsed.TotalMilliseconds / k_tickHumansMax:0.00} ms, {grown / 1048576.0 / k_tickHumansMax:0.00} MB");
+
+            int Exceptions()
+            {
+                int total = 0;
+                foreach (GodotObject sandbox in sandboxes) total += Counter(sandbox, "get_exceptions");
+                return total;
+            }
+
+            // 한 틱 = 사람 수만큼의 호출. separate 면 사람마다 자기 샌드박스를, 아니면 전부 0번 샌드박스를 부른다.
+            string Run(int humans, bool separate, Action<Node, int> call)
+            {
+                for (int h = 0; h < humans; h++) call(nodes[separate ? h : 0], h);
+                int exceptions = Exceptions();
+                apiCalls = 0;
+                double total = 0.0;
+                double worst = 0.0;
+                int slow = 0;
+                int collections = GC.CollectionCount(0);
+                int fullCollections = GC.CollectionCount(2);
+                for (int tick = 0; tick < k_tickRounds; tick++)
+                {
+                    var watch = Stopwatch.StartNew();
+                    for (int h = 0; h < humans; h++) call(nodes[separate ? h : 0], h);
+                    double ms = watch.Elapsed.TotalMilliseconds;
+                    total += ms;
+                    if (ms > worst) worst = ms;
+                    if (ms > k_tickSlowMs) slow++;
+                }
+                double average = total / k_tickRounds;
+                string failed = Exceptions() != exceptions ? " (예외 발생)" : string.Empty;
+                return $"{average:0.000} ms (최대 {worst:0.00}, {k_tickSlowMs:0} ms 넘은 틱 {slow}, GC {GC.CollectionCount(0) - collections}/{GC.CollectionCount(2) - fullCollections}, 1회 {average * 1000.0 / humans:0.0} us, 틱의 {average / k_tickMs * 100.0:0.00}%, API {apiCalls / (double)k_tickRounds / humans:0.0}회){failed}";
+            }
+
+            foreach (int humans in new[] { 1, 16, 64, k_tickHumansMax })
+            {
+                var states = new List<Godot.Collections.Dictionary>();
+                var hps = new Godot.Collections.Array();
+                var xs = new float[humans];
+                var zs = new float[humans];
+                var teams = new int[humans];
+                for (int h = 0; h < humans; h++)
+                {
+                    states.Add(new Godot.Collections.Dictionary());
+                    hps.Add(80f);
+                    xs[h] = h * 1.5f;
+                    zs[h] = (h % 7) * 2.0f;
+                    teams[h] = h % 2;
+                }
+                Variant packedX = xs;
+                Variant packedZ = zs;
+                Variant packedTeams = teams;
+
+                var rows = new (string label, Action<Node, int> call)[]
+                {
+                    ("빈 함수", (node, h) => node.Call("empty", h)),
+                    ("체력 재생, 수 3개를 주고 수 하나를 받음", (node, h) => node.Call("regen_value", 80f, 100f, 120)),
+                    ("체력 재생, 사전(값 6개)과 저장 칸을 줌", (node, h) => node.Call("regen_dict", new Godot.Collections.Dictionary { ["alive"] = true, ["hp"] = 80f, ["max_hp"] = 100f, ["x"] = 1f, ["y"] = 2f, ["z"] = 3f }, states[h])),
+                    ("체력 재생, API 로 묻고 API 로 고침", (node, h) => node.Call("regen_api", h)),
+                    ("AI 흉내, 찾기는 게임이 하고 API 3번", (node, h) => node.Call("ai_host", h)),
+                    ("AI 흉내, 스크립트가 전원의 배열을 훑고 API 2번", (node, h) => node.Call("ai_script", h, packedX, packedZ, packedTeams)),
+                };
+                foreach (var row in rows)
+                {
+                    GD.Print($"[틱] {humans}명, {row.label}");
+                    GD.Print($"[틱]     한 샌드박스: {Run(humans, false, row.call)}");
+                    if (humans > 1) GD.Print($"[틱]     사람마다 샌드박스: {Run(humans, true, row.call)}");
+                }
+
+                // 한 틱에 한 번만 부르고 전원의 값을 배열로 주고받는 모양.
+                int batchExceptions = Exceptions();
+                Variant batchResult = nodes[0].Call("regen_all", hps, 100f);
+                Expect(batchResult.VariantType == Variant.Type.Array && batchResult.AsGodotArray().Count == humans, $"한 번의 호출로 받은 배열의 크기가 사람 수와 다름 ({humans}명)");
+                var batchWatch = Stopwatch.StartNew();
+                for (int tick = 0; tick < k_tickRounds; tick++) nodes[0].Call("regen_all", hps, 100f);
+                double batchMs = batchWatch.Elapsed.TotalMilliseconds / k_tickRounds;
+                GD.Print($"[틱] {humans}명, 체력 재생을 한 번의 호출로 (배열을 주고 배열을 받음): {batchMs:0.000} ms (틱의 {batchMs / k_tickMs * 100.0:0.00}%){(Exceptions() != batchExceptions ? " (예외 발생)" : string.Empty)}");
+            }
+
+            foreach (Node node in nodes) node.Free();
         }
 
         /// <summary>
