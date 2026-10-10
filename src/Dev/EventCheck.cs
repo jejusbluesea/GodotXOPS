@@ -708,7 +708,7 @@ func bump(p, state):
         private void CheckStaging()
         {
             const int waitVar = 20, pauseWorld = 80, pauseAi = 81, lockPlayer = 82, setInvincible = 83, setInfiniteAmmo = 84, letterbox = 85, showHud = 86;
-            const int fadeScreen = 87, detachCamera = 88, attachCamera = 89, tweenCamera = 90, aiLookAt = 91, aiFireAt = 92, aiRelease = 93, tweenBlock = 94;
+            const int fadeScreen = 87, detachCamera = 88, attachCamera = 89, tweenCamera = 90, aiLookAt = 91, aiFireAt = 92, aiRelease = 93, tweenBlock = 94, setPlayer = 95;
             const int greaterEqual = 5, blockPathId = 78, shots = 2, fadeColor = 0x102030;
             const float seconds = 0.3f;
             const int ticks = 10;
@@ -757,6 +757,10 @@ func bump(p, state):
             file.points.Add(Event(setInvincible, 1023, -1, 1024, 0));
             file.points.Add(Event(setInfiniteAmmo, 1024, -1, 1025, 0));
             file.points.Add(Event(waitVar, 1025, 5, 1026, greaterEqual, 1));
+            // 조작 대상을 적으로, 없는 사람으로(아무 일도 없다).
+            file.points.Add(Event(setPlayer, 1026, k_enemyId, 1027));
+            file.points.Add(Event(setPlayer, 1027, 9999, 1028));
+            file.points.Add(Event(waitVar, 1028, 6, 1029, greaterEqual, 1));
 
             int errors = Debugger.ErrorCount;
             if (!WriteAndLoad(BuildPack(), k_script, file))
@@ -860,6 +864,12 @@ func bump(p, state):
             player.SetUnarmedArmDynamic(true);
             SimClock.Step();
             Expect(player.CurrentWeapon.IsNone && !player.UnarmedArmDynamic, "플레이어가 조작하는 맨손의 사람에게 팔의 조준 따르기가 남아 있음");
+
+            // 조작 대상 바꾸기: 적이 플레이어가 되고, 없는 사람을 가리킨 이벤트는 아무것도 바꾸지 않는다.
+            events.SetVariable(5, 1);
+            SimClock.Step();
+            Expect(events.LineCursor(0) == 1028 && MapLoader.Player == enemy, "조작 대상 바꾸기가 듣지 않거나 없는 사람을 가리킨 이벤트가 조작 대상을 바꿈");
+            MapLoader.SetPlayer(player);
 
             // 미션이 끝나면 HUD 가 다시 보이고, 미션을 다시 시작하면 전부 처음으로 돌아간다.
             events.SetHudVisible(false);

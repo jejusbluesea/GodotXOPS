@@ -1453,6 +1453,25 @@
           "kind": "event"
         }
       ]
+    },
+    {
+      "type": 95,
+      "name": "Set Player",
+      "function": "set_player",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
     }
   ]
 }

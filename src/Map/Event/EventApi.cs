@@ -100,6 +100,7 @@ namespace GodotXOPS
                     Enter() && m_events.TweenCamera(new Vector3(x, y, z), yaw, pitch, roll, fov, seconds, ease)),
                 ["ai_look"] = Callable.From((int index, float x, float y, float z) => Enter() && DirectAI(index, new Vector3(x, y, z), 0)),
                 ["ai_fire"] = Callable.From((int index, float x, float y, float z, int shots) => Enter() && DirectAI(index, new Vector3(x, y, z), Mathf.Max(1, shots))),
+                ["set_player"] = Callable.From((int index) => Enter() && SetPlayer(index)),
                 ["ai_release"] = Callable.From((int index) => { if (Enter()) MapLoader.GetHuman(index)?.Brain?.ClearDirect(); }),
 
                 // 미션
@@ -288,6 +289,23 @@ namespace GodotXOPS
         {
             if (index < 0 || index >= MapLoader.Blocks.Count) return false;
             return MoveBlock(index, target - MapLoader.Blocks[index].basePosition, angles, seconds, ease);
+        }
+
+        /// <summary>
+        /// 조작 대상(플레이어)을 다른 사람으로 바꾼다. 지금까지 조작하던 사람은 AI 가 이어받는다. 치트 F8 과 같은 일이다.
+        /// </summary>
+        /// <param name="index">새로 조작할 사람의 인덱스.</param>
+        /// <returns>그 사람이 조작 대상이 됐으면(이미 조작 대상이었어도) true. 없는 사람이거나 죽은 사람이면 false.</returns>
+        private static bool SetPlayer(int index)
+        {
+            Human human = MapLoader.GetHuman(index);
+            if (human == null || !human.Alive) return false;
+            if (human == MapLoader.Player) return true;
+
+            // 화면을 맡은 컨트롤러가 있으면 그쪽을 거친다: 옛 사람의 숨긴 몸을 다시 보이고 남은 입력을 버린다.
+            if (PlayerController.Current != null) return PlayerController.Current.SwitchPlayer(index);
+            MapLoader.SetPlayer(human);
+            return true;
         }
 
         /// <summary>
