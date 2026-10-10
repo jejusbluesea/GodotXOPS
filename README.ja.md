@@ -8,7 +8,7 @@
 
 - エンジン: Godot 4.7.2 (.NET)
 - プラットフォーム: Windows
-- 最新リリース: [1.1.0](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.1.0)
+- 最新リリース: [1.2.0](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.0)
 
 オリジナルの操作感をそのまま再現することが目標です。移動、当たり判定、弾の命中判定にはエンジンの物理機能を使わず、オリジナルの計算方法をそのまま移しました。ゲームの進行もオリジナルと同じ毎秒 33.33 ティックで動きます。
 

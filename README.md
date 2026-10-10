@@ -6,7 +6,7 @@
 
 - 엔진: Godot 4.7.2 (.NET)
 - 플랫폼: Windows
-- 최신 릴리즈: [1.1.0](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.1.0)
+- 최신 릴리즈: [1.2.0](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.0)
 
 원본의 조작감을 그대로 재현하는 것이 목표입니다. 이동, 충돌, 총알 판정은 엔진 물리를 쓰지 않고 원본의 계산 방식을 직접 옮겼고, 게임 진행은 원본과 같은 초당 33.33틱으로 돕니다.
 
