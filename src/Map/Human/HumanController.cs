@@ -224,6 +224,7 @@ namespace GodotXOPS
 
             // 무기 입력과 카운터는 이동보다 먼저 처리한다 (원본: 입력 → human::ProcessObject 앞부분). 총알은 이동 전 위치에서 나간다.
             m_human.TickWeapon();
+            m_human.TickRegeneration();
 
             // 사망 시 입력 플래그를 버린다. 틱 자체는 계속 돌려야 중력/지면/추락 한계가 시체에 적용된다.
             if (!m_human.Alive)

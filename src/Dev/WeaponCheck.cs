@@ -40,6 +40,7 @@ namespace GodotXOPS.Dev
             CheckGraze();
             CheckPenetration();
             CheckArmor();
+            CheckRegeneration();
             CheckFireRate();
             CheckReloadAndSwitch();
             CheckReloadStyles();
@@ -369,6 +370,72 @@ namespace GodotXOPS.Dev
             data.helmetDamageDecrease = savedHelmetDecrease;
             front.SetArmor(0f);
             front.SetHelmet(0f);
+        }
+
+        /// <summary>
+        /// 체력 재생: 꺼져 있으면 안 됨, 대기 시간, 속도(정수 단위), HP 가 줄면 다시 대기, 상한, 상한을 넘은 HP, HP 0.
+        /// 값은 사람 종류 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다. 이 점검은 사람 틱을 돌리지 않으므로 재생 틱을 직접 부른다.
+        /// </summary>
+        private void CheckRegeneration()
+        {
+            if (!Reset()) { Expect(false, "체력 재생: 준비 실패"); return; }
+
+            Human human = m_targets[0];
+            HumanTypeData type = human.HumanTypeData;
+            bool savedOn = type.regeneration;
+            float savedDelay = type.regenerationDelay, savedRate = type.regenerationRate, savedRatio = type.regenerationMaxRatio;
+            // 대기 1초(33틱), 초당 10, 처음 HP 의 절반까지.
+            const int delayTicks = 33;
+            type.regenerationDelay = 1f;
+            type.regenerationRate = 10f;
+            type.regenerationMaxRatio = 0.5f;
+
+            void Ticks(int count)
+            {
+                for (int i = 0; i < count; i++) human.TickRegeneration();
+            }
+
+            float full = human.MaxHP;
+            float limit = Mathf.Floor(full * 0.5f);
+
+            type.regeneration = false;
+            human.ApplyDamage(full - 10f);
+            Ticks(300);
+            Expect(human.HP == 10f, $"재생이 꺼진 사람의 HP 가 바뀜 ({human.HP})");
+
+            type.regeneration = true;
+            human.ApplyDamage(1f);
+            Ticks(delayTicks);
+            Expect(human.HP == 9f, $"대기 시간 안에 재생됨 ({human.HP}, 기대 9)");
+            // 52틱 = 1.56초 → 15.
+            Ticks(52);
+            Expect(human.HP == 24f, $"재생 52틱 뒤의 HP {human.HP} (기대 24: 초당 10)");
+
+            human.ApplyDamage(4f);
+            Ticks(delayTicks);
+            Expect(human.HP == 20f, $"재생 도중 HP 가 줄었는데 대기를 다시 세지 않음 ({human.HP}, 기대 20)");
+            Ticks(52);
+            Expect(human.HP == 35f, $"다시 시작한 재생 52틱 뒤의 HP {human.HP} (기대 35)");
+
+            human.SetHP(12f);
+            Ticks(delayTicks);
+            Expect(human.HP == 12f, $"HP 를 낮춰 정했는데 대기를 다시 세지 않음 ({human.HP}, 기대 12)");
+
+            Ticks(3000);
+            Expect(human.HP == limit, $"재생의 상한 {human.HP} (기대 {limit}: 처음 HP {full} 의 절반)");
+
+            human.RestoreHP();
+            Ticks(300);
+            Expect(human.HP == full, $"상한을 넘은 HP 가 바뀜 ({human.HP}, 기대 {full})");
+
+            human.ApplyDamage(full);
+            Ticks(300);
+            Expect(human.HP == 0f, $"HP 가 0 인 사람이 재생됨 ({human.HP})");
+
+            type.regeneration = savedOn;
+            type.regenerationDelay = savedDelay;
+            type.regenerationRate = savedRate;
+            type.regenerationMaxRatio = savedRatio;
         }
 
         /// <summary>

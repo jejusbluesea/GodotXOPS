@@ -15,6 +15,10 @@ namespace GodotXOPS
         // 남은 방어구 / 헬멧 포인트. 0 이면 없는 것이다 (원본에 없는 동작. 기본 데이터는 전부 0 이다).
         private float m_armor;
         private float m_helmet;
+        // 체력 재생: 시작까지 남은 틱, 재생을 시작한 뒤 지난 틱, 그동안 더한 HP.
+        private int m_regenDelayTicks;
+        private int m_regenTicks;
+        private int m_regenGiven;
         private int m_team;
         private HumanDeadState m_deadState = HumanDeadState.Alive;
 
@@ -167,7 +171,9 @@ namespace GodotXOPS
         {
             if (!Alive || !float.IsFinite(value)) return;
 
+            bool lowered = value < m_hp;
             m_hp = Mathf.Max(0f, value);
+            if (lowered) RestartRegenerationDelay();
         }
 
         /// <summary>
@@ -224,6 +230,52 @@ namespace GodotXOPS
 
             m_hp -= damage;
             if (m_hp < 0f) m_hp = 0f;
+            RestartRegenerationDelay();
+        }
+
+        /// <summary>
+        /// HP 가 줄었을 때 부른다. 체력 재생이 시작되기까지의 대기를 처음부터 다시 센다.
+        /// </summary>
+        private void RestartRegenerationDelay()
+        {
+            float delay = m_humanTypeData != null ? m_humanTypeData.regenerationDelay : 0f;
+            m_regenDelayTicks = float.IsFinite(delay) ? Mathf.Max(0, Mathf.RoundToInt(delay * SimClock.FrameRate)) : 0;
+            m_regenTicks = 0;
+            m_regenGiven = 0;
+        }
+
+        /// <summary>
+        /// 한 틱의 체력 재생 (원본에 없는 동작. 사람 종류의 regeneration 이 켜진 사람만). HumanController 가 사람 틱에서 부른다.
+        /// HP 가 마지막으로 준 뒤 regenerationDelay 초가 지나면 초당 regenerationRate 씩, 처음 HP × regenerationMaxRatio 까지 채운다.
+        /// HP 가 정수로 남도록 1 단위로 더한다: 재생을 시작한 뒤 n 틱 동안 더한 양이 (int)(n × 속도 ÷ 틱 수) 가 되게 맞춘다 (틱마다 실수를 더하면 잔차가 쌓인다).
+        /// 이미 상한 이상인 HP 는 건드리지 않는다. 죽었거나 HP 가 0 인 사람은 재생하지 않는다.
+        /// </summary>
+        public void TickRegeneration()
+        {
+            HumanTypeData type = m_humanTypeData;
+            if (type == null || !type.regeneration || !Alive || m_hp <= 0f) return;
+
+            if (m_regenDelayTicks > 0)
+            {
+                m_regenDelayTicks--;
+                return;
+            }
+
+            float limit = Mathf.Floor(MaxHP * Mathf.Clamp(type.regenerationMaxRatio, 0f, 1f));
+            if (m_hp >= limit || !(type.regenerationRate > 0f))
+            {
+                m_regenTicks = 0;
+                m_regenGiven = 0;
+                return;
+            }
+
+            m_regenTicks++;
+            int target = (int)(m_regenTicks * type.regenerationRate / SimClock.FrameRate);
+            int heal = target - m_regenGiven;
+            if (heal <= 0) return;
+
+            m_regenGiven = target;
+            m_hp = Mathf.Min(limit, m_hp + heal);
         }
 
         /// <summary>
