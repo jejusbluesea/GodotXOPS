@@ -233,7 +233,21 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `zombie` | 좀비 (근접 공격만 합니다) |
 | `zombieMeleeDamageRange`, `zombieMaxMeleeRange`, `zombieAttackSound` | 좀비의 근접 데미지, 닿는 거리, 공격음 |
 | `autoBulletMultiplier` | 처음 갖는 탄의 총량 (탄창 크기 × 이 값. 장전된 한 탄창을 포함합니다) |
+| `regeneration` | 체력 재생을 하는지 (기본 데이터는 전부 `false`) |
+| `regenerationDelay` | 체력이 마지막으로 줄어든 뒤 재생이 시작되기까지의 시간 (초) |
+| `regenerationRate` | 재생 속도 (초당 체력) |
+| `regenerationMaxRatio` | 재생으로 채워지는 상한. 그 사람의 처음 체력(`human/list.json` 의 `hp`)에 대한 비율 (0 에서 1 사이. 0.5 면 절반까지) |
 | `controllerSizeIndex`, `hitboxSizeIndex` | 몸 크기(`controller.json`)와 피격 판정(`hitbox.json`)의 번호 |
+
+#### 체력 재생
+
+원본에 없는 기능이고, `regeneration` 이 `false` 인 종류(기본 데이터 전부)는 전과 같습니다.
+
+- 체력이 줄어들면 `regenerationDelay` 초를 처음부터 다시 셉니다. 무엇으로 줄었는지는 가리지 않습니다 (총알, 폭발, 좀비의 공격, 낙하, 이벤트의 Damage Human / Set HP / Add HP 의 빼기). 무적이라 체력이 줄지 않았으면 다시 세지 않습니다.
+- 그 시간이 지나면 초당 `regenerationRate` 씩 채웁니다. 체력은 1 단위로 늘어납니다.
+- 상한은 처음 체력 × `regenerationMaxRatio` 이고 소수점 아래는 버립니다. 이미 상한 이상인 체력(이벤트로 더 채운 경우)은 건드리지 않습니다.
+- 죽은 사람과 체력이 0 인 사람은 재생하지 않습니다. 방어구와 헬멧은 재생하지 않습니다.
+- 이벤트의 게임 정지(Pause World) 중에는 멈춥니다.
 
 ### `human/ai.json` — AI
 

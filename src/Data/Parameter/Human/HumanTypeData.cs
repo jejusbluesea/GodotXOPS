@@ -38,5 +38,12 @@ namespace GodotXOPS
         public string zombieAttackSound;
 
         public int autoBulletMultiplier;
+
+        // 체력 재생 (원본에 없다). 켜져 있으면 HP 가 마지막으로 준 뒤 regenerationDelay 초가 지나고부터
+        // 초당 regenerationRate 씩, 사람 데이터의 처음 HP × regenerationMaxRatio(0 에서 1)까지 채운다.
+        public bool regeneration;
+        public float regenerationDelay = 5f;
+        public float regenerationRate = 10f;
+        public float regenerationMaxRatio = 1f;
     }
 }

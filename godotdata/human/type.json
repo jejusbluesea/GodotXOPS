@@ -36,6 +36,10 @@
             },
             "zombieMaxMeleeRange": 2.5,
             "autoBulletMultiplier": 3,
+            "regeneration": false,
+            "regenerationDelay": 5.0,
+            "regenerationRate": 10.0,
+            "regenerationMaxRatio": 1.0,
             "controllerSizeIndex": 0,
             "hitboxSizeIndex": 0
         },
@@ -75,6 +79,10 @@
             },
             "zombieMaxMeleeRange": 2.5,
             "autoBulletMultiplier": 3,
+            "regeneration": false,
+            "regenerationDelay": 5.0,
+            "regenerationRate": 10.0,
+            "regenerationMaxRatio": 1.0,
             "controllerSizeIndex": 0,
             "hitboxSizeIndex": 0
         },
@@ -115,6 +123,10 @@
             "zombieMaxMeleeRange": 2.5,
             "zombieAttackSound": "data/sound/hit2.wav",
             "autoBulletMultiplier": 3,
+            "regeneration": false,
+            "regenerationDelay": 5.0,
+            "regenerationRate": 10.0,
+            "regenerationMaxRatio": 1.0,
             "controllerSizeIndex": 0,
             "hitboxSizeIndex": 0
         }
