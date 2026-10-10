@@ -56,7 +56,10 @@ namespace GodotXOPS
                 // 사람
                 ["set_team"] = Callable.From((int index, int team) => { if (Enter()) MapLoader.GetHuman(index)?.SetTeam(team); }),
                 ["damage"] = Callable.From((int index, float amount) => { if (Enter()) MapLoader.GetHuman(index)?.ApplyDamage(amount); }),
-                ["kill"] = Callable.From((int index) => { if (Enter()) Kill(index); }),
+                ["set_hp"] = Callable.From((int index, float value) => { if (Enter()) MapLoader.GetHuman(index)?.SetHP(value); }),
+                ["set_armor"] = Callable.From((int index, float value) => { if (Enter()) MapLoader.GetHuman(index)?.SetArmor(value); }),
+                ["set_helmet"] = Callable.From((int index, float value) => { if (Enter()) MapLoader.GetHuman(index)?.SetHelmet(value); }),
+                ["kill"] =Callable.From((int index) => { if (Enter()) Kill(index); }),
                 ["teleport"] = Callable.From((int index, float x, float y, float z) => { if (Enter()) Teleport(index, new Vector3(x, y, z)); }),
                 ["give_weapon"] = Callable.From((int index, int slot, int weapon, int bullets) => { if (Enter()) GiveWeapon(index, slot, weapon, bullets); }),
                 ["spawn_human"] = Callable.From((int infoId, float x, float y, float z, float yaw, int id, int pathId) =>
@@ -146,7 +149,7 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="index">MapLoader.Humans 의 인덱스.</param>
         /// <returns>
-        /// alive, hp, team, x, y, z, yaw, pitch, weapon(든 무기의 번호), id(식별번호), invincible, infinite_ammo,
+        /// alive, hp, hp_max, armor, armor_max, helmet, helmet_max(_max 는 사람 데이터의 처음 값), team, x, y, z, yaw, pitch, weapon(든 무기의 번호), id(식별번호), invincible, infinite_ammo,
         /// directed(이벤트의 지시를 받는 중인지), shots_left(지시받은 사격에서 남은 발 수). 없는 인덱스면 빈 사전.
         /// </returns>
         private static Godot.Collections.Dictionary HumanInfo(int index)
@@ -158,6 +161,11 @@ namespace GodotXOPS
             Vector3 position = human.Controller.Position;
             result["alive"] = human.Alive;
             result["hp"] = human.HP;
+            result["hp_max"] = human.MaxHP;
+            result["armor"] = human.Armor;
+            result["armor_max"] = human.MaxArmor;
+            result["helmet"] = human.Helmet;
+            result["helmet_max"] = human.MaxHelmet;
             result["team"] = human.Team;
             result["x"] = position.X;
             result["y"] = position.Y;

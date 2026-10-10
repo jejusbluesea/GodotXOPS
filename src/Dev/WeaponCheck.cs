@@ -39,6 +39,7 @@ namespace GodotXOPS.Dev
             CheckHitReactionAndRotation();
             CheckGraze();
             CheckPenetration();
+            CheckArmor();
             CheckFireRate();
             CheckReloadAndSwitch();
             CheckReloadStyles();
@@ -278,6 +279,96 @@ namespace GodotXOPS.Dev
                 TickBullets(3);
                 Expect(ally.HP == allyHp, "같은 팀 사람이 총알에 맞음");
             }
+        }
+
+        /// <summary>
+        /// 방어구와 헬멧: 데미지 줄이기, 포인트 깎기(줄이기 전의 데미지 × 무기의 배율), 부서진 뒤, 뚫고 나가는 데 드는 관통력, 부위 구분, 총알이 아닌 데미지.
+        /// 줄이는 비율은 사람 데이터의 값이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// </summary>
+        private void CheckArmor()
+        {
+            if (!Reset()) { Expect(false, "방어구: 준비 실패"); return; }
+
+            Human front = m_targets[0];
+            Human back = m_targets[1];
+            HumanData data = front.HumanData;
+            float savedArmorDecrease = data.armorDamageDecrease;
+            float savedHelmetDecrease = data.helmetDamageDecrease;
+            data.armorDamageDecrease = 0.5f;
+            data.helmetDamageDecrease = 0.75f;
+
+            Expect(front.Armor == 0f && front.Helmet == 0f && front.MaxArmor == 0f, "기본 데이터의 사람에게 방어구나 헬멧이 있음");
+
+            float bodyFeetY = Eye.Y - front.HitboxSize.body.position.Y;
+            float headFeetY = Eye.Y - front.HitboxSize.head.position.Y;
+            IntRange add = front.HumanTypeData.bodyRandomAddDamage;
+            BulletData bulletData = DataManager.Instance.WeaponParameterData.bulletData[0];
+
+            // 표적 둘을 한 줄로 세우고 앞사람의 포인트를 정한 뒤 한 발을 쏜다. 돌려주는 것은 (앞사람이 잃은 HP, 뒷사람이 잃은 HP).
+            (float front, float back) Shoot(float feetY, float armor, float helmet, int penetration, float armorDecay, float helmetDecay)
+            {
+                front.RestoreHP();
+                back.RestoreHP();
+                front.Controller.Teleport(new Vector3(0f, feetY, -5f));
+                back.Controller.Teleport(new Vector3(0f, feetY, -7f));
+                front.SetArmor(armor);
+                front.SetHelmet(helmet);
+                float frontHp = front.HP;
+                float backHp = back.HP;
+                BulletManager.Instance.Spawn(bulletData, m_shooter, m_shooter.Team, 40, penetration, Eye, 0f, 0f, 3f, Eye, 1f, armorDecay, helmetDecay);
+                TickBullets(4);
+                return (frontHp - front.HP, backHp - back.HP);
+            }
+
+            // 몸통: 데미지는 절반, 방어구는 줄이기 전 데미지의 절반만큼 깎이고, 헬멧은 그대로다. 관통력 1 로는 뒤로 나가지 못한다.
+            var hit = Shoot(bodyFeetY, 100f, 50f, 1, 0.5f, 1f);
+            float armorLoss = 100f - front.Armor;
+            Expect(armorLoss >= 20f && armorLoss <= (40 + add.max - 1) * 0.5f, $"방어구가 깎인 양 {armorLoss} (기대 20~{(40 + add.max - 1) * 0.5f}, 데미지 × 0.5)");
+            Expect(hit.front == (int)armorLoss, $"방어구로 줄인 데미지 {hit.front} (기대 {(int)armorLoss}, 데미지 × 0.5)");
+            Expect(front.Helmet == 50f, $"몸통에 맞았는데 헬멧이 깎임 ({front.Helmet})");
+            Expect(hit.back == 0f, $"관통력 1 탄환이 방어구 입은 사람을 뚫고 나감 (뒷사람 데미지 {hit.back})");
+
+            // 관통력 2 면 뚫고 나가 뒷사람을 위력 40 × 0.6 으로 맞힌다.
+            hit = Shoot(bodyFeetY, 100f, 0f, 2, 1f, 1f);
+            Expect(hit.back >= 24 && hit.back <= 24 + add.max - 1, $"관통력 2 탄환이 방어구 입은 사람 뒤에 준 데미지 {hit.back} (기대 24~{24 + add.max - 1})");
+
+            // 방어구가 없으면 관통력 1 로 뚫고 나가고(원래 동작), 데미지를 그대로 받는다.
+            hit = Shoot(bodyFeetY, 0f, 0f, 1, 1f, 1f);
+            Expect(hit.front >= 40 && hit.back >= 24, $"방어구 없는 사람: 앞 {hit.front}, 뒤 {hit.back} (기대 40 이상, 24 이상)");
+
+            // 포인트가 모자라도 그 한 발까지는 줄여서 받고 방어구는 부서진다.
+            hit = Shoot(bodyFeetY, 10f, 0f, 1, 1f, 1f);
+            Expect(front.Armor == 0f && hit.front < 40f && hit.back == 0f, $"부서지는 한 발: 방어구 {front.Armor}, 데미지 {hit.front}, 뒷사람 {hit.back} (기대 0, 40 미만, 0)");
+
+            // 배율 0 인 무기는 방어구를 깎지 못한다.
+            Shoot(bodyFeetY, 100f, 0f, 0, 0f, 1f);
+            Expect(front.Armor == 100f, $"배율 0 인 무기가 방어구를 깎음 ({front.Armor})");
+
+            // 머리: 헬멧만 깎이고 데미지는 4분의 1 이다.
+            hit = Shoot(headFeetY, 100f, 200f, 0, 1f, 0.5f);
+            float helmetLoss = 200f - front.Helmet;
+            Expect(helmetLoss > 0f && front.Armor == 100f, $"머리에 맞음: 헬멧이 깎인 양 {helmetLoss}, 방어구 {front.Armor} (기대 0 초과, 100)");
+            Expect(hit.front == (int)(helmetLoss * 2f * 0.25f), $"헬멧으로 줄인 데미지 {hit.front} (기대 {(int)(helmetLoss * 2f * 0.25f)})");
+
+            // 무적이면 포인트도 깎이지 않는다.
+            front.SetInvincible(true);
+            hit = Shoot(bodyFeetY, 100f, 0f, 0, 1f, 1f);
+            Expect(front.Armor == 100f && hit.front == 0f, $"무적인 사람의 방어구가 깎임 ({front.Armor}, 데미지 {hit.front})");
+            front.SetInvincible(false);
+
+            // 폭발과 좀비 공격은 방어구를 거치지 않는다.
+            front.RestoreHP();
+            front.SetArmor(100f);
+            front.SetHelmet(100f);
+            float before = front.HP;
+            front.HitGrenadeExplosion(30);
+            front.HitZombieAttack(10);
+            Expect(before - front.HP == 40f && front.Armor == 100f && front.Helmet == 100f, $"총알이 아닌 데미지: HP {before - front.HP} 감소, 방어구 {front.Armor}, 헬멧 {front.Helmet} (기대 40, 100, 100)");
+
+            data.armorDamageDecrease = savedArmorDecrease;
+            data.helmetDamageDecrease = savedHelmetDecrease;
+            front.SetArmor(0f);
+            front.SetHelmet(0f);
         }
 
         /// <summary>

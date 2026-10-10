@@ -510,7 +510,7 @@ namespace GodotXOPS
 
         private string ToggleNoFight()
         {
-            m_noFight = !m_noFight;
+            m_noFight = !AIController.NoFightAll;
             AIController.SetNoFightAll(m_noFight);
             return $"No-fight {(m_noFight ? "on" : "off")}";
         }

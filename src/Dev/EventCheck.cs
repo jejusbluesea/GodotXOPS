@@ -11,7 +11,8 @@ namespace GodotXOPS.Dev
     /// 점검용 묶음(등록 JSON 과 .sgd)과 PD2, MIF2 를 게임 폴더의 build/event_check/ 에 만들어 로드하고 틱을 직접 돌린다:
     /// 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 실패한 줄만 멈추는지, 로드 때 거절되는 경우.
     /// 이어서 기본 제공 묶음(godotdata/event/base.json)의 이벤트 전부를 한 미션에서 돌려 본다 (화면 글자, Interact, 카운트다운, 연출 포함).
-    /// 명령행 인자("--" 뒤): --stage-sample 미션.pd2 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더하고 종료한다 (눈으로 확인하는 용도).
+    /// 명령행 인자("--" 뒤): --armor-sample 미션.pd2 는 점검 대신 그 PD2 에 방어구·헬멧과 재정비 이벤트의 시험용 구성을 더하고 종료한다 (에드온 데이터가 함께 있어야 한다. WriteArmorSample).
+    /// --stage-sample 미션.pd2 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더하고 종료한다 (눈으로 확인하는 용도).
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/event_check.tscn
     /// </summary>
     public partial class EventCheck : Node
@@ -172,6 +173,15 @@ func bump(p, state):
                 return;
             }
 
+            int armorArg = Array.IndexOf(args, "--armor-sample");
+            if (armorArg >= 0)
+            {
+                bool ok = armorArg + 1 < args.Length && WriteArmorSample(args[armorArg + 1]);
+                if (!ok) GD.Print("사용법: --armor-sample 미션.pd2 (경로는 exe 폴더 기준. 그 파일에 방어구 시험용 구성을 더해 덮어쓴다)");
+                GetTree().Quit(ok ? 0 : 1);
+                return;
+            }
+
             AIController.Enabled = false;
             m_folder = GamePath.Resolve(k_workFolder);
             Directory.CreateDirectory(m_folder);
@@ -185,6 +195,7 @@ func bump(p, state):
                 CheckFlow();
                 CheckRejected();
                 CheckBasePack();
+                CheckVitals();
                 CheckStaging();
                 CheckScreenText();
                 CheckDocumentExample();
@@ -702,6 +713,77 @@ func bump(p, state):
         }
 
         /// <summary>
+        /// 사람의 상태를 고치는 이벤트(기본 묶음 30~35): HP·방어구·헬멧을 정하기와 더하기. 더하기의 상한(처음 값 / 적은 값 / 없음), 전원, 죽은 사람.
+        /// </summary>
+        private void CheckVitals()
+        {
+            const int waitVar = 20, waitTicks = 25, setVar = 40, greaterEqual = 5;
+            const int setHp = 30, addHp = 31, setArmor = 32, addArmor = 33, setHelmet = 34, addHelmet = 35;
+            int none = PD2File.FloatCell(-1f);
+            int initial = PD2File.FloatCell(0f);
+
+            PD2File file = BaseFile();
+            file.eventEntryIds.Add(100);
+            // 정하고 더한다 → 처음 값까지만 → 상한 없이, 넘은 값은 끌어내리지 않고, 빼기 → 방어구와 헬멧 → 전원 → 0 으로 정해 죽이고 죽은 사람에게 더하기.
+            file.points.Add(Event(setHp, 100, k_enemyId, 101, PD2File.FloatCell(10f)));
+            file.points.Add(Event(addHp, 101, k_enemyId, 102, PD2File.FloatCell(5f), initial));
+            file.points.Add(Event(waitVar, 102, 1, 103, greaterEqual, 1));
+            file.points.Add(Event(addHp, 103, k_enemyId, 104, PD2File.FloatCell(100000f), initial));
+            file.points.Add(Event(waitVar, 104, 2, 105, greaterEqual, 1));
+            file.points.Add(Event(addHp, 105, k_enemyId, 106, PD2File.FloatCell(50f), none));
+            file.points.Add(Event(addHp, 106, k_enemyId, 107, PD2File.FloatCell(50f), initial));
+            file.points.Add(Event(addHp, 107, k_enemyId, 108, PD2File.FloatCell(-20f), initial));
+            file.points.Add(Event(setArmor, 108, k_enemyId, 109, PD2File.FloatCell(40f)));
+            file.points.Add(Event(addArmor, 109, k_enemyId, 110, PD2File.FloatCell(100f), PD2File.FloatCell(70f)));
+            file.points.Add(Event(addArmor, 110, k_enemyId, 111, PD2File.FloatCell(10f), initial));
+            file.points.Add(Event(setHelmet, 111, k_enemyId, 112, PD2File.FloatCell(5f)));
+            file.points.Add(Event(addHelmet, 112, k_enemyId, 113, PD2File.FloatCell(20f), none));
+            file.points.Add(Event(addHp, 113, -1, 114, PD2File.FloatCell(1f), none));
+            file.points.Add(Event(waitVar, 114, 3, 115, greaterEqual, 1));
+            file.points.Add(Event(setHp, 115, k_enemyId, 116, PD2File.FloatCell(0f)));
+            file.points.Add(Event(waitTicks, 116, 3, 117));
+            file.points.Add(Event(addHp, 117, k_enemyId, 118, PD2File.FloatCell(50f), none));
+            file.points.Add(Event(setArmor, 118, 4242, 119, PD2File.FloatCell(50f)));
+            file.points.Add(Event(setVar, 119, 9, 120, 1));
+
+            int errors = Debugger.ErrorCount;
+            if (!WriteAndLoad(BuildPack(), k_script, file))
+            {
+                Expect(false, $"사람의 상태 이벤트를 쓰는 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+                return;
+            }
+
+            Human enemy = MapLoader.SearchHuman(k_enemyId);
+            Human player = MapLoader.Player;
+            float enemyHp = enemy.HP;
+            float playerHp = player.HP;
+            EventManager events = EventManager.Instance;
+            events.AutoJudge = false;
+            events.BeginMission();
+            events.AutoJudge = false;
+
+            SimClock.Step();
+            Expect(Mathf.Abs(enemy.HP - 15f) < 0.01f, $"HP 정하기와 더하기 뒤의 HP {enemy.HP} (기대 15)");
+
+            events.SetVariable(1, 1);
+            SimClock.Step();
+            Expect(Mathf.Abs(enemy.HP - enemyHp) < 0.01f, $"상한이 처음 값인 더하기 뒤의 HP {enemy.HP} (기대 {enemyHp})");
+
+            events.SetVariable(2, 1);
+            SimClock.Step();
+            // 처음 값 + 50(상한 없음) + 0(상한을 넘은 값은 그대로) − 20 + 1(전원).
+            Expect(Mathf.Abs(enemy.HP - (enemyHp + 31f)) < 0.01f, $"상한 없는 더하기, 상한을 넘은 채 더하기, 빼기, 전원에게 더하기 뒤의 HP {enemy.HP} (기대 {enemyHp + 31f})");
+            Expect(Mathf.Abs(enemy.Armor - 70f) < 0.01f, $"방어구 정하기와 더하기 뒤의 포인트 {enemy.Armor} (기대 70: 적은 상한까지 차고, 그 뒤 처음 값 0 을 상한으로 더해도 그대로)");
+            Expect(Mathf.Abs(enemy.Helmet - 25f) < 0.01f, $"헬멧 정하기와 더하기 뒤의 포인트 {enemy.Helmet} (기대 25)");
+            Expect(Mathf.Abs(player.HP - (playerHp + 1f)) < 0.01f && player.Armor == 0f, $"전원에게 더하기 뒤 플레이어의 HP {player.HP} (기대 {playerHp + 1f})");
+
+            events.SetVariable(3, 1);
+            for (int tick = 0; tick < 8; tick++) SimClock.Step();
+            Expect(events.GetVariable(9) == 1 && !events.LineStopped(0), "죽은 사람이나 없는 사람을 가리킨 이벤트에서 줄이 멈춤");
+            Expect(enemy.HP <= 0f && !enemy.Alive, $"HP 를 0 으로 정한 사람이 죽지 않았거나 죽은 사람이 더하기로 되살아남 (HP {enemy.HP})");
+        }
+
+        /// <summary>
         /// 연출 이벤트(기본 묶음 80~94): 게임 정지, AI 정지, 조작 잠금, 무적, 무한 탄약, 레터박스, HUD, 암전, 카메라 떼기·옮기기·붙이기, AI 가 바라보고 쏘기, 블록을 포인트로 옮기기.
         /// 정지 중에 세계가 멈추고 이벤트와 화면 연출만 가는지, 풀면 이어지는지, 미션을 다시 시작하면 전부 처음으로 돌아가는지를 본다.
         /// </summary>
@@ -973,6 +1055,113 @@ func bump(p, state):
                 return false;
             }
             GD.Print($"시험용 컷신 줄을 더함: {path} (이벤트 {next - firstId}개, 줄 번호 {file.eventEntryIds.Count - 1})");
+            return true;
+        }
+
+        /// <summary>
+        /// PD2 하나에 방어구·헬멧과 재정비 이벤트(30~35)를 눈으로 보는 시험용 구성을 더해 덮어쓴다 (mif2_check 의 --convert-official 로 만든 미션에 쓴다).
+        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 10000(플레이어, 방어구와 헬멧), 10001(방어구 입은 표적), 10002(맨몸 표적), 무기 10002(바닥에 놓는 것),
+        /// 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 미션 전용 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~13번(안내 문구).
+        /// 놓는 것: 정면에 표적 두 줄(방어구 입은 표적 뒤에 맨몸 표적 / 맨몸 표적 둘), 오른쪽에 Interact 자리 넷(체력, 방어구, 헬멧, 쏘는 적 부르기).
+        /// </summary>
+        /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
+        /// <returns>썼으면 true.</returns>
+        private static bool WriteArmorSample(string path)
+        {
+            const int waitInteract = 26, addHp = 31, addArmor = 33, addHelmet = 35, spawnHuman = 42, spawnWeapon = 43, setAutoJudge = 52;
+            const int showVitals = 10000;
+            // 더하는 포인트의 첫 식별번호, 표적의 식별번호, 에드온 번호.
+            const int firstId = 30000, targetId = 9001, addonFirst = 10000;
+            const int playerInfo = 30900, armoredInfo = 30901, plainInfo = 30902, shooterInfo = 30903;
+            // 쏘는 적으로 쓰는 기본 사람 데이터의 번호와 표적의 팀.
+            const int shooterData = 2, enemyTeam = 1;
+            const float interactRadius = 1.5f;
+
+            string full = GamePath.Resolve(path);
+            if (full == null || !PD2File.Read(full, out PD2File file, out string error))
+            {
+                GD.Print($"PD2 를 읽지 못함: {path}");
+                return false;
+            }
+            PD2Point player = file.points.Find(point => point.type == MapLoader.PointHuman && point.id == 0);
+            if (player == null || file.points.Exists(point => point.id >= firstId))
+            {
+                GD.Print("플레이어 포인트(식별번호 0)가 없거나 이미 시험용 구성이 들어 있음");
+                return false;
+            }
+
+            Vector3 origin = player.position;
+            Vector3 forward = Coord.YawForward(player.direction);
+            Vector3 right = Coord.YawRight(player.direction);
+            Vector3 At(float side, float ahead) => origin + right * side + forward * ahead;
+
+            // 사람 정보 포인트: P2 가 사람 데이터의 번호, P3 가 팀이다.
+            void Info(int id, int data, int team)
+            {
+                file.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, id = id, param1 = data, param2 = team, position = origin });
+            }
+            Info(playerInfo, addonFirst, 0);
+            Info(armoredInfo, addonFirst + 1, enemyTeam);
+            Info(plainInfo, addonFirst + 2, enemyTeam);
+            Info(shooterInfo, shooterData, enemyTeam);
+            player.param1 = playerInfo;
+
+            // 표적: 플레이어를 마주 보고 선다. 경로는 없다.
+            void Target(int id, int info, float side, float ahead)
+            {
+                file.points.Add(new PD2Point { type = MapLoader.PointHuman, id = id, param1 = info, param2 = -1, position = At(side, ahead), direction = player.direction + 180f });
+            }
+            Target(targetId, armoredInfo, 0f, 8f);
+            Target(targetId + 1, plainInfo, 0f, 10f);
+            Target(targetId + 2, plainInfo, -3f, 8f);
+            Target(targetId + 3, plainInfo, -3f, 10f);
+
+            int next = firstId;
+            // 이벤트 줄 하나를 시작한다. 돌려주는 것은 그 줄의 첫 식별번호.
+            int Line()
+            {
+                next = (next / 100 + 1) * 100;
+                file.eventEntryIds.Add(next);
+                return next;
+            }
+            // 이벤트 하나를 줄의 끝에 잇는다. exit 이 0 이상이면 다음 번호 대신 그 식별번호로 간다.
+            void Add(int type, int p2, Vector3 position, int exit, params int[] extra)
+            {
+                file.points.Add(new PD2Point { type = type, id = next, param1 = p2, param2 = exit >= 0 ? exit : next + 1, extra = extra, position = position, direction = player.direction + 180f });
+                next++;
+            }
+
+            // 줄: 자동 판정을 끄고 무기를 하나 놓는다.
+            Line();
+            Add(setAutoJudge, 0, origin, -1);
+            Add(spawnWeapon, addonFirst + 2, At(-1.5f, 2f), -1, 60);
+
+            // 줄: 값을 화면에 띄운다 (플레이어, 방어구 입은 표적, 그 뒤의 표적, 옆줄의 두 표적). 이 이벤트는 넘어가지 않는다.
+            int[] shown = { 0, targetId, targetId + 1, targetId + 2, targetId + 3 };
+            for (int i = 0; i < shown.Length; i++)
+            {
+                Line();
+                Add(showVitals, shown[i], origin, -1, i, i);
+            }
+
+            // 줄: Interact 자리. 누르면 더하고 다시 기다린다.
+            void Station(float ahead, int message, int type, int p2, params int[] extra)
+            {
+                int wait = Line();
+                Add(waitInteract, 0, At(3f, ahead), -1, PD2File.FloatCell(interactRadius), PD2File.FloatCell(180f), message);
+                Add(type, p2, At(8f, 14f), wait, extra);
+            }
+            Station(0f, 10, addHp, 0, PD2File.FloatCell(50f), PD2File.FloatCell(0f));
+            Station(4f, 11, addArmor, 0, PD2File.FloatCell(60f), PD2File.FloatCell(120f));
+            Station(8f, 12, addHelmet, 0, PD2File.FloatCell(60f), PD2File.FloatCell(120f));
+            Station(12f, 13, spawnHuman, shooterInfo, targetId + 100, -1);
+
+            if (!file.Write(full, out error))
+            {
+                GD.Print($"PD2 를 쓰지 못함: {error}");
+                return false;
+            }
+            GD.Print($"방어구 시험용 구성을 더함: {path} (이벤트 줄 {file.eventEntryIds.Count}개)");
             return true;
         }
 

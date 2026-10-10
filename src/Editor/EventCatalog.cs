@@ -25,8 +25,8 @@ namespace GodotXOPS.Editor
         private const string k_slotP2 = "p2";
         private const string k_slotP3 = "p3";
 
-        // 기본 제공 묶음은 번호대로 나눠 보여 준다 (20 대기, 40 동작, 60 흐름, 70 화면 글자).
-        private static readonly (int First, string Name)[] s_baseGroups = { (20, "Wait"), (40, "Action"), (60, "Flow"), (70, "Screen text") };
+        // 기본 제공 묶음은 번호대로 나눠 보여 준다 (20 대기, 30 사람의 상태, 40 동작, 60 흐름, 70 화면 글자, 80 연출).
+        private static readonly (int First, string Name)[] s_baseGroups = { (20, "Wait"), (30, "Human state"), (40, "Action"), (60, "Flow"), (70, "Screen text"), (80, "Staging") };
 
         private readonly Dictionary<int, EventDefinitionData> m_definitions = new Dictionary<int, EventDefinitionData>();
         private readonly List<Group> m_groups = new List<Group>();

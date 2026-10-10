@@ -11,6 +11,9 @@ namespace GodotXOPS
         public int modelIndex;
         public float damage;
         public int penetration;
+        // 맞은 사람의 방어구 / 헬멧 포인트를 데미지의 몇 배만큼 깎는지 (0 에서 1. 1 이면 데미지만큼).
+        public float armorPointDecay = 1f;
+        public float helmetPointDecay = 1f;
         public int bulletIndex;
         public float fireRate;
         public float bulletSpeed;

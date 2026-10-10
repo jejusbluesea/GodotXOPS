@@ -102,7 +102,7 @@ namespace GodotXOPS.Dev
             foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result", "option" }) game.UiScriptFree(screen);
             game.SetUiScriptOverride(string.Empty);
             Godot.Collections.Dictionary values = game.HudValues();
-            Expect(values.ContainsKey("hp") && values.ContainsKey("weapon") && values.ContainsKey("message_text") && values.ContainsKey("result"), "화면 스크립트에 넘기는 값에 빠진 키가 있음");
+            Expect(values.ContainsKey("hp") && values.ContainsKey("armor") && values.ContainsKey("armor_max") && values.ContainsKey("helmet") && values.ContainsKey("helmet_max") &&values.ContainsKey("weapon") && values.ContainsKey("message_text") && values.ContainsKey("result"), "화면 스크립트에 넘기는 값에 빠진 키가 있음");
         }
 
         /// <summary>
@@ -499,6 +499,14 @@ namespace GodotXOPS.Dev
             game.ConsoleExecute("bot");
             game.ConsoleExecute("nofight");
             Expect(MapLoader.GetHuman(MapLoader.HumanCount - 1).Brain.NoFight, "nofight 가 적용되지 않음");
+            // 켜 둔 동안 스폰된 사람도 비전투여야 한다 (이벤트의 스폰, 복제).
+            RawPointData spawnInfo = null;
+            foreach (Human human in MapLoader.Humans)
+            {
+                if (human.HumanDataParam != null) { spawnInfo = human.HumanDataParam; break; }
+            }
+            int spawnedIndex = spawnInfo != null ? MapLoader.SpawnHuman(spawnInfo.param3, MapLoader.GetHuman(0).Controller.Position, 0f, 9990, -1) : -1;
+            Expect(spawnedIndex >= 0 && MapLoader.GetHuman(spawnedIndex).Brain.NoFight, "nofight 를 켠 뒤에 스폰된 사람이 비전투가 아님");
             game.ConsoleExecute("nofight");
             Expect(!MapLoader.GetHuman(MapLoader.HumanCount - 1).Brain.NoFight, "nofight 를 다시 쳐도 풀리지 않음");
 
