@@ -1178,6 +1178,41 @@ namespace GodotXOPS.Editor
                 RefreshAssetPreview();
                 Expect(m_previewRoot.FindChild("Hitbox", true, false) != null && m_previewCaption.Text.StartsWith("Human hitbox", StringComparison.Ordinal), "히트박스 데이터를 선택했는데 그려지지 않음");
             }
+            // 사람의 몸 크기: 사람을 고르면 히트박스와 함께 나오고, 몸 크기 데이터를 고르면 그것만 나온다.
+            Expect(OpenAsset("godotdata/human/list.json"), "사람 목록 파일을 다시 열지 못함");
+            AssetNode bodyHuman = m_assetNodes.Find(node => node.Get() is HumanData);
+            if (bodyHuman != null)
+            {
+                bodyHuman.Item.Select(0);
+                RefreshAssetPreview();
+                var controller = m_previewRoot.FindChild("Controller", true, false) as MeshInstance3D;
+                Expect(controller != null && controller.Mesh.GetSurfaceCount() == 3 && m_previewCaption.Text.Contains("body size 0"), "사람을 선택했는데 몸 크기가 나오지 않음");
+            }
+            Expect(OpenAsset("godotdata/human/controller.json"), "몸 크기 파일을 열지 못함");
+            AssetNode sizeNode = m_assetNodes.Find(node => node.Get() is ControllerSizeData);
+            if (sizeNode != null)
+            {
+                sizeNode.Item.Select(0);
+                RefreshAssetPreview();
+                Expect(m_previewRoot.FindChild("Controller", true, false) != null && m_previewCaption.Text.StartsWith("Body size", StringComparison.Ordinal), "몸 크기 데이터를 선택했는데 그려지지 않음");
+            }
+
+            // 에드온 번호(10000)의 몸 크기와 히트박스는 미션의 에드온 파일에서 찾고, 없는 번호는 게임처럼 기본 목록의 끝으로 본다.
+            string bodyAddon = $"{k_selfTestFolder}/addon_body.json";
+            const string part = "{ \"position\": { \"x\": 0, \"y\": 0.5, \"z\": 0 }, \"rotationEuler\": { \"x\": 0, \"y\": 0, \"z\": 0 }, \"height\": 0.123, \"radius\": 0.1 }";
+            File.WriteAllText(GamePath.Resolve(bodyAddon), "{ \"controllerSizeData\": [ { \"height\": 0.8, \"cameraHeight\": 0.7, \"mapRadius\": 0.28, \"humanRadius\": 0.25 } ], "
+                + $"\"humanHitboxSizeData\": [ {{ \"head\": {part}, \"body\": {part}, \"leg\": {part} }} ] }}");
+            string savedHumanAddon = m_document.Mission.addonHumanDataPath;
+            m_document.Mission.addonHumanDataPath = bodyAddon;
+            ControllerSizeData addonSize = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), DataList<int>.AddonBase, out int usedSize);
+            HumanHitboxSizeData addonHitbox = LookupClamped<HumanHitboxSizeData>(nameof(HumanParameterData.humanHitboxSizeData), DataList<int>.AddonBase, out int usedHitbox);
+            Expect(addonSize != null && Mathf.IsEqualApprox(addonSize.height, 0.8f) && usedSize == DataList<int>.AddonBase, "에드온 번호의 몸 크기를 미션의 에드온 파일에서 찾지 못함");
+            Expect(addonHitbox?.head != null && Mathf.IsEqualApprox(addonHitbox.head.height, 0.123f) && usedHitbox == DataList<int>.AddonBase, "에드온 번호의 히트박스를 미션의 에드온 파일에서 찾지 못함");
+            int baseSizes = DataManager.Instance.HumanParameterData.controllerSizeData.Count;
+            ControllerSizeData clamped = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), DataList<int>.AddonBase + 5, out int usedClamped);
+            Expect(clamped != null && usedClamped == baseSizes - 1, $"없는 에드온 번호의 몸 크기를 기본 목록의 끝으로 보지 않음 ({usedClamped})");
+            m_document.Mission.addonHumanDataPath = savedHumanAddon;
+            m_assetFiles.Remove(bodyAddon);
             m_previewHeld = true;
 
             CheckAssetReferences();

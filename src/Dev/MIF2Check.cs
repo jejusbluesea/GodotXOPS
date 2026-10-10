@@ -59,6 +59,7 @@ namespace GodotXOPS.Dev
 
             int missions = CheckOfficialMissions();
             CheckAddonData();
+            CheckAddonBodySize();
             CheckFormat();
             CheckLegacyAddonObject();
 
@@ -490,6 +491,155 @@ namespace GodotXOPS.Dev
 
             MapLoader.UnloadPointData();
             MapLoader.UnloadBlockData();
+            AIController.Enabled = true;
+        }
+
+        /// <summary>
+        /// 에드온의 몸 크기(controllerSizeData)와 히트박스(humanHitboxSizeData)가 실제로 그 사람에게 붙는지를 움직임과 명중으로 확인한다.
+        /// 바닥에서 1 m 떠 있는 장벽 밑을 키 0.8 m 의 에드온 몸은 지나가고 기본 몸(키 2 m)은 막힌다.
+        /// 절반 크기의 에드온 히트박스를 가진 사람은 기본 머리 높이의 탄에 맞지 않고 절반 높이의 탄에 맞는다 (몸 크기는 기본 그대로).
+        /// </summary>
+        private void CheckAddonBodySize()
+        {
+            // 장벽의 아랫면 높이, 장벽이 있는 Z, 걷게 하는 틱 수 (m, 틱).
+            const float gap = 1f, barrierZ = -5.5f;
+            const int walkTicks = 200;
+            const float smallHeight = 0.8f, smallCamera = 0.7f, hitboxScale = 0.5f;
+            const int smallId = 0, tallId = 1, shrunkId = 2, plainId = 3;
+
+            HumanParameterData baseHuman = DataManager.Instance.HumanParameterData;
+            HumanData source = baseHuman.humanData[0];
+            HumanTypeData sourceType = baseHuman.humanTypeData[source.typeIndex];
+            ControllerSizeData baseSize = baseHuman.controllerSizeData.GetClamped(sourceType.controllerSizeIndex);
+            HumanHitboxSizeData baseHitbox = baseHuman.humanHitboxSizeData.GetClamped(sourceType.hitboxSizeIndex);
+
+            // 에드온 사람 파일: 종류 10000 은 작은 몸, 10001 은 기본 몸에 절반 크기의 히트박스.
+            var human = new HumanParameterData();
+            ControllerSizeData small = Clone(baseSize);
+            small.height = smallHeight;
+            small.cameraHeight = smallCamera;
+            human.controllerSizeData.Add(small);
+            HumanHitboxSizeData shrunk = Clone(baseHitbox);
+            foreach (HitboxPartSizeData part in new[] { shrunk.head, shrunk.body, shrunk.leg })
+            {
+                part.position *= hitboxScale;
+                part.height *= hitboxScale;
+                part.radius *= hitboxScale;
+            }
+            human.humanHitboxSizeData.Add(shrunk);
+            HumanTypeData smallType = Clone(sourceType);
+            smallType.controllerSizeIndex = k_addon;
+            human.humanTypeData.Add(smallType);
+            HumanTypeData shrunkType = Clone(sourceType);
+            shrunkType.hitboxSizeIndex = k_addon;
+            human.humanTypeData.Add(shrunkType);
+            for (int i = 0; i < 2; i++)
+            {
+                HumanData entry = Clone(source);
+                entry.typeIndex = k_addon + i;
+                human.humanData.Add(entry);
+            }
+            WriteJson($"{k_workFolder}/body_human.json", human);
+
+            // 블록: 넓은 바닥(윗면 y 0)과, 그 위 1 m 에서 시작하는 두께 1 m 의 장벽.
+            var blocks = new BD2File { textureListPath = $"{k_workFolder}/body_textures.json" };
+            blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
+            blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, gap + 1.5f, barrierZ), new Vector3(10f, 1.5f, 0.5f), 0));
+            var textures = new BlockTextureListData();
+            textures.blockTextureData.Add(new BlockTextureData());
+            WriteJson(blocks.textureListPath, textures);
+            blocks.Write(GamePath.Resolve($"{k_workFolder}/body.bd2"), out _);
+
+            // 포인트: 작은 몸(플레이어)과 기본 몸은 장벽을 보고 서고, 히트박스가 작은 사람과 기본 사람은 장벽에서 떨어진 곳에 다른 팀으로 선다.
+            var points = new PD2File();
+            points.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = k_addon, param2 = 0, id = 100 });
+            points.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = 0, param2 = 0, id = 101 });
+            points.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = k_addon + 1, param2 = 1, id = 102 });
+            points.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = 0, param2 = 1, id = 103 });
+            points.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 100, param2 = -1, id = smallId, position = new Vector3(-3f, 0.01f, 0f) });
+            points.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 101, param2 = -1, id = tallId, position = new Vector3(3f, 0.01f, 0f) });
+            points.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 102, param2 = -1, id = shrunkId, position = new Vector3(30f, 0.01f, -10f) });
+            points.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 103, param2 = -1, id = plainId, position = new Vector3(40f, 0.01f, -10f) });
+            points.Write(GamePath.Resolve($"{k_workFolder}/body.pd2"), out _);
+
+            var mission = new ExtendedMissionData
+            {
+                name = "BODY CHECK",
+                fullname = "Add-on body size check",
+                blockPath = $"{k_workFolder}/body.bd2",
+                pointPath = $"{k_workFolder}/body.pd2",
+                addonHumanDataPath = $"{k_workFolder}/body_human.json",
+            };
+            string missionPath = GamePath.Resolve($"{k_workFolder}/body.mif2");
+            MIF2File.Write(missionPath, mission, out _);
+
+            AIController.Enabled = false;
+            MapLoader loader = MapLoader.Instance;
+            if (!(MapLoader.LoadMissionFile(missionPath) && MapLoader.LoadBlockData(loader.MissionBD1Path) && MapLoader.LoadPointData(loader.MissionPD1Path)))
+            {
+                Expect(false, "몸 크기 점검용 미션 로드 실패");
+                AIController.Enabled = true;
+                return;
+            }
+
+            Human smallHuman = MapLoader.SearchHuman(smallId);
+            Human tallHuman = MapLoader.SearchHuman(tallId);
+            Human shrunkHuman = MapLoader.SearchHuman(shrunkId);
+            Human plainHuman = MapLoader.SearchHuman(plainId);
+            Expect(baseHuman.controllerSizeData.AddonCount == 1 && baseHuman.humanHitboxSizeData.AddonCount == 1, "에드온의 몸 크기와 히트박스가 목록에 붙지 않음");
+            Expect(smallHuman != null && Mathf.IsEqualApprox(smallHuman.Controller.Height, smallHeight) && Mathf.IsEqualApprox(smallHuman.CameraHeight, smallCamera)
+                && ReferenceEquals(smallHuman.HitboxSize, baseHitbox), $"에드온 몸 크기(10000)가 붙지 않음 (키 {smallHuman?.Controller.Height}, 기대 {smallHeight})");
+            Expect(tallHuman != null && Mathf.IsEqualApprox(tallHuman.Controller.Height, baseSize.height), "기본 사람의 몸 크기가 바뀜");
+            Expect(shrunkHuman != null && ReferenceEquals(shrunkHuman.HitboxSize, baseHuman.humanHitboxSizeData[k_addon])
+                && Mathf.IsEqualApprox(shrunkHuman.Controller.Height, baseSize.height), "에드온 히트박스(10000)가 붙지 않았거나 몸 크기까지 바뀜");
+
+            if (smallHuman != null && tallHuman != null)
+            {
+                // 둘 다 장벽 쪽(-Z)으로 걷는다. 입력은 틱마다 소비되므로 매번 넣는다.
+                var input = new HumanInput { moveFlag = HumanMoveFlag.Forward, yaw = 0f, pitch = 0f };
+                for (int tick = 0; tick < walkTicks; tick++)
+                {
+                    smallHuman.Controller.SetInput(in input);
+                    tallHuman.Controller.SetInput(in input);
+                    SimClock.Step();
+                }
+                float smallZ = smallHuman.Controller.Position.Z;
+                float tallZ = tallHuman.Controller.Position.Z;
+                Expect(smallZ < barrierZ - 1f && smallHuman.Alive, $"키 {smallHeight} m 의 에드온 몸이 {gap} m 틈의 장벽 밑을 지나가지 못함 (z {smallZ:0.00}, 장벽 {barrierZ})");
+                Expect(tallZ > barrierZ + 0.5f && tallZ < -1f && tallHuman.Alive, $"기본 몸(키 {baseSize.height} m)이 장벽에 막히지 않았거나 걷지 못함 (z {tallZ:0.00}, 장벽 {barrierZ})");
+            }
+
+            if (shrunkHuman != null && plainHuman != null)
+            {
+                BulletData bullet = DataManager.Instance.WeaponParameterData.bulletData[0];
+                // 그 사람의 5 m 앞에서 주어진 높이로 정면(-Z)을 쏜다. 돌려주는 것은 잃은 HP.
+                float Shoot(Human target, float height)
+                {
+                    Vector3 feet = target.Controller.Position;
+                    var origin = new Vector3(feet.X, feet.Y + height, feet.Z + 5f);
+                    float before = target.HP;
+                    BulletManager.Instance.Spawn(bullet, null, 0, 40, 0, origin, 0f, 0f, 3f, origin);
+                    for (int tick = 0; tick < 5; tick++) BulletManager.Instance.SimTick();
+                    BulletManager.Instance.Clear();
+                    return before - target.HP;
+                }
+
+                float headHeight = baseHitbox.head.position.Y;
+                float bodyHeight = baseHitbox.body.position.Y;
+                Expect(Shoot(plainHuman, headHeight) > 0f && Shoot(plainHuman, bodyHeight) > 0f, "기본 히트박스의 사람이 머리·몸통 높이의 탄에 맞지 않음 (점검의 전제)");
+                float highHead = Shoot(shrunkHuman, headHeight);
+                float highBody = Shoot(shrunkHuman, bodyHeight);
+                Expect(highHead == 0f && highBody == 0f, $"절반 크기의 에드온 히트박스가 기본 머리·몸통 높이의 탄에 맞음 (데미지 {highHead}, {highBody})");
+                float lowHead = Shoot(shrunkHuman, headHeight * hitboxScale);
+                float lowBody = Shoot(shrunkHuman, bodyHeight * hitboxScale);
+                Expect(lowHead > 0f && lowBody > 0f, $"절반 크기의 에드온 히트박스가 절반 높이의 탄에 맞지 않음 (데미지 {lowHead}, {lowBody})");
+                // 머리 배율이 몸통보다 크므로, 절반 높이의 머리 자리에 맞은 쪽이 더 아파야 한다 (부위까지 옮겨졌는지).
+                Expect(lowHead > lowBody, $"절반 크기의 히트박스에서 머리 자리의 데미지({lowHead})가 몸통 자리({lowBody})보다 크지 않음");
+            }
+
+            MapLoader.UnloadPointData();
+            MapLoader.UnloadBlockData();
+            Expect(baseHuman.controllerSizeData.AddonCount == 0 && baseHuman.humanHitboxSizeData.AddonCount == 0, "맵을 내린 뒤에도 에드온의 몸 크기와 히트박스가 남아 있음");
             AIController.Enabled = true;
         }
 

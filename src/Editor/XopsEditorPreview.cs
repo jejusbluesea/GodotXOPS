@@ -56,6 +56,12 @@ namespace GodotXOPS.Editor
         private static readonly Color s_hitboxHeadColor = new Color(1f, 0.3f, 0.3f, 0.95f);
         private static readonly Color s_hitboxBodyColor = new Color(1f, 0.9f, 0.2f, 0.95f);
         private static readonly Color s_hitboxLegColor = new Color(0.3f, 0.7f, 1f, 0.95f);
+        // 몸 크기의 선: 맵 충돌의 원기둥, 사람끼리의 충돌 반지름, 눈높이.
+        private static readonly Color s_controllerMapColor = new Color(1f, 1f, 1f, 0.9f);
+        private static readonly Color s_controllerHumanColor = new Color(0.6f, 0.6f, 0.6f, 0.9f);
+        private static readonly Color s_controllerEyeColor = new Color(0.2f, 1f, 1f, 0.95f);
+        // 눈높이 표시가 몸의 원기둥 밖으로 나오는 길이 (m).
+        private const float k_eyeMarkExtra = 0.15f;
         // 이펙트를 미리 볼 때의 시점: 보는 자리의 높이와 거리 (m).
         private const float k_effectFocusHeight = 0.3f;
         private const float k_effectFocusRadius = 0.8f;
@@ -105,7 +111,7 @@ namespace GodotXOPS.Editor
             m_previewHeldToggle = new CheckBox { Text = "Arms", ButtonPressed = m_previewHeld, Visible = false, TooltipText = "Show the weapon held, with the arms it uses (no texture). Off: the weapon alone, at its size on the ground" };
             m_previewHeldToggle.Toggled += pressed => SetPreviewOption(ref m_previewHeld, pressed);
             variants.AddChild(m_previewHeldToggle);
-            m_previewHitboxToggle = new CheckBox { Text = "Hitbox", ButtonPressed = m_previewHitbox, Visible = false, TooltipText = "Draw where bullets hit: head red, body yellow, legs blue" };
+            m_previewHitboxToggle = new CheckBox { Text = "Hitbox", ButtonPressed = m_previewHitbox, Visible = false, TooltipText = "Draw where bullets hit (head red, body yellow, legs blue) and the body size (map collision white, human collision gray, eye height cyan)" };
             m_previewHitboxToggle.Toggled += pressed => SetPreviewOption(ref m_previewHitbox, pressed);
             variants.AddChild(m_previewHitboxToggle);
 
@@ -388,15 +394,16 @@ namespace GodotXOPS.Editor
                     if (model != null) AddHumanModel(subject, model);
                     caption = model != null ? $"Human: {human.name}\nmodel {human.modelIndex} ({model.name})" : $"Human: {human.name}\nno model {human.modelIndex}";
 
-                    // 히트박스는 사람 종류가 정한다 (게임과 같이 범위를 벗어난 번호는 가까운 끝의 것).
+                    // 히트박스와 몸 크기는 사람 종류가 정한다. 게임과 같이 있는 번호(에드온 포함)면 그것을, 없는 번호면 기본 목록의 가까운 끝의 것을 쓴다 (DataList.GetClamped).
                     HumanTypeData type = LookupData<HumanTypeData>(typeof(HumanParameterData), nameof(HumanParameterData.humanTypeData), human.typeIndex);
-                    IList sizes = ListOf(typeof(HumanParameterData), nameof(HumanParameterData.humanHitboxSizeData));
-                    m_previewHitboxOption = sizes != null && sizes.Count > 0;
+                    HumanHitboxSizeData hitbox = LookupClamped<HumanHitboxSizeData>(nameof(HumanParameterData.humanHitboxSizeData), type != null ? type.hitboxSizeIndex : 0, out int hitboxIndex);
+                    ControllerSizeData body = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), type != null ? type.controllerSizeIndex : 0, out int bodyIndex);
+                    m_previewHitboxOption = hitbox != null || body != null;
                     if (m_previewHitbox && m_previewHitboxOption)
                     {
-                        int hitboxIndex = Mathf.Clamp(type != null ? type.hitboxSizeIndex : 0, 0, sizes.Count - 1);
-                        subject.AddChild(BuildHitboxWire(sizes[hitboxIndex] as HumanHitboxSizeData));
-                        caption += $"\nhitbox {hitboxIndex} of type {human.typeIndex}: head red, body yellow, legs blue";
+                        if (hitbox != null) subject.AddChild(BuildHitboxWire(hitbox));
+                        if (body != null) subject.AddChild(BuildControllerWire(body));
+                        caption += $"\nhitbox {hitboxIndex} of type {human.typeIndex}: head red, body yellow, legs blue\nbody size {bodyIndex}: map collision white, human collision gray, eye height cyan";
                     }
                     break;
                 }
@@ -404,6 +411,11 @@ namespace GodotXOPS.Editor
                 case HumanHitboxSizeData size:
                     subject.AddChild(BuildHitboxWire(size));
                     caption = "Human hitbox: head red, body yellow, legs blue";
+                    break;
+
+                case ControllerSizeData size:
+                    subject.AddChild(BuildControllerWire(size));
+                    caption = $"Body size: height {size.height:0.##} m\nmap collision white, human collision gray, eye height cyan";
                     break;
 
                 case HumanArmModelData arms:
@@ -625,6 +637,84 @@ namespace GodotXOPS.Editor
                 mesh.SurfaceEnd();
             }
             return new MeshInstance3D { Name = "Hitbox", Mesh = mesh };
+        }
+
+        /// <summary>
+        /// 사람의 몸 크기를 선으로 그린다: 맵과 부딪치는 원기둥(키 × mapRadius), 사람끼리 부딪치는 반지름, 눈높이.
+        /// 발밑이 원점이다 (HumanController 의 위치와 같다).
+        /// </summary>
+        /// <param name="size">한 체형의 몸 크기. null 이면 빈 노드.</param>
+        /// <returns>선으로 그린 노드.</returns>
+        private static MeshInstance3D BuildControllerWire(ControllerSizeData size)
+        {
+            var mesh = new ImmediateMesh();
+            var node = new MeshInstance3D { Name = "Controller", Mesh = mesh };
+            if (size == null || size.height <= 0f) return node;
+
+            var material = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                VertexColorUseAsAlbedo = true,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                NoDepthTest = true,
+            };
+            var lines = new List<Vector3>();
+            void Flush(Color color)
+            {
+                if (lines.Count == 0) return;
+                mesh.SurfaceBegin(Mesh.PrimitiveType.Lines, material);
+                foreach (Vector3 point in lines)
+                {
+                    mesh.SurfaceSetColor(color);
+                    mesh.SurfaceAddVertex(point);
+                }
+                mesh.SurfaceEnd();
+                lines.Clear();
+            }
+
+            Vector3 top = Vector3.Up * size.height;
+            if (size.mapRadius > 0f)
+            {
+                AddWireCircle(lines, Vector3.Zero, size.mapRadius, 1);
+                AddWireCircle(lines, top, size.mapRadius, 1);
+                foreach (Vector3 side in new[] { Vector3.Right, Vector3.Left, Vector3.Forward, Vector3.Back })
+                {
+                    lines.Add(side * size.mapRadius);
+                    lines.Add(top + side * size.mapRadius);
+                }
+            }
+            Flush(s_controllerMapColor);
+
+            if (size.humanRadius > 0f) AddWireCircle(lines, top * 0.5f, size.humanRadius, 1);
+            Flush(s_controllerHumanColor);
+
+            float eye = Mathf.Max(size.mapRadius, size.humanRadius) + k_eyeMarkExtra;
+            lines.Add(Vector3.Up * size.cameraHeight + Vector3.Left * eye);
+            lines.Add(Vector3.Up * size.cameraHeight + Vector3.Right * eye);
+            lines.Add(Vector3.Up * size.cameraHeight + Vector3.Forward * eye);
+            lines.Add(Vector3.Up * size.cameraHeight + Vector3.Back * eye);
+            Flush(s_controllerEyeColor);
+            return node;
+        }
+
+        /// <summary>
+        /// 사람 종류가 번호로 가리키는 몸 크기나 히트박스를 게임과 같은 규칙으로 찾는다: 있는 번호(에드온 포함)면 그 항목, 없는 번호면 기본 목록의 가까운 끝의 항목.
+        /// </summary>
+        /// <typeparam name="T">항목의 형식.</typeparam>
+        /// <param name="listName">HumanParameterData 의 목록 필드 이름.</param>
+        /// <param name="index">번호.</param>
+        /// <param name="used">실제로 쓴 번호.</param>
+        /// <returns>항목. 목록이 비어 있으면 null.</returns>
+        private T LookupClamped<T>(string listName, int index, out int used) where T : class
+        {
+            used = index;
+            T found = LookupData<T>(typeof(HumanParameterData), listName, index);
+            if (found != null) return found;
+
+            IList list = ListOf(typeof(HumanParameterData), listName);
+            if (list == null || list.Count == 0) return null;
+            used = Mathf.Clamp(index, 0, list.Count - 1);
+            return list[used] as T;
         }
 
         /// <summary>
