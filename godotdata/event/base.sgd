@@ -388,3 +388,8 @@ func tween_block(p, state):
 		return 0
 	api["tween_block"].call(p["block"], point["x"], point["y"], point["z"], p["pitch"], p["roll"], p["turn"], p["time"], p["ease"])
 	return 0
+
+# The player now controls this human, and the AI takes over the human controlled until now. Nothing happens if the human is missing or dead.
+func set_player(p, state):
+	api["set_player"].call(api["find_human"].call(p["human"]))
+	return 0
