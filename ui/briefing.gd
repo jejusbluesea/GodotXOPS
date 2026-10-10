@@ -1,6 +1,7 @@
 extends Node
 ## 브리핑. 미션 이미지, 미션 이름, 브리핑 본문을 보여 준다. 좌클릭이면 미션 시작, ESC 면 메뉴로 돌아간다.
 
+const SCREEN_NAME := "briefing"
 const MENU_SCENE := "mainmenu"
 const GAME_SCENE := "maingame"
 # 들어온 뒤 이 시간이 지나야 입력을 받는다. 앞 화면에서 누른 입력이 새어 들어오지 않게 한다.
@@ -49,14 +50,35 @@ var _time := 0.0
 var _finished := false
 var _heading: XopsText
 var _click_pulse: XopsText
+var _ui: CanvasLayer
+# 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
+var _script: XopsScriptScreen
 
 
 func _ready() -> void:
 	InputManager.MouseCursorMode(true, false, false)
 
-	var ui := CanvasLayer.new()
-	add_child(ui)
+	_ui = CanvasLayer.new()
+	add_child(_ui)
 
+	var image_count := 2 if Game.MissionImage(1) != null else (1 if Game.MissionImage(0) != null else 0)
+	_script = XopsScriptScreen.start(_ui, SCREEN_NAME,
+		{"start": Callable(self, "_script_start"), "back": Callable(self, "_script_back")},
+		{"fullname": Game.MissionFullname(), "briefing": Game.MissionBriefing(), "images": image_count},
+		{"mission_image_0": Callable(Game, "MissionImage").bind(0), "mission_image_1": Callable(Game, "MissionImage").bind(1)})
+	if _script == null:
+		_build_default()
+
+
+func _exit_tree() -> void:
+	if _script != null:
+		_script.stop()
+		_script = null
+
+
+## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
+func _build_default() -> void:
+	var ui := _ui
 	var background := XopsUI.layer(ui, BACKGROUND_ORDER, true)
 	XopsUI.panel_stretch(background, XopsUI.Stretch.FULL, 0, 0, 0, 0, BACKDROP_COLOR)
 	XopsUI.image_stretch(background, XopsUI.Stretch.FULL, Game.LoadTexture(TITLE_PATH), 0, 0, 0, 0, Color(1, 1, 1, TITLE_ALPHA))
@@ -93,6 +115,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _finished:
 		return
+
+	if _script != null:
+		if _script.frame({}, delta):
+			return
+		_script.stop()
+		_script = null
+		if _finished:
+			return
+		_build_default()
+
 	_time += delta
 
 	_heading.set_alpha(lerpf(HEADING["alpha_from"], HEADING["alpha_to"], XopsUI.cycle(_time, HEADING["duration"])))
@@ -116,3 +148,22 @@ func _process(delta: float) -> void:
 func _add_image(parent: Control, texture: Texture2D, slot: Vector2) -> void:
 	if texture != null:
 		XopsUI.image(parent, XopsUI.MIDDLE_LEFT, texture, slot.x, slot.y, IMAGE_SIZE.x, IMAGE_SIZE.y)
+
+
+## 화면 스크립트용: 미션을 시작한다.
+func _script_start(_arguments: Dictionary) -> bool:
+	if _finished:
+		return false
+	_finished = true
+	Game.ChangeScene(GAME_SCENE)
+	return true
+
+
+## 화면 스크립트용: 미션을 내리고 메뉴로 돌아간다.
+func _script_back(_arguments: Dictionary) -> bool:
+	if _finished:
+		return false
+	_finished = true
+	Game.UnloadMission()
+	Game.ChangeScene(MENU_SCENE)
+	return true

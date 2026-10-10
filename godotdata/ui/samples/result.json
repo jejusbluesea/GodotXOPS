@@ -1,0 +1,5 @@
+{
+  "screen": "result",
+  "scriptPath": "godotdata/ui/samples/result.sgd",
+  "images": ["data/title.dds"]
+}

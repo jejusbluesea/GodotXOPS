@@ -249,7 +249,8 @@ godot --path . -- --scene editor
 | `--ui-state 값` | 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` 상태로 시작합니다. `console`은 어느 화면에서든 설정과 무관하게 디버그 콘솔을 허용합니다 |
 | `--ui-click "목록"` | 가짜 입력을 차례로 넣습니다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 침) |
 | `--ui-shot 경로.png [--ui-time 초]` | 화면을 PNG 로 저장하고 종료합니다 |
-| `--ui-script 경로.json` | [화면 스크립트](#화면-스크립트의-구조)의 등록 파일 하나를 지정합니다 (`godotdata/ui` 를 훑지 않습니다). 예제: `godotdata/ui/samples/hud.json` |
+| `--ui-script 경로` | [화면 스크립트](#화면-스크립트의-구조)의 등록 파일 하나(`.json`)나 등록 파일들이 든 폴더를 지정합니다 (`godotdata/ui` 를 훑지 않습니다). 예제 전부: `godotdata/ui/samples` |
+| `--demo 번호` | 메뉴 배경으로 늘 그 번호의 데모를 씁니다 (스크린샷을 견줄 때 배경을 고정합니다) |
 | `--ui-script-stats` | 메인게임을 떠날 때 화면 스크립트의 `frame` 한 번에 든 평균 시간을 찍습니다 |
 | `--ui-quit 초` | 그 시간 뒤 종료합니다. 화면 스크립트가 실패해 기본 화면으로 돌아갔으면 종료 코드 1 입니다 |
 
@@ -337,12 +338,15 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 
 ## 화면 스크립트의 구조
 
-모더가 읽는 설명은 [모딩 문서](modding.md#화면-스크립트)에 있습니다. 여기는 코드 쪽입니다. 지금은 메인게임(`ui/maingame.gd`)만 연결돼 있습니다.
+모더가 읽는 설명은 [모딩 문서](modding.md#화면-스크립트)에 있습니다. 여기는 코드 쪽입니다. 화면 다섯 개(`ui/opening.gd`, `mainmenu.gd`, `briefing.gd`, `maingame.gd`, `result.gd`)가 연결돼 있습니다.
 
 - 샌드박스에 올리는 일은 `SandboxScript`(`src/Scripting/`)가 합니다. 스크립트 이벤트의 `ScriptEventPack` 과 화면 스크립트가 함께 씁니다. 격리를 걸 수 없으면 로드를 거절하는 것도 여기 있습니다.
 - `Game.UiScriptLoad(화면 이름)` 이 `godotdata/ui/*.json` 에서 그 화면의 등록을 찾아 스크립트를 올리고 노드(트리 밖)를 돌려줍니다 (`GameBridgeUiScript.cs`). 등록이 없으면 null 이고 화면은 기본 GDScript 화면을 그립니다.
 - 스크립트를 부르고 요소를 만드는 쪽은 GDScript 의 `XopsScriptScreen`(`ui/common/xops_script_screen.gd`)입니다. 요소를 `XopsUI` 로 만들기 때문에 GDScript 에 두었습니다. 스크립트에는 함수 표(사전에 담은 `Callable`)만 넘기고, 요소는 번호로 가리키며, 스크립트가 준 값은 전부 형과 범위를 확인합니다.
-- 화면마다 다른 것은 화면이 넘깁니다: 프레임마다의 값(`Game.HudValues()` 가 사전 하나로 만든다)과 화면 전용 함수(`maingame.gd` 의 `_script_api`).
+- 화면마다 다른 것은 화면이 `XopsScriptScreen.start` 에 넘깁니다: `build` 의 `ctx`, 프레임마다의 값(메인게임은 `Game.HudValues()` 가 사전 하나로 만든다), 화면 전용 함수(각 화면의 `_script_*`), 화면 전용 이미지(이름 → 텍스처를 돌려주는 `Callable`). 화면 전환과 미션 로드는 이 화면 전용 함수가 하므로, 화면이 떠날 때의 정리(`_left`, 맵 내리기)는 기본 화면과 같은 코드를 탑니다.
+- 화면은 `_ready` 에서 스크립트를 올려 보고 없으면 `_build_default()` 로 기본 화면을 만듭니다. `_process` 는 스크립트가 있으면 `frame` 만 부르고, false 가 돌아오면 스크립트를 내리고 그 자리에서 `_build_default()` 를 부릅니다.
+- 메뉴의 OPTION 화면(`MenuOption`)은 스크립트로 바꾸지 않습니다. 스크립트가 `open_option` 을 부르면 `mainmenu.gd` 가 자기 `MenuOption` 과 BACK 버튼을 띄우고 그 입력을 처리합니다. 설정을 쓰는 길은 이 화면뿐입니다.
+- 스크립트가 남기는 값(`save`)은 `XopsScriptScreen.s_saved` 에 화면 이름별로 둡니다 (기본 메뉴의 `s_is_addon` 같은 static 과 같은 구실).
 - 값을 사전 하나로 넘기고 요소를 `set_many` 로 묶어 고치게 한 것은 비용 때문입니다. `script_probe` 로 잰 값: 값 12개를 스크립트가 하나씩 물으면 88 us, 사전으로 받으면 25 us 이고, 요소 12개를 하나씩 고치면 60 us 쯤이 더 들지만 한 번에 고치면 거의 들지 않습니다.
 - 화면 스크립트는 호출 한 번이 만들 수 있는 값의 수(`references_max`)를 8000 으로 올려 둡니다. 확장의 기본값 100 으로는 요소 수십 개를 만드는 `build` 가 돌지 못합니다. 스크립트 이벤트는 기본값 그대로입니다.
 - 실패(호출 앞뒤의 예외 횟수, 요소 수와 호출 수의 한도)하면 `XopsScriptScreen.frame` 이 false 를 돌려주고, 화면이 스크립트를 내린 뒤 기본 화면을 만듭니다.

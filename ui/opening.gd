@@ -2,6 +2,7 @@ extends Node
 ## 오프닝. 배경 맵을 천천히 훑는 카메라 위로 제작 표시가 차례로 나타났다 사라진다. ESC 나 좌클릭으로 건너뛴다.
 ## 좌표와 각도는 UnityXOPS 공간 기준이다.
 
+const SCREEN_NAME := "opening"
 const NEXT_SCENE := "mainmenu"
 
 # ----- 층 (클수록 위) -----
@@ -68,6 +69,9 @@ var _position_speed := Vector3.ZERO
 var _rotation_speed := Vector3.ZERO
 var _fade: ColorRect
 var _texts: Array[XopsText] = []
+var _ui: CanvasLayer
+# 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
+var _script: XopsScriptScreen
 
 
 func _ready() -> void:
@@ -75,9 +79,23 @@ func _ready() -> void:
 	Game.LoadOpening()
 	Game.SetSceneCamera(_cam_position, _cam_euler, CAM_FOV)
 
-	var ui := CanvasLayer.new()
-	add_child(ui)
+	_ui = CanvasLayer.new()
+	add_child(_ui)
 
+	_script = XopsScriptScreen.start(_ui, SCREEN_NAME, {"camera": Callable(self, "_script_camera"), "finish": Callable(self, "_script_finish")}, {})
+	if _script == null:
+		_build_default()
+
+
+func _exit_tree() -> void:
+	if _script != null:
+		_script.stop()
+		_script = null
+
+
+## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
+func _build_default() -> void:
+	var ui := _ui
 	var fade_layer := XopsUI.layer(ui, FADE_ORDER, true)
 	_fade = XopsUI.panel_stretch(fade_layer, XopsUI.Stretch.FULL, 0, 0, 0, 0, Color.BLACK)
 
@@ -97,6 +115,17 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _finished:
 		return
+
+	if _script != null:
+		if _script.frame({}, delta):
+			return
+		_script.stop()
+		_script = null
+		if _finished:
+			return
+		_reset_sequence()
+		_build_default()
+
 	_time += delta
 
 	_position_speed = _update_speed(_position_speed, POSITION_ANIM, delta)
@@ -118,13 +147,39 @@ func _process(delta: float) -> void:
 func console_restart() -> void:
 	if _finished:
 		return
+	Game.ReloadBackground()
+	if _script != null:
+		_script.call_optional("restart")
+		return
+	_reset_sequence()
+
+
+## 카메라 이동과 시간을 처음으로 되돌린다.
+func _reset_sequence() -> void:
 	_time = 0.0
 	_cam_position = CAM_POSITION
 	_cam_euler = CAM_EULER
 	_position_speed = Vector3.ZERO
 	_rotation_speed = Vector3.ZERO
-	Game.ReloadBackground()
 	Game.SetSceneCamera(_cam_position, _cam_euler, CAM_FOV)
+
+
+## 화면 스크립트용: 장면 카메라를 놓는다. position / euler 는 [x, y, z] (UnityXOPS 공간), fov 는 도.
+func _script_camera(arguments: Dictionary) -> bool:
+	_cam_position = XopsScriptScreen.vector(arguments.get("position"), _cam_position)
+	_cam_euler = XopsScriptScreen.vector(arguments.get("euler"), _cam_euler)
+	var fov = arguments.get("fov", CAM_FOV)
+	Game.SetSceneCamera(_cam_position, _cam_euler, clampf(float(fov), 1.0, 179.0) if (fov is int or fov is float) else CAM_FOV)
+	return true
+
+
+## 화면 스크립트용: 오프닝을 끝내고 메뉴로 간다.
+func _script_finish(_arguments: Dictionary) -> bool:
+	if _finished:
+		return false
+	_finished = true
+	Game.ChangeScene(NEXT_SCENE)
+	return true
 
 
 ## 속도를 연출 설정에 따라 갱신한다: 가속 → 등속 → 감쇠.
@@ -167,5 +222,6 @@ func _fade_alpha(time: float, in_start: float, in_end: float, out_start: float, 
 
 func _finish() -> void:
 	_finished = true
-	_fade.color.a = 1.0
+	if _fade != null:
+		_fade.color.a = 1.0
 	Game.ChangeScene(NEXT_SCENE)

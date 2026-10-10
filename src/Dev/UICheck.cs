@@ -58,6 +58,16 @@ namespace GodotXOPS.Dev
             Expect(node != null && node.GetParent() == null && node.Get("restrictions").AsBool(), "화면 스크립트의 노드가 트리에 있거나 격리가 걸리지 않음");
             Expect(game.UiScriptExceptions() == 0, "올리기만 한 화면 스크립트에 예외가 셈");
             Expect(game.UiScriptLoad("briefing") == null, "등록하지 않은 화면의 스크립트가 올라옴");
+
+            // 예제 폴더를 통째로 지정하면 화면 다섯 개가 전부 등록돼 있어야 한다.
+            game.SetUiScriptOverride("godotdata/ui/samples");
+            foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result" })
+            {
+                Node loaded = game.UiScriptLoad(screen);
+                Expect(loaded != null && loaded.HasMethod("frame") && game.UiScriptExceptions() == 0, $"예제 화면 스크립트를 올리지 못함: {screen}");
+            }
+            game.SetUiScriptOverride(sample);
+            game.UiScriptLoad("maingame");
             Expect(game.UiScriptImage(0) == null && game.UiScriptImage(-1) == null, "없는 번호의 이미지가 null 이 아님");
 
             ConfigManager config = ConfigManager.Instance;

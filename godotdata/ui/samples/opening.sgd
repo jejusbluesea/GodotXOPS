@@ -1,0 +1,113 @@
+# GodotXOPS sample screen script: the built-in opening rewritten as a screen script.
+# To use it, copy opening.json into godotdata/ui/.
+# The camera slides over the background map while the credits fade in and out. Escape or a click skips it.
+# Camera positions and angles are in UnityXOPS space (degrees).
+
+var api
+var time = 0.0
+var finished = false
+var fade_rect = 0
+var texts = []
+var fades = []
+var cam_pos = [0.5, 5.8, -2.9]
+var cam_rot = [-12.0, 64.0, 0.0]
+var pos_speed = [0.0, 0.0, 0.0]
+var rot_speed = [0.0, 0.0, 0.0]
+
+func init(a):
+	api = a
+
+func build(ctx):
+	var fade_layer = api["layer"].call(0, true)
+	var text_layer = api["layer"].call(1, true)
+	var box_layer = api["layer"].call(2, true)
+	fade_rect = api["rect"].call(fade_layer, {"stretch": "full", "color": 0x000000})
+
+	# pivot (also the alignment), x, y, size, color, then the times: fade in start / end, fade out start / end.
+	var lines = [
+		["Project GodotXOPS", 7, 0, 120, 22, 0xFFFFFF, 0.5, 1.5, 3.0, 4.0],
+		["Original by", 0, 60, -120, 20, 0xFFFFFF, 4.5, 5.5, 7.5, 8.5],
+		["nine-two", 0, 100, -150, 20, 0xFFFFFF, 5.0, 6.0, 8.0, 9.0],
+		["TENNKUU", 0, 100, -180, 20, 0xFFFFFF, 5.0, 6.0, 8.0, 9.0],
+		["GodotXOPS by", 2, -100, -270, 20, 0xFFFFFF, 7.0, 8.0, 10.0, 11.0],
+		["JayTwoGames", 2, -70, -300, 20, 0xFFFFFF, 7.5, 8.5, 10.5, 11.5],
+		["JJL", 2, -70, -330, 20, 0xFFFFFF, 7.5, 8.5, 10.5, 11.5],
+		["dlwowlsgod", 2, -70, -360, 20, 0xFFFFFF, 7.5, 8.5, 10.5, 11.5],
+		["X OPERATIONS", 4, 0, 0, 22, 0xFF0000, 12.0, 13.0, 15.0, 16.0],
+	]
+	for line in lines:
+		texts.append(api["text"].call(text_layer, {"text": line[0], "pivot": line[1], "align": line[1], "x": line[2], "y": line[3], "font_w": line[4], "font_h": line[4], "color": line[5], "alpha": 0.0}))
+		fades.append([line[6], line[7], line[8], line[9]])
+
+	# Black bars at the top and bottom: 12 % of the 480 high screen.
+	api["rect"].call(box_layer, {"stretch": "top", "h": 57.6, "color": 0x000000})
+	api["rect"].call(box_layer, {"stretch": "bottom", "h": 57.6, "color": 0x000000})
+	api["camera"].call({"position": cam_pos, "euler": cam_rot, "fov": 65.0})
+
+# Called when the debug console restarts the screen.
+func restart():
+	time = 0.0
+	cam_pos = [0.5, 5.8, -2.9]
+	cam_rot = [-12.0, 64.0, 0.0]
+	pos_speed = [0.0, 0.0, 0.0]
+	rot_speed = [0.0, 0.0, 0.0]
+
+# Speed of a camera move: accelerates towards the target between start and end, keeps it until hold (forever when hold is negative), then decays.
+func update_speed(speed, target, start, end, hold, delta):
+	var decay = pow(0.8, delta * 33.333)
+	if decay > 1.0:
+		decay = 1.0
+	var out = [0.0, 0.0, 0.0]
+	if time < start:
+		return out
+	for i in range(3):
+		if time < end:
+			out[i] = target[i] + (speed[i] - target[i]) * decay
+		elif hold < 0.0 or time < hold:
+			out[i] = target[i]
+		else:
+			out[i] = speed[i] * decay
+	return out
+
+func fade_alpha(f):
+	if time < f[0]:
+		return 0.0
+	if time < f[1]:
+		return (time - f[0]) / (f[1] - f[0])
+	if time < f[2]:
+		return 1.0
+	if time < f[3]:
+		return 1.0 - (time - f[2]) / (f[3] - f[2])
+	return 0.0
+
+func frame(v, delta):
+	if finished:
+		return
+	time += delta
+
+	pos_speed = update_speed(pos_speed, [0.0, -0.1667, -0.2667], 4.0, 5.0, -1.0, delta)
+	rot_speed = update_speed(rot_speed, [20.20, -30.0, 0.0], 2.6, 3.6, 5.0, delta)
+	for i in range(3):
+		cam_pos[i] += pos_speed[i] * delta
+		cam_rot[i] += rot_speed[i] * delta
+	api["camera"].call({"position": cam_pos, "euler": cam_rot})
+
+	var changes = {}
+	var fade = 1.0
+	if time < 2.0:
+		fade = 1.0 - time / 2.0
+	elif time < 11.0:
+		fade = 0.0
+	elif time < 15.0:
+		fade = (time - 11.0) / 4.0
+	changes[fade_rect] = {"alpha": fade}
+	for i in range(texts.size()):
+		changes[texts[i]] = {"alpha": fade_alpha(fades[i])}
+
+	if time > 16.1 or api["pressed"].call("escape") or v["click_pressed"]:
+		finished = true
+		changes[fade_rect] = {"alpha": 1.0}
+		api["set_many"].call(changes)
+		api["finish"].call()
+		return
+	api["set_many"].call(changes)

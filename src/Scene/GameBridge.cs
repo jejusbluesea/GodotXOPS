@@ -117,6 +117,9 @@ namespace GodotXOPS
             return LoadBackgroundMap(DataManager.Instance.MissionData.openingData);
         }
 
+        // 0 이상이면 메뉴 배경으로 늘 그 번호의 데모를 쓴다 (개발용 인자 --demo. 화면을 스크린샷으로 견줄 때 배경을 고정한다).
+        public int DemoOverride { get; set; } = -1;
+
         /// <summary>
         /// 메뉴 배경 맵을 데모 목록에서 하나 골라 로드하고 시뮬레이션을 켠다.
         /// </summary>
@@ -126,7 +129,8 @@ namespace GodotXOPS
             var demos = DataManager.Instance.MissionData.demoData;
             if (demos.Count == 0) return false;
 
-            return LoadBackgroundMap(demos[GameRandom.Visual.Range(0, demos.Count)]);
+            int index = DemoOverride >= 0 && DemoOverride < demos.Count ? DemoOverride : GameRandom.Visual.Range(0, demos.Count);
+            return LoadBackgroundMap(demos[index]);
         }
 
         /// <summary>

@@ -86,6 +86,20 @@
           "value": "false",
           "min": 0,
           "max": 0
+        },
+        {
+          "name": "AllowEventScript",
+          "type": "bool",
+          "value": "true",
+          "min": 0,
+          "max": 0
+        },
+        {
+          "name": "AllowUiScript",
+          "type": "bool",
+          "value": "true",
+          "min": 0,
+          "max": 0
         }
       ]
     },
@@ -201,15 +215,15 @@
       "name": "look",
       "type": "PassThrough",
       "bindings": [
-        "\u003CMouse\u003E/delta"
+        "<Mouse>/delta"
       ],
       "composites": [
         {
           "type": "2DVector",
-          "up": "\u003CKeyboard\u003E/upArrow",
-          "down": "\u003CKeyboard\u003E/downArrow",
-          "left": "\u003CKeyboard\u003E/leftArrow",
-          "right": "\u003CKeyboard\u003E/rightArrow"
+          "up": "<Keyboard>/upArrow",
+          "down": "<Keyboard>/downArrow",
+          "left": "<Keyboard>/leftArrow",
+          "right": "<Keyboard>/rightArrow"
         }
       ]
     },
@@ -220,10 +234,10 @@
       "composites": [
         {
           "type": "2DVector",
-          "up": "\u003CKeyboard\u003E/w",
-          "down": "\u003CKeyboard\u003E/s",
-          "left": "\u003CKeyboard\u003E/a",
-          "right": "\u003CKeyboard\u003E/d"
+          "up": "<Keyboard>/w",
+          "down": "<Keyboard>/s",
+          "left": "<Keyboard>/a",
+          "right": "<Keyboard>/d"
         }
       ]
     },
@@ -231,7 +245,7 @@
       "name": "jump",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/space"
+        "<Keyboard>/space"
       ],
       "composites": []
     },
@@ -239,7 +253,7 @@
       "name": "walk",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/tab"
+        "<Keyboard>/tab"
       ],
       "composites": []
     },
@@ -247,7 +261,7 @@
       "name": "drop",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/g"
+        "<Keyboard>/g"
       ],
       "composites": []
     },
@@ -255,7 +269,7 @@
       "name": "fire",
       "type": "Button",
       "bindings": [
-        "\u003CMouse\u003E/leftButton"
+        "<Mouse>/leftButton"
       ],
       "composites": []
     },
@@ -263,7 +277,7 @@
       "name": "zoom",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/leftShift"
+        "<Keyboard>/leftShift"
       ],
       "composites": []
     },
@@ -271,7 +285,7 @@
       "name": "previous",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/z"
+        "<Keyboard>/z"
       ],
       "composites": []
     },
@@ -279,7 +293,7 @@
       "name": "next",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/x"
+        "<Keyboard>/x"
       ],
       "composites": []
     },
@@ -287,7 +301,7 @@
       "name": "reload",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/r"
+        "<Keyboard>/r"
       ],
       "composites": []
     },
@@ -295,7 +309,7 @@
       "name": "first",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/1"
+        "<Keyboard>/1"
       ],
       "composites": []
     },
@@ -303,7 +317,7 @@
       "name": "second",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/2"
+        "<Keyboard>/2"
       ],
       "composites": []
     },
@@ -311,7 +325,7 @@
       "name": "interact",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/f"
+        "<Keyboard>/f"
       ],
       "composites": []
     },
@@ -319,7 +333,7 @@
       "name": "escape",
       "type": "Button",
       "bindings": [
-        "\u003CKeyboard\u003E/escape"
+        "<Keyboard>/escape"
       ],
       "composites": []
     }

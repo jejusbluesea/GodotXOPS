@@ -4,7 +4,10 @@ extends Node
 ## 클릭은 발사 키 바인딩과 무관하게 마우스 왼쪽 버튼이다.
 ## 버튼은 누른 자리에서 뗐을 때만 동작한다 (누른 채 벗어나면 취소).
 
+const SCREEN_NAME := "mainmenu"
 const BRIEFING_SCENE := "briefing"
+# 화면 스크립트가 한 번에 물을 수 있는 미션 이름의 수.
+const SCRIPT_MISSION_BATCH := 64
 
 # ----- 층 (클수록 위) -----
 const TITLE_ORDER := 1
@@ -136,6 +139,11 @@ var _credit_panel: ColorRect
 var _credit_label: Label
 var _exit_panel: ColorRect
 var _option: MenuOption
+var _ui: CanvasLayer
+# 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
+# OPTION 화면은 스크립트로 바꾸지 않는다: 스크립트가 open_option 을 부르면 여기의 MenuOption 을 띄운다.
+var _script: XopsScriptScreen
+var _script_layer: XopsLayer
 
 # 버튼 하나 = {"shadow": XopsText, "main": XopsText, "x": 기준 x, "y": 기준 y}.
 var _up_slot: Dictionary
@@ -160,9 +168,38 @@ func _ready() -> void:
 	_page = clampi(s_page, 0, maxi(0, Game.AddonPageCount() - 1))
 	_scroll_index = clampi(s_addon_scroll if _is_addon else s_official_scroll, 0, _max_index())
 
-	var ui := CanvasLayer.new()
-	add_child(ui)
+	_ui = CanvasLayer.new()
+	add_child(_ui)
 
+	var state: String = Dev.value("--ui-state", "")
+	_script = XopsScriptScreen.start(_ui, SCREEN_NAME, _script_api(), {
+		"version": Game.Version(), "credit": Game.CreditText(), "state": state,
+		"official_count": Game.OfficialMissionCount(), "addon_pages": Game.AddonPageCount(), "addon_exists": _addon_exists,
+	})
+	if _script == null:
+		_build_default()
+		return
+
+	# 스크립트가 그리는 동안에도 OPTION 화면과 그 BACK 버튼은 여기서 만든 것을 쓴다.
+	_script_layer = _layer(_ui, MENU_ORDER)
+	_build_back(_script_layer)
+	_option = MenuOption.new(self, _script_layer)
+	_script_show_option(false)
+	if state.begins_with("option"):
+		if state.begins_with("option-"):
+			_option.select_tab(state.trim_prefix("option-").capitalize())
+		_script_show_option(true)
+
+
+func _exit_tree() -> void:
+	if _script != null:
+		_script.stop()
+		_script = null
+
+
+## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
+func _build_default() -> void:
+	var ui := _ui
 	var title_layer := _layer(ui, TITLE_ORDER)
 	XopsUI.image(title_layer, XopsUI.TOP_LEFT, Game.LoadTexture(TITLE["path"]), TITLE["x"], TITLE["y"], TITLE["w"], TITLE["h"])
 
@@ -210,6 +247,11 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _left:
 		return
+
+	if _script != null:
+		if _process_script(delta):
+			return
+
 	_time += delta
 
 	if Game.PlayerExists():
@@ -301,9 +343,7 @@ func _build_menu(layer: XopsLayer) -> void:
 		var y := (count - 1 - i) * MENU_ROW_HEIGHT
 		_menu_slots.append(_row_button(_menu_bg, y, MENU_ITEMS[i], row))
 
-	_back_bg = XopsUI.panel(layer, XopsUI.BOTTOM_LEFT, BACK_BG["x"], BACK_BG["y"],
-		BACK_BG["w"], MENU_ROW_HEIGHT, BACK_BG["color"])
-	_back_slot = _row_button(_back_bg, 0, BACK_TEXT, Vector2(BACK_BG["w"], MENU_ROW_HEIGHT))
+	_build_back(layer)
 
 	var inset := CREDIT_INSET
 	_credit_panel = XopsUI.panel_stretch(layer, XopsUI.Stretch.FULL,
@@ -326,6 +366,13 @@ func _build_menu(layer: XopsLayer) -> void:
 		-(yes_width * 0.5 + EXIT_BUTTON_GAP * 0.5), button_y, EXIT_YES, BUTTON_NORMAL, SWITCH_FONT, Vector2(yes_width, MENU_ROW_HEIGHT))
 	_exit_no_slot = _text_pair(_exit_panel, XopsUI.CENTER, XopsUI.CENTER,
 		no_width * 0.5 + EXIT_BUTTON_GAP * 0.5, button_y, EXIT_NO, BUTTON_NORMAL, SWITCH_FONT, Vector2(no_width, MENU_ROW_HEIGHT))
+
+
+## BACK 버튼 (CREDIT 과 OPTION 에서 쓴다).
+func _build_back(layer: XopsLayer) -> void:
+	_back_bg = XopsUI.panel(layer, XopsUI.BOTTOM_LEFT, BACK_BG["x"], BACK_BG["y"],
+		BACK_BG["w"], MENU_ROW_HEIGHT, BACK_BG["color"])
+	_back_slot = _row_button(_back_bg, 0, BACK_TEXT, Vector2(BACK_BG["w"], MENU_ROW_HEIGHT))
 
 
 ## 그림자와 본문 두 겹으로 된 글자 버튼을 만든다. 판정 사각형은 기준점에서 pivot 정렬로 hit 크기만큼이다.
@@ -452,7 +499,10 @@ func _back_to_main() -> void:
 	if _screen == "option":
 		ConfigManager.RevertToSaved()
 		_apply_ui_scale()
-	_set_screen("main")
+	if _script != null:
+		_script_show_option(false)
+	else:
+		_set_screen("main")
 
 
 ## 설정의 UIScale 을 메뉴의 층들에 다시 적용한다 (OPTION 에서 SAVE 할 때와 BACK 으로 되돌릴 때).
@@ -460,6 +510,8 @@ func _apply_ui_scale() -> void:
 	var ui_scale: float = ConfigManager.GetFloat("General", "UIScale", 1.0)
 	for layer in _layers:
 		layer.ui_scale = ui_scale
+	if _script != null:
+		_script.apply_ui_scale()
 
 
 ## 크레딧 글자 크기를 창 안에 들어가는 가장 큰 값으로 맞춘다.
@@ -626,3 +678,138 @@ func _update_load_error(delta: float) -> void:
 func console_restart() -> void:
 	if not _left:
 		Game.ReloadBackground()
+		if _script != null:
+			_script.call_optional("restart")
+
+
+# ============================================================
+#  화면 스크립트
+# ============================================================
+
+## 화면 스크립트의 frame 을 부른다. OPTION 이 열려 있는 동안의 입력은 여기서 처리한다.
+## 반환: 스크립트가 이 프레임을 맡았으면 true. 실패했으면 기본 화면을 만들고 false.
+func _process_script(delta: float) -> bool:
+	_time += delta
+	if _screen == "option":
+		var allowed := _time >= CLICK_ALLOW_TIME
+		var pressed: bool = allowed and InputManager.WasClickPressed()
+		var clicked: bool = allowed and InputManager.WasClickReleased()
+		var held: bool = InputManager.IsClickPressed()
+		if pressed:
+			_press_capture = null
+		if _button(_back_slot, pressed, clicked, held) or (allowed and InputManager.WasPressed("escape")):
+			_back_to_main()
+		else:
+			_option.update(delta, pressed, clicked, held)
+
+	var values := {"option_open": _screen == "option", "player_exists": Game.PlayerExists()}
+	if values["player_exists"]:
+		var at: Vector3 = Game.PlayerPosition()
+		values["player"] = [at.x, at.y, at.z]
+	if _script.frame(values, delta):
+		return true
+
+	_script.stop()
+	_script = null
+	if _left:
+		return true
+	# 스크립트용으로 만들어 둔 OPTION 층을 걷고 기본 화면을 통째로 만든다.
+	if _screen == "option":
+		ConfigManager.RevertToSaved()
+	_option = null
+	_layers.clear()
+	_script_layer.get_parent().remove_child(_script_layer)
+	_script_layer.free()
+	_script_layer = null
+	_build_default()
+	return false
+
+
+## OPTION 화면과 그 BACK 버튼을 보이거나 숨긴다 (화면 스크립트가 그리는 동안).
+func _script_show_option(open: bool) -> void:
+	_screen = "option" if open else "main"
+	_back_bg.visible = open
+	_option.set_visible(open)
+
+
+## 메뉴가 화면 스크립트에 더 내주는 함수. 인자는 사전 하나다.
+func _script_api() -> Dictionary:
+	return {
+		"camera": Callable(self, "_script_camera"),
+		"mission_count": Callable(self, "_script_mission_count"),
+		"missions": Callable(self, "_script_missions"),
+		"page_name": Callable(self, "_script_page_name"),
+		"load_mission": Callable(self, "_script_load_mission"),
+		"open_option": Callable(self, "_script_open_option"),
+		"quit": Callable(self, "_script_quit"),
+	}
+
+
+## 장면 카메라를 놓는다. position / euler 는 [x, y, z] (UnityXOPS 공간), fov 는 도.
+func _script_camera(arguments: Dictionary) -> bool:
+	var fov = arguments.get("fov", CAM_FOV)
+	Game.SetSceneCamera(XopsScriptScreen.vector(arguments.get("position"), Vector3.ZERO),
+		XopsScriptScreen.vector(arguments.get("euler"), CAM_EULER),
+		clampf(float(fov), 1.0, 179.0) if (fov is int or fov is float) else CAM_FOV)
+	return true
+
+
+func _script_int(arguments: Dictionary, key: String) -> int:
+	var value = arguments.get(key, 0)
+	return value if value is int else 0
+
+
+func _script_addon(arguments: Dictionary) -> bool:
+	var value = arguments.get("addon", false)
+	return value if value is bool else false
+
+
+## 미션 수. addon 이 참이면 그 에드온 페이지(page)의 것, 아니면 공식 미션.
+func _script_mission_count(arguments: Dictionary) -> int:
+	return Game.AddonMissionCount(_script_int(arguments, "page")) if _script_addon(arguments) else Game.OfficialMissionCount()
+
+
+## 미션 이름들: from 번째부터 count 개 (한 번에 64개까지).
+func _script_missions(arguments: Dictionary) -> Array:
+	var addon := _script_addon(arguments)
+	var page := _script_int(arguments, "page")
+	var from := maxi(0, _script_int(arguments, "from"))
+	var total: int = Game.AddonMissionCount(page) if addon else Game.OfficialMissionCount()
+	var names: Array = []
+	for index in range(from, mini(total, from + clampi(_script_int(arguments, "count"), 0, SCRIPT_MISSION_BATCH))):
+		names.append(Game.AddonMissionName(page, index) if addon else Game.OfficialMissionName(index))
+	return names
+
+
+func _script_page_name(arguments: Dictionary) -> String:
+	return Game.AddonPageName(_script_int(arguments, "page"))
+
+
+## 미션을 로드하고 브리핑으로 넘어간다. 실패하면 배경 맵을 다시 올리고 이유를 돌려준다.
+## 반환: ok(넘어갔는지), error(실패한 이유. 영어 한 줄).
+func _script_load_mission(arguments: Dictionary) -> Dictionary:
+	if _left:
+		return {"ok": false, "error": ""}
+	if Game.LoadMission(_script_int(arguments, "index"), _script_addon(arguments), _script_int(arguments, "page")):
+		_left = true
+		Game.ChangeScene(BRIEFING_SCENE)
+		return {"ok": true, "error": ""}
+	var reason: String = Game.LastLoadError()
+	Game.LoadDemo()
+	return {"ok": false, "error": reason}
+
+
+## OPTION 화면을 연다. 닫히면 frame 의 option_open 이 거짓으로 돌아온다.
+func _script_open_option(_arguments: Dictionary) -> bool:
+	if _left or _screen == "option":
+		return false
+	_script_show_option(true)
+	return true
+
+
+func _script_quit(_arguments: Dictionary) -> bool:
+	if _left:
+		return false
+	_left = true
+	Game.Quit()
+	return true

@@ -26,9 +26,9 @@ namespace GodotXOPS
         public int UiScriptFailures { get; private set; }
 
         /// <summary>
-        /// 등록 폴더를 훑는 대신 이 등록 파일 하나만 쓰게 한다 (개발용 인자 --ui-script).
+        /// 등록 폴더(godotdata/ui)를 훑는 대신 이 등록 파일 하나, 또는 이 폴더의 등록 파일들만 쓰게 한다 (개발용 인자 --ui-script).
         /// </summary>
-        /// <param name="registryPath">등록 파일 경로 (exe 폴더 기준, .json). 빈 문자열이면 평소대로 폴더를 훑는다.</param>
+        /// <param name="registryPath">등록 파일 하나(.json)나 등록 파일들이 든 폴더의 경로 (exe 폴더 기준). 빈 문자열이면 평소대로 godotdata/ui 를 훑는다.</param>
         public void SetUiScriptOverride(string registryPath)
         {
             m_uiOverride = registryPath ?? string.Empty;
@@ -166,7 +166,12 @@ namespace GodotXOPS
             if (!string.IsNullOrEmpty(m_uiOverride))
             {
                 string full = GamePath.Resolve(m_uiOverride);
-                if (full != null && File.Exists(full)) files.Add(full);
+                if (full != null && Directory.Exists(full))
+                {
+                    files.AddRange(Directory.GetFiles(full, "*.json"));
+                    files.Sort(StringComparer.OrdinalIgnoreCase);
+                }
+                else if (full != null && File.Exists(full)) files.Add(full);
                 else Debugger.LogError($"Screen script registry open failed: {m_uiOverride}", nameof(GameBridge));
             }
             else

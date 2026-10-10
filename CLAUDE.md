@@ -109,7 +109,8 @@ dotnet build GodotXOPS.csproj
 - `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` / `console` 상태로 시작한다. `console`은 어느 화면에서든 설정 파일과 무관하게 디버그 콘솔을 허용한다 (콘솔을 화면으로 확인할 때 `--ui-click "key:F11 text:help key:Enter"`와 함께 쓴다).
 - `--ui-click "목록"` — 가짜 입력을 차례로 넣는다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 친다. 띄어쓰기는 `key:Space`). 좌표는 창 픽셀이고 실제 커서를 옮긴다. 버튼을 눌러 본 결과를 `--ui-shot`으로 볼 때 쓴다 (`--window 640x480`과 함께).
 - `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다. `.sgd` 화면 스크립트가 실패해 기본 화면으로 돌아갔으면 종료 코드 1 이다.
-- `--ui-script 경로.json` — `.sgd` 화면 스크립트의 등록 파일 하나를 지정한다 (`godotdata/ui` 를 훑지 않는다). `--ui-script-stats` 는 메인게임을 떠날 때 `frame` 한 번의 평균 시간을 찍는다.
+- `--demo 번호` — 메뉴 배경으로 늘 그 번호의 데모를 쓴다 (스크린샷을 견줄 때).
+- `--ui-script 경로` — `.sgd` 화면 스크립트의 등록 파일 하나(`.json`)나 등록 파일들이 든 폴더를 지정한다 (`godotdata/ui` 를 훑지 않는다). `--ui-script-stats` 는 메인게임을 떠날 때 `frame` 한 번의 평균 시간을 찍는다.
 
 `play_test.tscn` 은 AI 와 이벤트를 켠 채로 돈다. `--noai` 로 끄고 시작하고, 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), F9+↑/↓(복제), Insert(플레이어 무적), Home(디버그 텍스트 켜기/끄기)을 쓴다. `--invincible`, `--notext` 로 켜고 끈 채 시작할 수 있다. AI 가 꺼져 있어야 하는 점검 도구는 `AIController.Enabled = false` 로 둔다 (`WeaponCheck` 참조).
 
@@ -201,7 +202,10 @@ dotnet build GodotXOPS.csproj
 
 ## 화면 스크립트
 
-- 1.2.0 의 작업이다 (사용자 결정, 2026-10-10): UnityXOPS 의 Lua 처럼 `.sgd` 로 화면을 바꿀 수 있게 한다. **기본 화면은 지금의 GDScript 이고, `godotdata/ui/*.json` 에 등록된 화면만 스크립트가 대신 그린다.** 대상은 화면 5종(오프닝, 메뉴, 브리핑, 메인게임, 결과)이고 OPTION 과 디버그 콘솔은 뺀다. **지금은 메인게임(HUD)만 연결돼 있다.**
+- 1.2.0 의 작업이다 (사용자 결정, 2026-10-10): UnityXOPS 의 Lua 처럼 `.sgd` 로 화면을 바꿀 수 있게 한다. **기본 화면은 지금의 GDScript 이고, `godotdata/ui/*.json` 에 등록된 화면만 스크립트가 대신 그린다.** 대상은 화면 5종(오프닝, 메뉴, 브리핑, 메인게임, 결과)이고 **OPTION 과 디버그 콘솔은 뺀다** (사용자 결정). 다섯 화면이 전부 연결돼 있다.
+- 화면(`ui/*.gd`)의 모양: `_ready` 에서 `XopsScriptScreen.start(층을 붙일 노드, 화면 이름, 화면 전용 함수, ctx, 화면 전용 이미지)` 를 해 보고 null 이면 `_build_default()`. `_process` 는 스크립트가 있으면 `frame` 만 부르고, false 면 스크립트를 내리고 그 자리에서 `_build_default()`. **화면 전환·미션 로드·종료는 화면 전용 함수(`_script_*`)가 한다** (스크립트가 `Game` 을 직접 만지지 않는다). 화면 전용 함수의 인자는 사전 하나다.
+- 메뉴의 OPTION 은 스크립트가 `open_option` 을 부르면 `mainmenu.gd` 가 자기 `MenuOption` 과 BACK 버튼을 띄우고 입력을 처리한다 (`_script_show_option`). **스크립트는 설정을 쓰지 못한다** (읽기만. 쓰는 길은 OPTION 화면뿐이다).
+- 화면을 떠나면 스크립트는 내려가고 돌아오면 처음부터 다시 돈다. 남길 값은 `save` → `XopsScriptScreen.s_saved`(화면 이름별) → 다음 `build` 의 `ctx["saved"]`.
 - 샌드박스에 올리는 것은 `SandboxScript`(`src/Scripting/`)이고 `ScriptEventPack` 과 함께 쓴다. `Game.UiScriptLoad(화면 이름)` 이 등록을 찾아 올린 노드(트리 밖)를 돌려주고, GDScript 의 `XopsScriptScreen`(`ui/common/xops_script_screen.gd`)이 그 노드를 부르며 요소를 `XopsUI` 로 만든다. 이것도 외부 스크립트이므로 격리 없이 돌리지 않는다.
 - 계약: `init(api)` → `build(ctx)` → 프레임마다 `frame(v, delta)`. **값은 게임이 사전 하나로 넘기고(`Game.HudValues()`), 요소는 번호로 가리키며 `set_many` 로 묶어 고친다** (API 호출 횟수가 비용이다. `script_probe` 의 `CheckFrameCost`). 스크립트에 노드를 넘기지 않고, 스크립트가 준 값은 `XopsScriptScreen` 이 형과 범위를 확인한다.
 - 스크립트는 파일 경로를 받지 않는다. 이미지는 등록 파일의 `images` 목록의 번호로 가리킨다.
@@ -209,7 +213,7 @@ dotnet build GodotXOPS.csproj
 - **이벤트가 놓는 글자는 화면 스크립트와 별개다** (사용자 결정): 게임이 늘 그린다. **미션은 HUD 를 들고 오지 않는다** (사용자 결정): 화면 스크립트는 설치형뿐이고 MIF2 에 넣지 않는다.
 - 화면 스크립트는 `references_max` 를 8000 으로 올린다 (기본 100 으로는 `build` 가 돌지 못한다). 스크립트 이벤트는 기본값 그대로다.
 - 설정 `General` / `AllowUiScript`(기본 true)는 `AllowEventScript` 처럼 OPTION 화면에 없고 RESET 이 건드리지 않는다.
-- 예제 `godotdata/ui/samples/hud.sgd` 는 기본 HUD 를 그대로 옮긴 것이다. **`ui/maingame.gd` 의 기본 HUD 를 고치면 이 예제도 같이 고친다.** 확인은 `--ui-script godotdata/ui/samples/hud.json` 과 `--ui-shot` 으로 기본 화면과 픽셀을 견준다 (3D 무기 표시는 도는 중이라 조금 다르다). API 를 고치면 `docs/modding.md` 의 "화면 스크립트"도 고친다.
+- 예제 `godotdata/ui/samples/`(`opening`, `mainmenu`, `briefing`, `hud`, `result` 의 `.json` + `.sgd`)는 기본 화면을 그대로 옮긴 것이다. **`ui/*.gd` 의 기본 화면을 고치면 그 예제도 같이 고친다.** 확인은 `--ui-script godotdata/ui/samples`(폴더를 주면 그 안의 등록 파일 전부)와 `--ui-shot` 으로 기본 화면과 픽셀을 견준다. 메뉴는 `--demo 0` 으로 배경을 고정한다. 도는 것(3D 무기 표시, 배경의 사람과 눈, 브리핑의 클릭 안내)은 조금 다르게 찍힌다. API 를 고치면 `docs/modding.md` 의 "화면 스크립트"도 고친다.
 
 ## 에디터
 

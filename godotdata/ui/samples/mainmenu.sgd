@@ -1,0 +1,480 @@
+# GodotXOPS sample screen script: the built-in main menu rewritten as a screen script.
+# To use it, copy mainmenu.json into godotdata/ui/.
+# ctx: version, credit (text), state (start state for development), official_count, addon_pages, addon_exists, saved.
+# The OPTION screen is not scripted: open_option() shows the built-in one, and v["option_open"] is true while it is open.
+# Buttons work when the mouse is released over the element it was pressed on.
+# Most elements hang from the bottom right (pivot 8) or bottom left (pivot 6) of the screen, so offsets are measured from there.
+
+var api
+var shown = {}
+var changes = {}
+
+var item_count = 8
+var time = 0.0
+var left = false
+var screen = "main"
+var is_addon = false
+var addon_exists = false
+var page = 0
+var page_count = 1
+var scroll = 0
+var official_scroll = 0
+var addon_scroll = 0
+var count = 0
+var names = []
+var dragging = false
+var grab = 0.0
+var capture = 0
+var hover = {}
+var error_time = 0.0
+
+var scroll_layer = 0
+var pointer_layer = 0
+var fade_rect = 0
+var pointer_h = 0
+var pointer_v = 0
+var track = 0
+var thumb = 0
+var thumb_inner = 0
+var up_button = []
+var down_button = []
+var items = []
+var switch_button = []
+var prev_button = []
+var next_button = []
+var page_name = []
+var menu_buttons = []
+var back_button = []
+var yes_button = []
+var no_button = []
+var error_rect = 0
+var error_label = 0
+
+var main_group = []
+var switch_group = []
+var page_group = []
+var credit_group = []
+var exit_group = []
+
+func init(a):
+	api = a
+
+# Remembers what each element shows and collects only the values that changed. flush() sends them in one call.
+func put(id, key, value):
+	if not shown.has(id):
+		shown[id] = {}
+	var seen = shown[id]
+	if seen.has(key) and seen[key] == value:
+		return
+	seen[key] = value
+	if not changes.has(id):
+		changes[id] = {}
+	changes[id][key] = value
+
+func flush():
+	if changes.size() > 0:
+		api["set_many"].call(changes)
+		changes = {}
+
+func show_all(group, visible):
+	for id in group:
+		put(id, "visible", visible)
+
+# A text button: a black shadow one pixel down-right and the text itself. Returns [shadow, main, x, y].
+# hit_w, hit_h is the clickable box, placed around the position by hit_pivot.
+func button(layer, group, pivot, align, x, y, value, color, font_w, font_h, hit_w, hit_h, hit_pivot):
+	var shadow = api["text"].call(layer, {"pivot": pivot, "align": align, "x": x + 1, "y": y - 1, "text": value, "font_w": font_w, "font_h": font_h, "color": 0x000000})
+	var main = api["text"].call(layer, {"pivot": pivot, "align": align, "x": x, "y": y, "text": value, "font_w": font_w, "font_h": font_h, "color": color, "hit_w": hit_w, "hit_h": hit_h, "hit_pivot": hit_pivot})
+	group.append(shadow)
+	group.append(main)
+	return [shadow, main, x, y]
+
+func set_text(slot, value):
+	put(slot[0], "text", value)
+	put(slot[1], "text", value)
+
+func set_visible(slot, visible):
+	put(slot[0], "visible", visible)
+	put(slot[1], "visible", visible)
+
+# ---- build
+
+func build(ctx):
+	addon_exists = ctx["addon_exists"]
+	page_count = ctx["addon_pages"]
+	var saved = ctx["saved"]
+	if saved.has("is_addon"):
+		is_addon = saved["is_addon"] and addon_exists
+		page = saved["page"]
+		official_scroll = saved["official_scroll"]
+		addon_scroll = saved["addon_scroll"]
+	if page < 0 or page >= page_count:
+		page = 0
+
+	var title_layer = api["layer"].call(1, false)
+	var version_layer = api["layer"].call(2, false)
+	scroll_layer = api["layer"].call(3, false)
+	var mission_layer = api["layer"].call(4, false)
+	var menu_layer = api["layer"].call(5, false)
+	var error_layer = api["layer"].call(8, true)
+	pointer_layer = api["layer"].call(9, true)
+	var fade_layer = api["layer"].call(10, true)
+
+	# Image 0 of the registration file is the title picture.
+	api["image"].call(title_layer, {"pivot": 0, "x": 20, "y": -25, "w": 480, "h": 80, "source": 0})
+	api["text"].call(version_layer, {"pivot": 2, "align": 2, "x": -9, "y": -76, "text": ctx["version"], "font_w": 16, "font_h": 19, "color": 0x000000})
+	api["text"].call(version_layer, {"pivot": 2, "align": 2, "x": -10, "y": -75, "text": ctx["version"], "font_w": 16, "font_h": 19})
+
+	# Scroll bar at the bottom right: a 20 x 300 track with a two-colored thumb.
+	track = api["rect"].call(scroll_layer, {"pivot": 8, "x": 0, "y": 39, "w": 20, "h": 300, "color": 0x808080, "alpha": 0.5, "hit": true})
+	thumb = api["rect"].call(scroll_layer, {"pivot": 8, "x": 0, "y": 39, "w": 20, "h": 0, "color": 0x999940, "hit": true})
+	thumb_inner = api["rect"].call(scroll_layer, {"pivot": 8, "x": -3, "y": 42, "w": 14, "h": 0, "color": 0xCCCC40})
+	main_group.append(track)
+
+	# Mission list left of the scroll bar: UP, eight missions, DOWN. Each row is 30 high.
+	main_group.append(api["rect"].call(mission_layer, {"pivot": 8, "x": -20, "y": 39, "w": 340, "h": 300, "color": 0x000000, "alpha": 0.5}))
+	up_button = button(mission_layer, main_group, 8, 0, -360, 339, "<  UP  >", 0xFFFFFF, 25, 26, 340, 30, 0)
+	for i in range(item_count):
+		items.append(button(mission_layer, main_group, 8, 0, -360, 339 - (i + 1) * 30, "", 0x9999FF, 20, 26, 340, 30, 0))
+	down_button = button(mission_layer, main_group, 8, 0, -360, 339 - (item_count + 1) * 30, "< DOWN >", 0xFFFFFF, 25, 26, 340, 30, 0)
+
+	# Switch between the standard and the add-on missions, below the list.
+	switch_group.append(api["rect"].call(mission_layer, {"pivot": 8, "x": 0, "y": 14, "w": 360, "h": 25, "color": 0x000000, "alpha": 0.5}))
+	switch_button = button(mission_layer, switch_group, 8, 0, -360, 39, "", 0xFFFFFF, 17, 22, 360, 25, 0)
+
+	# Add-on page bar above the list. Shown only on the add-on tab when there are two or more pages.
+	page_group.append(api["rect"].call(mission_layer, {"pivot": 8, "x": 0, "y": 339, "w": 360, "h": 25, "color": 0x000000, "alpha": 0.5}))
+	prev_button = button(mission_layer, page_group, 8, 3, -360, 351.5, "<<", 0xFFFFFF, 17, 22, 60, 25, 3)
+	next_button = button(mission_layer, page_group, 8, 5, 0, 351.5, ">>", 0xFFFFFF, 17, 22, 60, 25, 5)
+	page_name = button(mission_layer, page_group, 8, 4, -180, 351.5, "", 0xFFFFFF, 17, 22, 0, 0, 4)
+
+	# OPTION, CREDIT, EXIT at the bottom left. Each row is 25 high; the text sits in the middle of its row.
+	main_group.append(api["rect"].call(menu_layer, {"pivot": 6, "x": 5, "y": 14, "w": 170, "h": 75, "color": 0x000000, "alpha": 0.5}))
+	var labels = ["< OPTION >", "< CREDIT >", "<  EXIT  >"]
+	for i in range(3):
+		menu_buttons.append(button(menu_layer, main_group, 6, 3, 5, 14 + (2 - i) * 25 + 12.5, labels[i], 0xFFFFFF, 17, 22, 170, 25, 3))
+
+	# CREDIT: a panel inset from the screen edges, the text fitted into it, and a BACK button.
+	credit_group.append(api["rect"].call(menu_layer, {"stretch": "full", "x": 69, "y": -47.5, "w": -166, "h": -123, "color": 0x000000, "alpha": 0.5}))
+	credit_group.append(api["label"].call(menu_layer, {"stretch": "full", "x": 69, "y": -47.5, "w": -166, "h": -123, "text": ctx["credit"], "halign": 1, "valign": 1, "fit": true, "fit_min": 1, "fit_max": 80, "fit_margin": 8}))
+	credit_group.append(api["rect"].call(menu_layer, {"pivot": 6, "x": 5, "y": 14, "w": 136, "h": 25, "color": 0x000000, "alpha": 0.5}))
+	back_button = button(menu_layer, credit_group, 6, 3, 5, 26.5, "< BACK >", 0xFFFFFF, 17, 22, 136, 25, 3)
+
+	# Quit confirmation in the middle of the screen.
+	exit_group.append(api["rect"].call(menu_layer, {"pivot": 4, "x": 0, "y": 0, "w": 446, "h": 130, "color": 0x000000, "alpha": 0.5}))
+	button(menu_layer, exit_group, 4, 4, 0, 36.4, "Do you want to quit the game?", 0xFFFFFF, 14, 19, 0, 0, 4)
+	yes_button = button(menu_layer, exit_group, 4, 4, -78, -36.4, "< EXIT >", 0xFFFFFF, 17, 22, 136, 25, 4)
+	no_button = button(menu_layer, exit_group, 4, 4, 86.5, -36.4, "< ABORT >", 0xFFFFFF, 17, 22, 153, 25, 4)
+
+	# Cross pointer, the mission load error strip under the title, and the fade over everything.
+	pointer_h = api["rect"].call(pointer_layer, {"stretch": "top", "h": 1, "color": 0xFF0000, "alpha": 0.5})
+	pointer_v = api["rect"].call(pointer_layer, {"stretch": "left", "w": 1, "color": 0xFF0000, "alpha": 0.5})
+	error_rect = api["rect"].call(error_layer, {"stretch": "top", "y": -112, "h": 22, "color": 0x000000, "alpha": 0.7, "visible": false})
+	error_label = api["label"].call(error_layer, {"stretch": "top", "y": -112, "h": 22, "size": 13, "color": 0xFF5959, "halign": 1, "valign": 1, "clip": true, "visible": false})
+	fade_rect = api["rect"].call(fade_layer, {"stretch": "full", "color": 0x000000})
+
+	enter_tab()
+	var state = ctx["state"]
+	if state == "credit" or state == "exit":
+		set_screen(state)
+	else:
+		set_screen("main")
+	if state == "addon" and addon_exists and not is_addon:
+		switch_tab(true)
+	flush()
+
+# ---- state
+
+func max_index():
+	if count > item_count:
+		return count - item_count
+	return 0
+
+func remember():
+	if is_addon:
+		addon_scroll = scroll
+	else:
+		official_scroll = scroll
+	api["save"].call({"is_addon": is_addon, "page": page, "official_scroll": official_scroll, "addon_scroll": addon_scroll})
+
+# Reads the mission count of the current tab and restores its scroll position.
+func enter_tab():
+	count = api["mission_count"].call({"addon": is_addon, "page": page})
+	scroll = official_scroll
+	if is_addon:
+		scroll = addon_scroll
+	if scroll > max_index():
+		scroll = max_index()
+	if scroll < 0:
+		scroll = 0
+	refresh_items()
+	update_thumb()
+	if is_addon:
+		set_text(switch_button, "<< STANDARD MISSIONS")
+	else:
+		set_text(switch_button, "ADD-ON MISSIONS >>")
+
+func refresh_items():
+	names = api["missions"].call({"addon": is_addon, "page": page, "from": scroll, "count": item_count})
+	for i in range(item_count):
+		var exists = i < names.size()
+		set_visible(items[i], exists and screen == "main")
+		if exists:
+			set_text(items[i], names[i])
+
+# Height and position of the scroll thumb. Without scrolling it is hidden and the track takes the color of the list.
+func update_thumb():
+	var scrollable = count > item_count
+	put(thumb, "visible", scrollable and screen == "main")
+	put(thumb_inner, "visible", scrollable and screen == "main")
+	if not scrollable:
+		put(track, "color", 0x000000)
+		return
+	put(track, "color", 0x808080)
+	var bar = 300.0 * item_count / count
+	place_thumb((300.0 - bar) * scroll / max_index(), bar)
+
+# from_top is the distance of the thumb from the top of the track.
+func place_thumb(from_top, bar):
+	put(thumb, "y", 339.0 - from_top - bar)
+	put(thumb, "h", bar)
+	put(thumb_inner, "y", 342.0 - from_top - bar)
+	put(thumb_inner, "h", bar - 6.0)
+
+func switch_tab(to_addon):
+	remember()
+	is_addon = to_addon
+	enter_tab()
+	remember()
+	show_page_bar()
+
+func show_page_bar():
+	var visible = screen == "main" and is_addon and page_count > 1
+	show_all(page_group, visible)
+	if visible:
+		set_text(page_name, api["page_name"].call({"page": page}))
+
+func set_screen(value):
+	screen = value
+	var main = screen == "main"
+	show_all(main_group, main)
+	show_all(switch_group, main and addon_exists)
+	show_all(credit_group, screen == "credit")
+	show_all(exit_group, screen == "exit")
+	show_page_bar()
+	if main:
+		refresh_items()
+		update_thumb()
+	else:
+		put(thumb, "visible", false)
+		put(thumb_inner, "visible", false)
+
+# ---- input
+
+# Updates the color and the pressed look of a button and returns true when it was clicked.
+func click(slot, v, disabled):
+	var main = slot[1]
+	var over = not dragging and hover.has(main)
+	if v["pressed"] and over:
+		capture = main
+	var owned = capture == main
+
+	var color = 0xFFFFFF
+	if disabled:
+		color = 0x999999
+	elif over:
+		color = 0x00FFFF
+	put(main, "color", color)
+	press_look(slot, over and v["held"] and owned and not disabled)
+	return v["clicked"] and over and owned and not disabled
+
+# While pressed, the text moves onto its shadow.
+func press_look(slot, pressed):
+	var offset = 0.0
+	if pressed:
+		offset = 1.0
+	put(slot[1], "x", slot[2] + offset)
+	put(slot[1], "y", slot[3] - offset)
+
+func frame(v, delta):
+	if left:
+		return
+	time += delta
+
+	if v["player_exists"]:
+		var p = v["player"]
+		api["camera"].call({"position": [p[0] + 0.4, p[1] + 2.2, p[2] + 1.2], "euler": [25.0, 225.0, 0.0], "fov": 65.0})
+
+	var fade = 1.0 - time / 2.0
+	if fade < 0.0:
+		fade = 0.0
+	put(fade_rect, "alpha", fade)
+	update_error(delta)
+
+	var mouse = api["mouse"].call(pointer_layer)
+	put(pointer_h, "y", mouse["y"])
+	put(pointer_v, "x", mouse["x"])
+
+	# While the built-in OPTION screen is open, this script only keeps its own panels hidden.
+	if v["option_open"]:
+		if screen != "option":
+			set_screen("option")
+		flush()
+		return
+	if screen == "option":
+		set_screen("main")
+
+	hover = {}
+	for id in api["hovered"].call():
+		hover[id] = true
+
+	var allowed = time >= 0.2
+	v["pressed"] = allowed and v["click_pressed"]
+	v["clicked"] = allowed and v["click_released"]
+	v["held"] = v["click_held"]
+	var escape = allowed and api["pressed"].call("escape")
+	if v["pressed"]:
+		capture = 0
+
+	if screen == "main":
+		update_main(v, escape)
+	elif screen == "exit":
+		if click(yes_button, v, false):
+			left = true
+			flush()
+			api["quit"].call()
+			return
+		if click(no_button, v, false) or escape:
+			set_screen("main")
+	elif click(back_button, v, false) or escape:
+		set_screen("main")
+	flush()
+
+func update_main(v, escape):
+	if escape:
+		set_screen("exit")
+		return
+
+	var top = max_index()
+	var scrollable = count > item_count
+
+	# Dragging the scroll bar comes first, so that nothing else reacts while it is dragged.
+	if scrollable:
+		var bar = 300.0 * item_count / count
+		var range_left = 300.0 - bar
+		var from_top = -api["mouse"].call(scroll_layer)["y"] - (v["pixel_h"] - 339.0)
+		if v["pressed"] and hover.has(track):
+			grab = from_top - range_left * scroll / top
+			if grab < 0.0:
+				grab = 0.0
+			if grab > bar:
+				grab = bar
+			dragging = true
+			capture = track
+		if dragging:
+			if v["held"]:
+				var ratio = (from_top - grab) / range_left
+				if ratio < 0.0:
+					ratio = 0.0
+				if ratio > 1.0:
+					ratio = 1.0
+				place_thumb(range_left * ratio, bar)
+				var index = int(ratio * top)
+				if index != scroll:
+					scroll = index
+					refresh_items()
+			else:
+				dragging = false
+				update_thumb()
+
+	var scrolled = false
+	if click(up_button, v, scroll <= 0):
+		scroll -= 1
+		scrolled = true
+	if click(down_button, v, scroll >= top):
+		scroll += 1
+		scrolled = true
+	if scrolled:
+		refresh_items()
+		update_thumb()
+
+	if addon_exists and click(switch_button, v, false):
+		switch_tab(not is_addon)
+		return
+
+	if is_addon and page_count > 1:
+		var direction = 0
+		if click(prev_button, v, page <= 0):
+			direction = -1
+		if click(next_button, v, page >= page_count - 1):
+			direction = 1
+		if direction != 0:
+			page += direction
+			addon_scroll = 0
+			enter_tab()
+			remember()
+			show_page_bar()
+
+	if click(menu_buttons[0], v, false):
+		api["open_option"].call()
+		return
+	if click(menu_buttons[1], v, false):
+		set_screen("credit")
+		return
+	if click(menu_buttons[2], v, false):
+		set_screen("exit")
+		return
+
+	for i in range(names.size()):
+		var slot = items[i]
+		var main = slot[1]
+		var over = not dragging and hover.has(main)
+		if v["pressed"] and over:
+			capture = main
+		var owned = capture == main
+		if over:
+			put(main, "color", 0xFF9999)
+		else:
+			put(main, "color", 0x9999FF)
+		press_look(slot, over and v["held"] and owned)
+		if v["clicked"] and over and owned:
+			load_mission(scroll + i)
+			return
+
+	if scrollable:
+		if dragging:
+			put(thumb, "color", 0x994D40)
+			put(thumb_inner, "color", 0xCC4D40)
+		elif hover.has(thumb):
+			put(thumb, "color", 0x66AB91)
+			put(thumb_inner, "color", 0x61C4A3)
+		else:
+			put(thumb, "color", 0x999940)
+			put(thumb_inner, "color", 0xCCCC40)
+
+func load_mission(index):
+	remember()
+	var result = api["load_mission"].call({"index": index, "addon": is_addon, "page": page})
+	if result["ok"]:
+		left = true
+		return
+	# The reason is shown under the title for five seconds.
+	put(error_label, "text", result["error"])
+	put(error_rect, "visible", true)
+	put(error_label, "visible", true)
+	error_time = 5.0
+
+func update_error(delta):
+	if error_time <= 0.0:
+		return
+	error_time -= delta
+	var alpha = error_time / 0.5
+	if alpha > 1.0:
+		alpha = 1.0
+	if alpha < 0.0:
+		alpha = 0.0
+	put(error_rect, "alpha", 0.7 * alpha)
+	put(error_label, "alpha", alpha)
+	if error_time <= 0.0:
+		put(error_rect, "visible", false)
+		put(error_label, "visible", false)

@@ -1,6 +1,7 @@
 extends Node
 ## 결과. 미션 성공·실패와 플레이어 통계를 보여 준다. F12 는 같은 미션 재시작, ESC 나 좌클릭은 메뉴로 돌아간다.
 
+const SCREEN_NAME := "result"
 const MENU_SCENE := "mainmenu"
 const GAME_SCENE := "maingame"
 const INPUT_ALLOW_TIME := 0.2
@@ -41,14 +42,33 @@ const INFO := {"top": -200, "pitch": -50, "w": 20, "h": 32, "color": Color(1, 1,
 var _time := 0.0
 var _finished := false
 var _heading: XopsText
+var _ui: CanvasLayer
+# 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
+var _script: XopsScriptScreen
 
 
 func _ready() -> void:
 	InputManager.MouseCursorMode(true, false, false)
 
-	var ui := CanvasLayer.new()
-	add_child(ui)
+	_ui = CanvasLayer.new()
+	add_child(_ui)
 
+	_script = XopsScriptScreen.start(_ui, SCREEN_NAME,
+		{"restart": Callable(self, "_script_restart"), "back": Callable(self, "_script_back")},
+		{"fullname": Game.MissionFullname(), "complete": EventManager.Result == RESULT_COMPLETE, "stats": Game.GetStats()})
+	if _script == null:
+		_build_default()
+
+
+func _exit_tree() -> void:
+	if _script != null:
+		_script.stop()
+		_script = null
+
+
+## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
+func _build_default() -> void:
+	var ui := _ui
 	var background := XopsUI.layer(ui, BACKGROUND_ORDER, true)
 	XopsUI.panel_stretch(background, XopsUI.Stretch.FULL, 0, 0, 0, 0, BACKDROP_COLOR)
 	XopsUI.image_stretch(background, XopsUI.Stretch.FULL, Game.LoadTexture(TITLE_PATH), 0, 0, 0, 0, Color(1, 1, 1, TITLE_ALPHA))
@@ -69,6 +89,16 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if _finished:
 		return
+
+	if _script != null:
+		if _script.frame({}, delta):
+			return
+		_script.stop()
+		_script = null
+		if _finished:
+			return
+		_build_default()
+
 	_time += delta
 
 	_heading.set_alpha(lerpf(HEADING["alpha_from"], HEADING["alpha_to"], XopsUI.cycle(_time, HEADING["duration"])))
@@ -77,16 +107,32 @@ func _process(delta: float) -> void:
 		return
 
 	if InputManager.WasKeyPressed(RESTART_KEY):
-		_finished = true
-		if Game.ReloadMission():
-			Game.ChangeScene(GAME_SCENE)
-		else:
-			Game.UnloadMission()
-			Game.ChangeScene(MENU_SCENE)
+		_script_restart({})
 	elif InputManager.WasPressed("escape") or InputManager.WasClickPressed():
-		_finished = true
+		_script_back({})
+
+
+## 같은 미션을 다시 시작한다 (화면 스크립트도 부른다). 다시 로드하지 못하면 메뉴로 간다.
+func _script_restart(_arguments: Dictionary) -> bool:
+	if _finished:
+		return false
+	_finished = true
+	if Game.ReloadMission():
+		Game.ChangeScene(GAME_SCENE)
+	else:
 		Game.UnloadMission()
 		Game.ChangeScene(MENU_SCENE)
+	return true
+
+
+## 미션을 내리고 메뉴로 돌아간다 (화면 스크립트도 부른다).
+func _script_back(_arguments: Dictionary) -> bool:
+	if _finished:
+		return false
+	_finished = true
+	Game.UnloadMission()
+	Game.ChangeScene(MENU_SCENE)
+	return true
 
 
 ## 화면 위 가운데 기준으로 한 줄을 놓는다.

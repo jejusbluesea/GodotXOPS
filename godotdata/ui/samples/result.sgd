@@ -1,0 +1,62 @@
+# GodotXOPS sample screen script: the built-in result screen rewritten as a screen script.
+# To use it, copy result.json into godotdata/ui/.
+# ctx: fullname (mission name), complete (true when the mission was cleared),
+#      stats (playTime in seconds, fire, onTarget, accuracy in percent, kill, headshot).
+# F12 restarts the mission, Escape or a click goes back to the menu.
+
+var api
+var time = 0.0
+var finished = false
+var heading = 0
+
+func init(a):
+	api = a
+
+func line(layer, value, y, w, h, color):
+	return api["text"].call(layer, {"pivot": 1, "align": 1, "x": 0, "y": y, "text": value, "font_w": w, "font_h": h, "color": color})
+
+func build(ctx):
+	var background = api["layer"].call(0, true)
+	var content = api["layer"].call(1, true)
+	api["rect"].call(background, {"stretch": "full", "color": 0x000000})
+	# Image 0 of the registration file is the title picture.
+	api["image"].call(background, {"stretch": "full", "source": 0, "alpha": 0.1})
+
+	heading = line(content, "RESULT", -30, 50, 42, 0xFF00FF)
+	line(content, ctx["fullname"], -90, 18, 25, 0x8080FF)
+	if ctx["complete"]:
+		line(content, "mission successful", -140, 24, 32, 0x00FF00)
+	else:
+		line(content, "mission failure", -140, 24, 32, 0xFF0000)
+
+	var stats = ctx["stats"]
+	var total = int(stats["playTime"])
+	# One decimal place of the accuracy.
+	var tenths = int(stats["accuracy"] * 10.0 + 0.5)
+	var lines = [
+		"Time  " + str(int(total / 60)) + "min " + str(total % 60) + "sec",
+		"Rounds fired  " + str(stats["fire"]),
+		"Rounds on target  " + str(stats["onTarget"]),
+		"Accuracy rate  " + str(int(tenths / 10)) + "." + str(tenths % 10) + "%",
+		"Kill  " + str(stats["kill"]) + " / HeadShot  " + str(stats["headshot"]),
+	]
+	for i in range(lines.size()):
+		line(content, lines[i], -200 - 50 * i, 20, 32, 0xFFFFFF)
+
+func frame(v, delta):
+	if finished:
+		return
+	time += delta
+
+	var t = time / 0.7
+	api["set"].call(heading, {"alpha": 1.0 + (0.1585 - 1.0) * (t - int(t))})
+
+	# Input from the previous screen must not leak in.
+	if time < 0.2:
+		return
+	if api["key_pressed"].call("F12"):
+		finished = true
+		api["restart"].call()
+	elif api["pressed"].call("escape") or v["click_pressed"]:
+		finished = true
+		api["back"].call()

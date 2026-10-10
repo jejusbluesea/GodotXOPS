@@ -1,0 +1,63 @@
+# GodotXOPS sample screen script: the built-in briefing rewritten as a screen script.
+# To use it, copy briefing.json into godotdata/ui/.
+# ctx: fullname (mission name), briefing (text), images (number of mission images: 0, 1 or 2).
+# A click starts the mission, Escape goes back to the menu.
+
+var api
+var time = 0.0
+var finished = false
+var heading = 0
+var pulse = 0
+
+func init(a):
+	api = a
+
+func build(ctx):
+	var background = api["layer"].call(0, true)
+	var content = api["layer"].call(1, true)
+	var click = api["layer"].call(2, false)
+
+	api["rect"].call(background, {"stretch": "full", "color": 0x000000})
+	# Image 0 of the registration file is the title picture.
+	api["image"].call(background, {"stretch": "full", "source": 0, "alpha": 0.1})
+
+	# Mission images at the middle left: one in the middle, or two stacked.
+	if ctx["images"] >= 2:
+		api["image"].call(content, {"pivot": 3, "x": 40, "y": 35, "w": 160, "h": 150, "source": "mission_image_0"})
+		api["image"].call(content, {"pivot": 3, "x": 40, "y": -135, "w": 160, "h": 150, "source": "mission_image_1"})
+	elif ctx["images"] == 1:
+		api["image"].call(content, {"pivot": 3, "x": 40, "y": -15, "w": 160, "h": 150, "source": "mission_image_0"})
+
+	heading = api["text"].call(content, {"pivot": 1, "align": 1, "x": 0, "y": -30, "text": "BRIEFING", "font_w": 60, "font_h": 42, "color": 0xFFFF00})
+	api["text"].call(content, {"pivot": 1, "align": 1, "x": 0, "y": -90, "text": ctx["fullname"], "font_w": 18, "font_h": 25, "color": 0xFF8000})
+	api["label"].call(content, {"pivot": 0, "x": 230, "y": -175, "w": 370, "h": 600, "text": ctx["briefing"], "size": 16, "wrap": true, "line_spacing": -3})
+
+	# The click prompt has a fixed size (it follows UIScale only). The upper copy grows and fades again and again.
+	api["text"].call(click, {"pivot": 8, "align": 4, "x": -220, "y": 35, "text": "LEFT CLICK TO BEGIN", "font_w": 18, "font_h": 26})
+	pulse = api["text"].call(click, {"pivot": 8, "align": 4, "x": -220, "y": 35, "text": "LEFT CLICK TO BEGIN", "font_w": 18, "font_h": 24})
+
+# Progress from 0 to 1 that repeats every duration seconds.
+func cycle(duration):
+	var t = time / duration
+	return t - int(t)
+
+func frame(v, delta):
+	if finished:
+		return
+	time += delta
+
+	var spread = cycle(1.0)
+	var changes = {}
+	changes[heading] = {"alpha": 1.0 + (0.1585 - 1.0) * cycle(0.7)}
+	changes[pulse] = {"alpha": 1.0 + (0.142 - 1.0) * spread, "font_w": 18.0 + 8.0 * spread, "font_h": 24.0 + 34.0 * spread}
+	api["set_many"].call(changes)
+
+	# Input from the previous screen must not leak in.
+	if time < 0.2:
+		return
+	if api["pressed"].call("escape"):
+		finished = true
+		api["back"].call()
+	elif v["click_pressed"]:
+		finished = true
+		api["start"].call()

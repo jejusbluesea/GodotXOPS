@@ -1,0 +1,5 @@
+{
+  "screen": "briefing",
+  "scriptPath": "godotdata/ui/samples/briefing.sgd",
+  "images": ["data/title.dds"]
+}
