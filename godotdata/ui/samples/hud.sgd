@@ -1,0 +1,459 @@
+# GodotXOPS sample screen script: the built-in main game HUD rewritten as a screen script.
+# To use it, copy hud.json into godotdata/ui/ (only .json files directly in that folder are read).
+# init(api) is called once, build(ctx) once when the screen opens, frame(v, delta) every frame.
+# Elements are made with api functions and are referred to by number. Positions are offsets from a pivot, +x right, +y up.
+# Pivot / align numbers: 0 top-left, 1 top-center, 2 top-right, 3 middle-left, 4 center, 5 middle-right, 6 bottom-left, 7 bottom-center, 8 bottom-right.
+
+var api
+var shown = {}
+var changes = {}
+
+var mode = "normal"
+var input_lock = 1.0
+var play_time = 0.0
+var end_time = -1.0
+var last_start = -1
+var left = false
+
+var frames = []
+var normal_items = []
+var simple_items = []
+var state_text = 0
+var hp_text = 0
+var ammo_text = 0
+var name_text = 0
+var view_image = 0
+var view_yaw = 0.0
+var reload_items = []
+var change_items = []
+var simple_bars = []
+var simple_name = 0
+var crosshair = []
+var cross_gap = 3
+var cross_length = 10
+var cross_static = false
+var scope_image = 0
+var scope_bars = []
+var scope_lines = 0
+var scope_aspect = 1.3333
+var scope_hides = false
+var scope_shown = -1
+var message_label = 0
+var message_id = -1
+var flash_rect = 0
+var flash_timer = 0.0
+var blind = []
+var fade_rect = 0
+var ending_text = 0
+var fps_text = 0
+var fps_time = 0.0
+var fps_frames = 0
+var glyph_magazine = ""
+var glyph_reserve = ""
+
+func init(a):
+	api = a
+
+# Remembers what each element shows and collects only the values that changed. flush() sends them in one call.
+func put(id, key, value):
+	if not shown.has(id):
+		shown[id] = {}
+	var seen = shown[id]
+	if seen.has(key) and seen[key] == value:
+		return
+	seen[key] = value
+	if not changes.has(id):
+		changes[id] = {}
+	changes[id][key] = value
+
+func flush():
+	if changes.size() > 0:
+		api["set_many"].call(changes)
+		changes = {}
+
+func show_all(items, visible):
+	for id in items:
+		put(id, "visible", visible)
+
+func clamp01(x):
+	if x < 0.0:
+		return 0.0
+	if x > 1.0:
+		return 1.0
+	return x
+
+func rgb(r, g, b):
+	return int(r * 255.0) * 65536 + int(g * 255.0) * 256 + int(b * 255.0)
+
+# ---- build
+
+func build(ctx):
+	if ctx["mode"] == "simple" or ctx["mode"] == "off":
+		mode = ctx["mode"]
+
+	var blind_layer = api["layer"].call(0, true)
+	var center_layer = api["layer"].call(1, true)
+	var scope_layer = api["layer"].call(2, true)
+	var message_layer = api["layer"].call(3, true)
+	var fps_layer = api["layer"].call(4, false)
+	var flash_layer = api["layer"].call(5, false)
+	var cross_layer = api["layer"].call(6, false)
+	var frame_layer = api["layer"].call(7, false)
+	var weapon_layer = api["layer"].call(8, false)
+	var hud_layer = api["layer"].call(9, false)
+	var simple_layer = api["layer"].call(10, false)
+	var fade_layer = api["layer"].call(11, true)
+	var ending_layer = api["layer"].call(12, true)
+
+	# Decorative frame at the bottom: border glyphs of char.dds.
+	var lines = [
+		[6, 15, 73, [0xB3, 0xB4, 0xB4, 0xB4, 0xB4, 0xB4, 0xB4, 0xB5]],
+		[6, 15, 41, [0xC3, 0xC4, 0xC4, 0xC4, 0xC4, 0xC4, 0xC4, 0xC5]],
+		[6, 15, 23, [0xB3, 0xB4, 0xB4, 0xB6, 0xB7, 0xB7, 0xB7, 0xB8, 0xB9]],
+		[6, 15, -9, [0xC3, 0xC4, 0xC4, 0xC6, 0xC7, 0xC7, 0xC7, 0xC8, 0xC9]],
+		[8, 0, 66, [0xB0, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB1, 0xB2]],
+		[8, 0, 34, [0xC0, 0xC1, 0xC1, 0xC1, 0xC1, 0xC1, 0xC1, 0xC2]],
+		[8, 0, 2, [0xD0, 0xD1, 0xD1, 0xD1, 0xD1, 0xD1, 0xD1, 0xD2]],
+	]
+	for line in lines:
+		var id = api["text"].call(frame_layer, {"pivot": line[0], "align": line[0], "x": line[1], "y": line[2], "glyphs": line[3], "font_w": 32, "font_h": 32, "alpha": 0.75})
+		frames.append(id)
+		normal_items.append(id)
+
+	# Normal mode: STATE and health at the bottom left, ammo above them, weapon name at the bottom right.
+	state_text = api["text"].call(hud_layer, {"pivot": 6, "align": 6, "x": 23, "y": 21, "text": "STATE", "font_w": 18, "font_h": 24, "color": 0x00FF00})
+	hp_text = api["text"].call(hud_layer, {"pivot": 6, "align": 6, "x": 155, "y": 21, "font_w": 18, "font_h": 24, "color": 0x00FF00})
+	ammo_text = api["text"].call(hud_layer, {"pivot": 6, "align": 6, "x": 25, "y": 72, "font_w": 23, "font_h": 24})
+	name_text = api["text"].call(hud_layer, {"pivot": 8, "align": 6, "x": -247, "y": 75, "font_w": 16, "font_h": 20})
+	view_image = api["image"].call(weapon_layer, {"pivot": 8, "x": 0, "y": 0, "w": 256, "h": 256, "source": "weapon_view"})
+	api["weapon_view"].call({
+		"main": [0, -4.3, 0], "main_scale": 0.8, "main_yaw": 0.0,
+		"sub": [2.5, -5, 0], "sub_scale": 0.4, "sub_yaw": 90.0,
+		"camera": [0, 0, -10], "camera_euler": [0, 0, 0], "fov": 65.0,
+	})
+	normal_items.append(state_text)
+	normal_items.append(hp_text)
+	normal_items.append(ammo_text)
+	normal_items.append(name_text)
+	normal_items.append(view_image)
+	glyph_magazine = api["chr"].call(0xBB)
+	glyph_reserve = api["chr"].call(0xBA)
+
+	reload_items = center_pair(center_layer, "RELOADING")
+	change_items = center_pair(center_layer, "CHANGING")
+
+	# Simple mode: a one pixel border in the health color, a name plate and the weapon name.
+	simple_bars = [
+		api["rect"].call(simple_layer, {"stretch": "left", "w": 1, "h": -2, "color": 0x00FF00}),
+		api["rect"].call(simple_layer, {"stretch": "right", "w": 1, "h": -2, "color": 0x00FF00}),
+		api["rect"].call(simple_layer, {"stretch": "top", "w": 0, "h": 1, "color": 0x00FF00}),
+		api["rect"].call(simple_layer, {"stretch": "bottom", "w": 0, "h": 1, "color": 0x00FF00}),
+	]
+	for id in simple_bars:
+		simple_items.append(id)
+	simple_items.append(api["rect"].call(simple_layer, {"pivot": 6, "x": 8, "y": 7, "w": 219, "h": 25, "color": 0x000000, "alpha": 0.298}))
+	simple_name = api["text"].call(simple_layer, {"pivot": 6, "align": 6, "x": 8, "y": 9.5, "font_w": 16, "font_h": 20})
+	simple_items.append(simple_name)
+
+	# Scope: the picture, four black bars around it and the reticle lines.
+	scope_image = api["image"].call(scope_layer, {"pivot": 4, "visible": false})
+	for i in range(4):
+		scope_bars.append(api["rect"].call(scope_layer, {"pivot": 4, "color": 0x000000, "visible": false}))
+	scope_lines = api["lines"].call(scope_layer, {"pivot": 4, "visible": false})
+
+	# Crosshair: left, right, top, bottom bars.
+	cross_gap = int(api["config_number"].call("General", "aimGap"))
+	cross_length = int(api["config_number"].call("General", "aimLength"))
+	cross_static = api["config_bool"].call("General", "StaticAim")
+	var thick = int(api["config_number"].call("General", "aimThick"))
+	var cross_color = rgb(api["config_number"].call("General", "aimColorR"), api["config_number"].call("General", "aimColorG"), api["config_number"].call("General", "aimColorB"))
+	var cross_alpha = api["config_number"].call("General", "aimColorA")
+	for i in range(4):
+		var w = cross_length
+		var h = thick
+		if i >= 2:
+			w = thick
+			h = cross_length
+		crosshair.append(api["rect"].call(cross_layer, {"pivot": 4, "w": w, "h": h, "color": cross_color, "alpha": cross_alpha, "visible": false}))
+
+	message_label = api["label"].call(message_layer, {"stretch": "bottom", "w": 0, "h": 140, "size": 18, "halign": 1, "alpha": 0.0})
+	flash_rect = api["rect"].call(flash_layer, {"stretch": "full", "color": 0xFF0000, "alpha": 0.5, "visible": false})
+	fps_text = api["text"].call(fps_layer, {"pivot": 2, "align": 2, "x": -10, "y": -10, "font_w": 18, "font_h": 24, "color": 0xFF00FF, "visible": false})
+	for side in ["top", "bottom", "left", "right"]:
+		blind.append(api["rect"].call(blind_layer, {"stretch": side, "color": 0x000000, "visible": false}))
+	fade_rect = api["rect"].call(fade_layer, {"stretch": "full", "color": 0x000000})
+	ending_text = api["text"].call(ending_layer, {"pivot": 4, "align": 4, "font_w": 28, "font_h": 32, "visible": false})
+
+	apply_mode()
+	flush()
+
+func center_pair(layer, value):
+	var shadow = api["text"].call(layer, {"pivot": 4, "align": 4, "x": 3, "y": -63, "text": value, "font_w": 32, "font_h": 34, "color": 0x333333, "visible": false})
+	var main = api["text"].call(layer, {"pivot": 4, "align": 4, "x": 0, "y": -60, "text": value, "font_w": 32, "font_h": 34, "visible": false})
+	return [shadow, main]
+
+func apply_mode():
+	show_all(normal_items, mode == "normal")
+	show_all(simple_items, mode == "simple")
+
+# ---- frame
+
+func frame(v, delta):
+	if left:
+		return
+	if update_input(v, delta):
+		return
+
+	if v["start_count"] != last_start:
+		last_start = v["start_count"]
+		play_time = 0.0
+		end_time = -1.0
+		input_lock = 1.0
+		put(ending_text, "visible", false)
+		put(fade_rect, "alpha", 1.0)
+
+	if api["key_pressed"].call("F2"):
+		if mode == "normal":
+			mode = "simple"
+		elif mode == "simple":
+			mode = "off"
+		else:
+			mode = "normal"
+		apply_mode()
+
+	var hidden_by_scope = update_scope(v)
+	var show_cross = v["first_person"] and v["crosshair"] and not hidden_by_scope
+	show_all(crosshair, show_cross)
+	if show_cross:
+		var gap = cross_gap
+		if not cross_static:
+			gap = cross_gap + v["error_range"]
+		var offset = gap + cross_length * 0.5
+		put(crosshair[0], "x", -offset)
+		put(crosshair[1], "x", offset)
+		put(crosshair[2], "y", offset)
+		put(crosshair[3], "y", -offset)
+
+	if v["exists"]:
+		if mode == "normal":
+			update_normal(v)
+		elif mode == "simple":
+			update_simple(v)
+		show_all(reload_items, v["reloading"])
+		show_all(change_items, v["switching"])
+
+	view_yaw += 66.667 * delta
+	if view_yaw >= 360.0:
+		view_yaw -= 360.0
+	if mode == "normal":
+		api["weapon_view"].call({"main_yaw": view_yaw})
+
+	update_blind(v)
+	update_message(v)
+	update_flash(v, delta)
+	update_fade(v, delta)
+	update_fps(delta)
+	flush()
+
+# Leaving and restarting. Returns true when the screen was left.
+func update_input(v, delta):
+	if input_lock > 0.0:
+		input_lock -= delta
+		return false
+	if api["pressed"].call("escape"):
+		left = true
+		api["leave"].call({"scene": "mainmenu"})
+		return true
+	if api["key_pressed"].call("F12"):
+		api["restart_mission"].call()
+	return false
+
+func state_color(hp):
+	if hp >= 100.0:
+		return 0x00FF00
+	if hp >= 50.0:
+		return rgb((100.0 - hp) / 50.0, 1.0, 0.0)
+	if hp > 0.0:
+		return rgb(1.0, hp / 50.0, 0.0)
+	return 0xFF0000
+
+func update_normal(v):
+	var hp = v["hp"]
+	var color = state_color(hp)
+	put(state_text, "color", color)
+	put(hp_text, "color", color)
+	if hp >= 80.0:
+		put(hp_text, "text", "FINE")
+		put(hp_text, "x", 155)
+	elif hp >= 40.0:
+		put(hp_text, "text", "CAUTION")
+		put(hp_text, "x", 135)
+	elif hp > 0.0:
+		put(hp_text, "text", "DANGER")
+		put(hp_text, "x", 140)
+	else:
+		put(hp_text, "text", "DEAD")
+		put(hp_text, "x", 155)
+
+	var reserve = str(v["reserve"])
+	if v["reserve"] > 999:
+		reserve = "999+"
+	put(ammo_text, "text", glyph_magazine + str(v["magazine"]) + " " + glyph_reserve + reserve)
+	put_name(name_text, v["weapon"], 14)
+
+func update_simple(v):
+	var color = state_color(v["hp"])
+	for id in simple_bars:
+		put(id, "color", color)
+	put_name(simple_name, v["weapon"], 10)
+
+# A weapon name longer than limit letters is squeezed into the same width.
+func put_name(id, value, limit):
+	put(id, "text", value)
+	var count = value.length()
+	if count > limit:
+		put(id, "font_w", 16.0 * limit / count)
+	else:
+		put(id, "font_w", 16.0)
+
+# Shows the scope of the weapon in use. Returns true when the scope replaces the crosshair.
+func update_scope(v):
+	var index = -1
+	if v["scoping"] and v["first_person"]:
+		index = v["scope_index"]
+
+	if index != scope_shown:
+		var visible = false
+		if index >= 0:
+			var scope = api["scope"].call()
+			if scope["index"] < 0:
+				index = -1
+			else:
+				scope_aspect = scope["aspect"]
+				scope_hides = scope["hide_crosshair"]
+				api["set"].call(scope_image, {"source": "scope"})
+				api["set"].call(scope_lines, {"source": "scope"})
+				visible = true
+		put(scope_image, "visible", visible)
+		put(scope_lines, "visible", visible)
+		show_all(scope_bars, visible)
+		scope_shown = index
+
+	if scope_shown < 0:
+		return false
+
+	# Fit the picture into the screen at its own aspect and fill the rest with black bars.
+	var sw = v["scaled_w"]
+	var sh = v["scaled_h"]
+	var w = sh * scope_aspect
+	var h = sh
+	if sw / sh < scope_aspect:
+		w = sw
+		h = sw / scope_aspect
+	var gx = (sw - w) / 2.0
+	var gy = (sh - h) / 2.0
+	if gx < 0.5:
+		w = sw
+		gx = 0.0
+	if gy < 0.5:
+		h = sh
+		gy = 0.0
+	put(scope_image, "w", w)
+	put(scope_image, "h", h)
+	put_box(scope_bars[0], -(w + gx) / 2.0, 0, gx, sh)
+	put_box(scope_bars[1], (w + gx) / 2.0, 0, gx, sh)
+	put_box(scope_bars[2], 0, (h + gy) / 2.0, sw, gy)
+	put_box(scope_bars[3], 0, -(h + gy) / 2.0, sw, gy)
+	return scope_hides
+
+func put_box(id, x, y, w, h):
+	put(id, "x", x)
+	put(id, "y", y)
+	put(id, "w", w)
+	put(id, "h", h)
+
+# Covers the half of the screen on the side where the camera is inside a wall. Bits: 1 top, 2 bottom, 4 left, 8 right.
+func update_blind(v):
+	var bits = v["blind"]
+	var bit = 1
+	for i in range(4):
+		var on = int(bits / bit) % 2 == 1
+		if on:
+			if i < 2:
+				put(blind[i], "h", v["scaled_h"] / 2.0)
+			else:
+				put(blind[i], "w", v["scaled_w"] / 2.0)
+		put(blind[i], "visible", on)
+		bit = bit * 2
+
+func update_message(v):
+	if v["message_id"] < 0:
+		message_id = -1
+		put(message_label, "alpha", 0.0)
+		return
+	if v["message_id"] != message_id:
+		message_id = v["message_id"]
+		put(message_label, "text", v["message_text"])
+	put(message_label, "alpha", v["message_alpha"])
+
+# Red flash when the player is hit: full for 0.05 s, then fading for 0.1 s.
+func update_flash(v, delta):
+	if v["hit"]:
+		flash_timer = 0.15
+	var intensity = 0.0
+	if flash_timer > 0.0:
+		flash_timer -= delta
+		if flash_timer < 0.0:
+			flash_timer = 0.0
+		intensity = 1.0
+		if flash_timer < 0.1:
+			intensity = flash_timer / 0.1
+	put(flash_rect, "visible", intensity > 0.0)
+	if intensity > 0.0:
+		put(flash_rect, "alpha", 0.5 * intensity)
+
+# Fades in at the start. When the mission ends, fades out, shows the ending text and goes to the result screen.
+func update_fade(v, delta):
+	if v["result"] == 0:
+		play_time += delta
+		put(fade_rect, "alpha", 1.0 - clamp01(play_time / 2.0))
+		return
+
+	if end_time < 0.0:
+		end_time = 0.0
+		if v["result"] == 1:
+			put(ending_text, "text", "objective complete")
+			put(ending_text, "color", 0xFF8000)
+		else:
+			put(ending_text, "text", "mission failure")
+			put(ending_text, "color", 0xFF0000)
+		put(ending_text, "visible", true)
+
+	end_time += delta
+	put(fade_rect, "alpha", clamp01(end_time / 3.5))
+	var alpha = 0.0
+	if end_time < 1.0:
+		alpha = end_time
+	elif end_time < 3.0:
+		alpha = 1.0
+	elif end_time < 4.0:
+		alpha = 4.0 - end_time
+	put(ending_text, "alpha", alpha)
+
+	if end_time >= 4.0:
+		left = true
+		flush()
+		api["leave"].call({"scene": "result"})
+
+func update_fps(delta):
+	var show = api["config_bool"].call("General", "ShowFPS")
+	put(fps_text, "visible", show)
+	if not show:
+		return
+	fps_time += delta
+	fps_frames += 1
+	if fps_time >= 0.5:
+		var one = fps_time / fps_frames
+		put(fps_text, "text", str(int(1.0 / one + 0.5)) + " FPS (" + str(int(one * 1000.0 + 0.5)) + " ms)")
+		fps_time = 0.0
+		fps_frames = 0

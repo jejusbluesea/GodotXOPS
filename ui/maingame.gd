@@ -3,6 +3,7 @@ extends Node
 ## F2 로 표시 방식을 바꾼다: 일반 → 간이 → 끔. F12 는 미션 재시작, ESC 는 메뉴로 나간다.
 ## 시점 전환(F1)과 스코프 입력은 PlayerController 가 처리하고, 여기서는 상태를 읽어 그리기만 한다.
 
+const SCREEN_NAME := "maingame"
 const MENU_SCENE := "mainmenu"
 const RESULT_SCENE := "result"
 const UI_MODE_KEY := KEY_F2
@@ -91,6 +92,13 @@ const FPS := {"x": -10, "y": -10, "font": Vector2(18, 24), "color": Color(1, 0, 
 const DEFAULT_SCOPE_ASPECT := 4.0 / 3.0
 
 var _ui: CanvasLayer
+# 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
+var _script: XopsScriptScreen
+var _script_view := {
+	"main": Vector3.ZERO, "main_scale": 1.0, "main_yaw": 0.0,
+	"sub": Vector3.ZERO, "sub_scale": 1.0, "sub_yaw": 0.0,
+	"camera": Vector3.ZERO, "camera_euler": Vector3.ZERO, "fov": 65.0,
+}
 var _layers := {}
 var _mode := "normal"
 var _left := false
@@ -152,6 +160,16 @@ func _ready() -> void:
 	_ui = CanvasLayer.new()
 	add_child(_ui)
 
+	# 이벤트가 놓는 글자는 화면 스크립트와 무관하게 늘 여기서 그린다.
+	_build_event_texts()
+
+	_script = XopsScriptScreen.start(_ui, SCREEN_NAME, _script_api(), {"mode": Dev.value("--ui-state", "normal")})
+	if _script == null:
+		_build_default()
+
+
+## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
+func _build_default() -> void:
 	_build_frames()
 	_build_normal()
 	_build_weapon_view()
@@ -168,12 +186,22 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if _script != null:
+		if Dev.has("--ui-script-stats"):
+			print("screen script frame: %.1f us" % _script.average_frame_usec())
+		_script.stop()
+		_script = null
 	Game.FreeWeaponView()
 
 
 func _process(delta: float) -> void:
 	if _left:
 		return
+
+	if _script != null:
+		_update_event_texts()
+		if _process_script(delta):
+			return
 
 	# 입력을 먼저 본다. 재시작하면 바로 아래에서 알아채 같은 프레임에 화면이 검어진다.
 	if _update_input(delta):
@@ -231,6 +259,14 @@ func _layer(order: int, scaled: bool) -> XopsLayer:
 	if not _layers.has(order):
 		_layers[order] = XopsUI.layer(_ui, order, scaled)
 	return _layers[order]
+
+
+## 이벤트가 놓는 글자를 담을 자리. 메시지와 같은 층(화면 높이 480 기준으로 확대)에 둔다.
+func _build_event_texts() -> void:
+	_event_texts = Control.new()
+	_event_texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_event_texts.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_layer(MESSAGE_ORDER, true).add_child(_event_texts)
 
 
 func _build_frames() -> void:
@@ -331,11 +367,8 @@ func _build_overlays() -> void:
 	XopsUI.place_stretch(_message, XopsUI.Stretch.BOTTOM, 0, 0, 0, MESSAGE["box_height"])
 	_message.modulate.a = 0.0
 
-	# 이벤트가 놓는 글자. 메시지와 같은 층(화면 높이 480 기준으로 확대)에 둔다.
-	_event_texts = Control.new()
-	_event_texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_event_texts.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_layer(MESSAGE_ORDER, true).add_child(_event_texts)
+	# 이벤트가 놓는 글자는 메시지 위에 그린다.
+	_event_texts.get_parent().move_child(_event_texts, -1)
 
 	_flash = XopsUI.panel_stretch(_layer(FLASH_ORDER, false), XopsUI.Stretch.FULL, 0, 0, 0, 0, FLASH["color"])
 	_flash.visible = false
@@ -595,12 +628,7 @@ func _update_message() -> void:
 
 ## 피격 번쩍임. 피격 표시는 확인하면 지워지므로 여기서만 확인한다.
 func _update_flash(delta: float) -> void:
-	# 조작 대상이 바뀌면 그 사람이 갖고 있던 피격 표시를 흘려 버린다.
-	var index: int = Game.PlayerIndex()
-	if index != _flash_player:
-		_flash_player = index
-		Game.ConsumeHit()
-	elif Game.ConsumeHit() and Game.PlayerAlive():
+	if _take_hit():
 		_flash_timer = FLASH["hold"] + FLASH["fade"]
 
 	var intensity := 0.0
@@ -611,6 +639,17 @@ func _update_flash(delta: float) -> void:
 	_flash.visible = intensity > 0.0
 	if intensity > 0.0:
 		_flash.color.a = (FLASH["color"] as Color).a * intensity
+
+
+## 살아 있는 플레이어가 마지막 확인 이후 맞았는지 확인하고 표시를 지운다.
+func _take_hit() -> bool:
+	# 조작 대상이 바뀌면 그 사람이 갖고 있던 피격 표시를 흘려 버린다.
+	var index: int = Game.PlayerIndex()
+	if index != _flash_player:
+		_flash_player = index
+		Game.ConsumeHit()
+		return false
+	return Game.ConsumeHit() and Game.PlayerAlive()
 
 
 ## 미션이 처음부터 다시 시작될 때: 종료 문구를 걷고 검은 화면에서 다시 밝아지게 한다.
@@ -705,3 +744,83 @@ func _update_input(delta: float) -> bool:
 	if InputManager.WasKeyPressed(RESTART_KEY):
 		Game.RestartMission()
 	return false
+
+
+# ============================================================
+#  화면 스크립트
+# ============================================================
+
+## 화면 스크립트의 frame 을 부른다. 반환: 스크립트가 이 프레임을 맡았으면 true. 실패했으면 기본 화면을 만들고 false.
+func _process_script(delta: float) -> bool:
+	var values: Dictionary = Game.HudValues()
+	values["hit"] = _take_hit()
+	if _script.frame(values, delta):
+		return true
+
+	_script.stop()
+	_script = null
+	if _left:
+		return true
+	_build_default()
+	_reset_for_start()
+	return false
+
+
+## 메인게임이 화면 스크립트에 더 내주는 함수. 인자는 사전 하나다.
+func _script_api() -> Dictionary:
+	return {
+		"restart_mission": Callable(self, "_script_restart"),
+		"leave": Callable(self, "_script_leave"),
+		"scope": Callable(self, "_script_scope"),
+		"weapon_view": Callable(self, "_script_weapon_view"),
+	}
+
+
+func _script_restart(_arguments: Dictionary) -> bool:
+	return not _left and Game.RestartMission()
+
+
+## 화면을 떠난다. scene 이 "result" 면 결과 화면으로, 그 밖에는 메뉴로 간다. 에디터의 플레이 테스트로 들어왔으면 에디터로 돌아간다.
+func _script_leave(arguments: Dictionary) -> bool:
+	if _left:
+		return false
+	_left = true
+	if Game.HasHeldScene():
+		Game.ReturnToHeldScene()
+	elif arguments.get("scene", MENU_SCENE) == RESULT_SCENE:
+		Game.UnloadMap()
+		Game.ChangeScene(RESULT_SCENE)
+	else:
+		Game.UnloadMission()
+		Game.ChangeScene(MENU_SCENE)
+	return true
+
+
+## 쓰고 있는 스코프: index(스코프 번호, 없으면 -1), aspect(그림의 가로세로비), hide_crosshair. 그림과 조준선은 요소의 source "scope" 로 넣는다.
+func _script_scope(_arguments: Dictionary) -> Dictionary:
+	var scope: Dictionary = Game.ActiveScope()
+	if scope.is_empty():
+		return {"index": -1, "aspect": DEFAULT_SCOPE_ASPECT, "hide_crosshair": false}
+	var aspect: float = scope["aspect"]
+	return {"index": Game.ScopeIndex(), "aspect": aspect if aspect > 0.0 else DEFAULT_SCOPE_ASPECT, "hide_crosshair": scope["hideCrosshair"]}
+
+
+## 3D 무기 표시의 자리를 정한다. 준 키만 바꾼다: main / sub / camera / camera_euler ([x, y, z], UnityXOPS 공간), main_scale, main_yaw, sub_scale, sub_yaw, fov.
+func _script_weapon_view(arguments: Dictionary) -> bool:
+	for key in arguments:
+		if not _script_view.has(key):
+			continue
+		var value = arguments[key]
+		if _script_view[key] is Vector3:
+			if value is Array and value.size() == 3 and _is_number(value[0]) and _is_number(value[1]) and _is_number(value[2]):
+				_script_view[key] = Vector3(value[0], value[1], value[2])
+		elif _is_number(value):
+			_script_view[key] = float(value)
+	Game.SetWeaponViewMain(_script_view["main"], _script_view["main_scale"], _script_view["main_yaw"])
+	Game.SetWeaponViewSub(_script_view["sub"], _script_view["sub_scale"], _script_view["sub_yaw"])
+	Game.SetWeaponViewCamera(_script_view["camera"], _script_view["camera_euler"], _script_view["fov"])
+	return true
+
+
+func _is_number(value) -> bool:
+	return (value is int or value is float) and is_finite(float(value))

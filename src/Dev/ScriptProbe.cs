@@ -57,6 +57,7 @@ namespace GodotXOPS.Dev
             CheckCompileTime();
             CheckOutsideTree();
             CheckApiBudget();
+            CheckFrameCost();
 
             // 샌드박스 안의 _process 가 도는지, 끄는 두 방법이 듣는지는 몇 프레임 뒤에 본다.
             m_processControl = Load("process.sgd", k_processSource, out _, out _);
@@ -424,6 +425,95 @@ func spin():
                 GD.Print($"[예산 {timeout}] 끝나지 않는 루프가 끊길 때까지: {spinWatch.Elapsed.TotalMilliseconds:0} ms");
                 node.Free();
             }
+        }
+
+        /// <summary>
+        /// 화면 스크립트를 프레임마다 한 번 부를 때의 비용을 잰다 (측정이라 실패로 치지 않는다).
+        /// 값을 얻는 방법 둘(스크립트가 API 로 하나씩 묻기 / 게임이 사전 하나로 넘기기)과, 화면 요소를 고치는 호출의 수(바뀐 것만 / 전부)를 바꿔 가며 본다.
+        /// </summary>
+        private void CheckFrameCost()
+        {
+            const string source = @"var api
+var last = {}
+var keys = [""hp"", ""magazine"", ""reserve"", ""weapon"", ""reloading"", ""switching"", ""scoping"", ""first_person"", ""error_range"", ""blind"", ""result"", ""alive""]
+
+func init(a):
+	api = a
+
+func empty(delta):
+	return 0
+
+func pull(delta, force):
+	var sets = 0
+	for k in keys:
+		var v = api[""get""].call(k)
+		if force or not last.has(k) or last[k] != v:
+			last[k] = v
+			api[""set""].call(sets, k, v)
+			sets += 1
+	return sets
+
+func push(v, force):
+	var sets = 0
+	for k in keys:
+		var x = v[k]
+		if force or not last.has(k) or last[k] != x:
+			last[k] = x
+			api[""set""].call(sets, k, x)
+			sets += 1
+	return sets
+
+func push_batch(v, force):
+	var out = {}
+	for k in keys:
+		var x = v[k]
+		if force or not last.has(k) or last[k] != x:
+			last[k] = x
+			out[k] = x
+	if out.size() > 0:
+		api[""set_many""].call(out)
+	return out.size()
+";
+            var values = new Godot.Collections.Dictionary
+            {
+                ["hp"] = 100f, ["magazine"] = 30, ["reserve"] = 90, ["weapon"] = "MP5", ["reloading"] = false, ["switching"] = false,
+                ["scoping"] = false, ["first_person"] = true, ["error_range"] = 3, ["blind"] = 0, ["result"] = 0, ["alive"] = true,
+            };
+            int setCalls = 0;
+            var api = new Godot.Collections.Dictionary
+            {
+                ["get"] = Callable.From((string key) => values[key]),
+                ["set"] = Callable.From((int id, string property, Variant value) => { setCalls++; }),
+                ["set_many"] = Callable.From((Godot.Collections.Dictionary changes) => { setCalls += changes.Count; }),
+            };
+
+            Node node = Load("frame.sgd", source, out GodotObject sandbox, out string error, inTree: false, configure: n => n.Set("execution_timeout", 200));
+            if (node == null)
+            {
+                GD.Print($"[프레임] 컴파일 실패: {FirstLine(error)}");
+                return;
+            }
+            node.Call("init", api);
+
+            void Measure(string label, Func<Variant> call)
+            {
+                call();
+                int exceptions = Counter(sandbox, "get_exceptions");
+                setCalls = 0;
+                var watch = Stopwatch.StartNew();
+                for (int i = 0; i < k_benchCalls; i++) call();
+                double us = watch.Elapsed.TotalMilliseconds * 1000.0 / k_benchCalls;
+                bool failed = Counter(sandbox, "get_exceptions") != exceptions;
+                GD.Print($"[프레임] {label}: 1회 {us:0.0} us, 요소 고치기 {setCalls / (double)k_benchCalls:0.0}회{(failed ? " (예외 발생)" : "")}");
+            }
+
+            Measure("빈 함수", () => node.Call("empty", 0.016));
+            Measure("API 로 12개 묻기, 바뀐 것 없음", () => node.Call("pull", 0.016, false));
+            Measure("API 로 12개 묻기, 12개 전부 고침", () => node.Call("pull", 0.016, true));
+            Measure("사전으로 12개 받기, 바뀐 것 없음", () => node.Call("push", values, false));
+            Measure("사전으로 12개 받기, 12개 전부 고침", () => node.Call("push", values, true));
+            Measure("사전으로 12개 받기, 12개를 한 번에 고침", () => node.Call("push_batch", values, true));
+            node.Free();
         }
 
         /// <summary>

@@ -7,6 +7,8 @@ extends Node
 ##   --ui-state 값        화면마다 정해 둔 상태로 시작한다 (메뉴: credit / exit / addon / option / option-input / option-graphic / option-sound, 메인게임: simple / off).
 ##                        console 은 어느 화면에서든 설정과 무관하게 디버그 콘솔을 허용한다.
 ## 디버그 콘솔(XopsConsole)도 여기서 만든다. 화면(씬)이 바뀌어도 남아 있어야 해서 Autoload 아래에 둔다.
+##   --ui-script 경로.json   화면 스크립트의 등록 파일 하나를 지정한다 (godotdata/ui 를 훑지 않는다).
+##   --ui-script-stats       끝날 때 화면 스크립트의 frame 한 번에 든 평균 시간을 찍는다.
 ##   --ui-quit 초         그 시간이 지나면 종료한다. 헤드리스로 화면 스크립트에 오류가 없는지 볼 때 쓴다.
 ##   --ui-click "목록"    가짜 입력을 차례로 넣는다. 띄어쓰기로 나눈 항목마다 "x,y"(그 자리를 클릭), "x,y,초"(그 시간 동안 누르고 있기),
 ##                        "key:이름"(키 한 번. 이름은 Godot 키 이름, 예: key:Q), "text:글자"(글자를 차례로 친다. 띄어쓰기는 key:Space 로 넣는다. 콘솔에 명령을 칠 때 쓴다).
@@ -39,6 +41,9 @@ func _ready() -> void:
 		if parts.size() == 2:
 			Game.SetDevWindow(int(parts[0]), int(parts[1]))
 
+	# 등록 폴더(godotdata/ui)를 훑는 대신 그 등록 파일 하나만 쓴다. 화면 스크립트를 설치하지 않고 돌려 볼 때 쓴다.
+	Game.SetUiScriptOverride(value("--ui-script", ""))
+
 	_shot_path = value("--ui-shot", "")
 	_shot_time = float(value("--ui-time", str(DEFAULT_SHOT_TIME)))
 	_quit_time = float(value("--ui-quit", "-1"))
@@ -62,7 +67,8 @@ func _process(delta: float) -> void:
 			get_viewport().warp_mouse(event.position)
 		Input.parse_input_event(event)
 	if _quit_time >= 0.0 and _elapsed >= _quit_time:
-		get_tree().quit(0)
+		# 화면 스크립트가 실패해 기본 화면으로 되돌렸으면 종료 코드 1.
+		get_tree().quit(1 if Game.UiScriptFailures > 0 else 0)
 		return
 	if _shot_path.is_empty() or _elapsed < _shot_time:
 		return
@@ -84,6 +90,9 @@ func _build_fake_events(list: String) -> void:
 				var key := InputEventKey.new()
 				key.physical_keycode = keycode
 				key.keycode = keycode
+				# 좌우가 있는 키는 왼쪽 것으로 넣는다 (바인딩이 leftShift 처럼 한쪽을 가리킨다).
+				if keycode == KEY_SHIFT or keycode == KEY_CTRL or keycode == KEY_ALT:
+					key.location = KEY_LOCATION_LEFT
 				# 띄어쓰기는 글자로도 들어가야 콘솔에 칠 수 있다.
 				if keycode == KEY_SPACE:
 					key.unicode = KEY_SPACE

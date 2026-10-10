@@ -66,6 +66,7 @@ godot --headless --path . --export-release "Windows Desktop" build/windows/Godot
 | `src/Data/` | 데이터 클래스와 `DataManager`, 설정, 입력 |
 | `src/Map/` | 맵, 사람, 무기, 총알, 오브젝트, 이펙트, 소리, AI, 이벤트 |
 | `src/Map/Event/` | 미션 이벤트. 원본 이벤트(`BuiltinEventHandler`)와 스크립트 이벤트(`ScriptEventPack`, `ScriptEventHandler`, `EventApi`) |
+| `src/Scripting/` | SafeGDScript 를 샌드박스에 올리는 `SandboxScript` (스크립트 이벤트와 화면 스크립트가 함께 씁니다) |
 | `src/Scene/` | 화면이 쓰는 창구 `GameBridge`(Autoload `Game`) |
 | `src/Dev/` | 점검 도구 |
 | `src/Editor/` | 에디터 (포인트·블록·미션·에셋). 씬은 `scenes/editor.tscn` |
@@ -159,7 +160,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `play_test.tscn` | `-- --selftest` | 모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 |
 | `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 오브젝트, 통계 |
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
-| `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름 |
+| `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름, 화면 스크립트의 등록과 로드 |
 | `bd2_check.tscn` | — | 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정 결과가 같은지, 블록 플래그(판정별 통과), 그리지 않는 면, 재질(착탄 이펙트와 소리, 발소리와 박자), 깨진 파일, 레이 범위 거르기가 전부 훑은 결과와 같은지 |
 | `mif2_check.tscn` | — | 모든 공식 미션을 확장 형식(BD2, PD2, MIF2)으로 바꿔 미션 정보와 같은 난수 씨앗으로 돌린 100틱의 결과가 원본과 같은지, 에드온 데이터와 10000 번호 규칙, MIF2 의 형식 오류, 미션 목록 스캔, MIF 추가 오브젝트의 변환 |
 | `pd2_check.tscn` | — | 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰된 사람·무기·오브젝트가 같은지, 255 를 넘는 번호, 추가 파라미터, 방향, 이벤트 줄 수, 깨진 파일 |
@@ -173,7 +174,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 - `map_viewer.tscn` — 미션을 골라 자유 카메라로 봅니다. `-- --mission 번호 [--addon] --screenshot 경로.png [--cam x,y,z,yaw,pitch]`로 화면을 저장하고 종료합니다. `-- --file 경로`는 미션 대신 블록 데이터 파일(BD1, BD2) 하나를 띄웁니다 (게임 폴더 기준 경로).
 - `mif2_check.tscn` — 원본 미션을 확장 형식 한 벌(BD2, 텍스처 목록, PD2, `.msg`, MIF2)로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로). `-- --convert-official 번호 출력폴더`는 공식 미션 하나, `-- --convert-official all 출력폴더`는 공식 미션 전부, `-- --convert 입력.mif 출력폴더`는 MIF 미션 하나입니다. 출력 폴더를 `addon.json`에 페이지로 등록하면 메뉴에서 고를 수 있습니다.
 - `pd2_check.tscn` — `-- --convert 입력.pd1 출력.pd2`로 PD1 하나를 PD2 로 바꿉니다. 같은 이름의 `.msg`도 복사합니다 (헤드리스 가능, 게임 폴더 기준 경로).
-- `script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 로드·호출하고, 격리(파일, 프로그램 실행, 씬 트리 접근 등 21가지 시도)와 자원 제한, 실패 통지를 확인합니다 (헤드리스 가능). 측정값도 출력합니다: 메모리 한도가 듣는 범위, 스크립트 하나의 컴파일 비용, 실행 예산별로 부를 수 있는 API 호출 수. 확장의 버전을 올리거나 샌드박스 연결을 고친 뒤에 돌립니다. 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe` (`dev/event_check` 도 같은 방식).
+- `script_probe.tscn` — Godot Sandbox 의 SafeGDScript(`.sgd`)를 로드·호출하고, 격리(파일, 프로그램 실행, 씬 트리 접근 등 21가지 시도)와 자원 제한, 실패 통지를 확인합니다 (헤드리스 가능). 측정값도 출력합니다: 메모리 한도가 듣는 범위, 스크립트 하나의 컴파일 비용, 실행 예산별로 부를 수 있는 API 호출 수, 화면 스크립트를 프레임마다 부를 때의 비용. 확장의 버전을 올리거나 샌드박스 연결을 고친 뒤에 돌립니다. 익스포트 빌드에서는 `GodotXOPS.exe --headless -- --scene dev/script_probe` (`dev/event_check` 도 같은 방식).
 - `block_bench.tscn` — 블록 수를 늘려 가며 한 틱에 걸리는 시간과 레이·내부 판정 한 번의 시간을 잽니다 (헤드리스 가능). 점검이 아니라 측정입니다. 인자: `-- [--ticks 수] [--mission 번호]`.
 - `bd2_check.tscn` — `-- --convert 입력.bd1 출력.bd2`로 BD1 하나를 BD2 와 텍스처 목록(`출력_textures.json`)으로 바꿉니다 (헤드리스 가능, 게임 폴더 기준 경로).
 - `effect_viewer.tscn` — 이펙트 프리셋을 골라 봅니다. 인자: `-- [--effect 번호] [--additive] [--screenshot 경로.png]`. 창에서는 ← →(프리셋), Space(다시 재생), B(가산 미리보기), ↑ ↓(카메라 거리).
@@ -248,7 +249,9 @@ godot --path . -- --scene editor
 | `--ui-state 값` | 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` 상태로 시작합니다. `console`은 어느 화면에서든 설정과 무관하게 디버그 콘솔을 허용합니다 |
 | `--ui-click "목록"` | 가짜 입력을 차례로 넣습니다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 침) |
 | `--ui-shot 경로.png [--ui-time 초]` | 화면을 PNG 로 저장하고 종료합니다 |
-| `--ui-quit 초` | 그 시간 뒤 종료합니다 |
+| `--ui-script 경로.json` | [화면 스크립트](#화면-스크립트의-구조)의 등록 파일 하나를 지정합니다 (`godotdata/ui` 를 훑지 않습니다). 예제: `godotdata/ui/samples/hud.json` |
+| `--ui-script-stats` | 메인게임을 떠날 때 화면 스크립트의 `frame` 한 번에 든 평균 시간을 찍습니다 |
+| `--ui-quit 초` | 그 시간 뒤 종료합니다. 화면 스크립트가 실패해 기본 화면으로 돌아갔으면 종료 코드 1 입니다 |
 
 ```powershell
 godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.png
@@ -331,6 +334,19 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 - 실패는 호출 앞뒤로 샌드박스의 예외 횟수를 비교해 알아냅니다 (스크립트 안의 오류, 막힌 호출, 실행 예산 초과가 모두 여기에 잡힙니다). 실패한 줄만 멈춥니다.
 - 스크립트 하나를 컴파일해 처음 올리는 데 약 150 ms 와 32 MB 가 듭니다. 그래서 종류마다가 아니라 묶음마다 스크립트 하나이고, 미션이 쓰는 묶음만 올리며, 컴파일 결과는 파일이 바뀌지 않으면 다시 씁니다.
 - Interact 키는 `PlayerController` 가 `EventManager.QueueInteract()` 로 넘기고 다음 틱 한 번 동안 읽힙니다. 화면 글자는 `EventManager` 가 칸(32개)으로 들고, HUD(`ui/maingame.gd`)가 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽어 다시 그립니다.
+
+## 화면 스크립트의 구조
+
+모더가 읽는 설명은 [모딩 문서](modding.md#화면-스크립트)에 있습니다. 여기는 코드 쪽입니다. 지금은 메인게임(`ui/maingame.gd`)만 연결돼 있습니다.
+
+- 샌드박스에 올리는 일은 `SandboxScript`(`src/Scripting/`)가 합니다. 스크립트 이벤트의 `ScriptEventPack` 과 화면 스크립트가 함께 씁니다. 격리를 걸 수 없으면 로드를 거절하는 것도 여기 있습니다.
+- `Game.UiScriptLoad(화면 이름)` 이 `godotdata/ui/*.json` 에서 그 화면의 등록을 찾아 스크립트를 올리고 노드(트리 밖)를 돌려줍니다 (`GameBridgeUiScript.cs`). 등록이 없으면 null 이고 화면은 기본 GDScript 화면을 그립니다.
+- 스크립트를 부르고 요소를 만드는 쪽은 GDScript 의 `XopsScriptScreen`(`ui/common/xops_script_screen.gd`)입니다. 요소를 `XopsUI` 로 만들기 때문에 GDScript 에 두었습니다. 스크립트에는 함수 표(사전에 담은 `Callable`)만 넘기고, 요소는 번호로 가리키며, 스크립트가 준 값은 전부 형과 범위를 확인합니다.
+- 화면마다 다른 것은 화면이 넘깁니다: 프레임마다의 값(`Game.HudValues()` 가 사전 하나로 만든다)과 화면 전용 함수(`maingame.gd` 의 `_script_api`).
+- 값을 사전 하나로 넘기고 요소를 `set_many` 로 묶어 고치게 한 것은 비용 때문입니다. `script_probe` 로 잰 값: 값 12개를 스크립트가 하나씩 물으면 88 us, 사전으로 받으면 25 us 이고, 요소 12개를 하나씩 고치면 60 us 쯤이 더 들지만 한 번에 고치면 거의 들지 않습니다.
+- 화면 스크립트는 호출 한 번이 만들 수 있는 값의 수(`references_max`)를 8000 으로 올려 둡니다. 확장의 기본값 100 으로는 요소 수십 개를 만드는 `build` 가 돌지 못합니다. 스크립트 이벤트는 기본값 그대로입니다.
+- 실패(호출 앞뒤의 예외 횟수, 요소 수와 호출 수의 한도)하면 `XopsScriptScreen.frame` 이 false 를 돌려주고, 화면이 스크립트를 내린 뒤 기본 화면을 만듭니다.
+- 화면 스크립트를 고친 뒤에는 `ui_check`(등록과 로드)를 돌리고, 화면은 `--ui-script` 와 `--ui-shot` 으로 기본 화면과 견줘 봅니다.
 
 ## 원본과 다르게 한 동작
 

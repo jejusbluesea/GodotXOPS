@@ -32,6 +32,7 @@ namespace GodotXOPS
         // 디버그 콘솔(메인게임의 F11)을 허용할지. 옵션 화면에 없는 설정이라 config.json 을 직접 고쳐서 켠다.
         public const string KeyAllowConsole = "AllowConsole";
         public const string KeyAllowEventScript = "AllowEventScript";
+        public const string KeyAllowUiScript = "AllowUiScript";
 
         /// <summary>
         /// config.json이 없을 때 기록할 기본 설정을 코드로 구성한다. 코어 섹션 4종과 기본 입력 바인딩을 담는다.
@@ -76,6 +77,7 @@ namespace GodotXOPS
                         new ConfigSetting { name = KeyAllowConsole, type = TypeBool, value = "false", min = 0f, max = 0f },
                         // 스크립트 이벤트(20 이상의 포인트 종류)를 돌릴지. 끄면 그것을 쓰는 미션은 로드하지 않는다. 옵션 화면에 없는 설정이다.
                         new ConfigSetting { name = KeyAllowEventScript, type = TypeBool, value = "true", min = 0f, max = 0f },
+                        new ConfigSetting { name = KeyAllowUiScript, type = TypeBool, value = "true", min = 0f, max = 0f },
                     },
                 },
                 new ConfigSection

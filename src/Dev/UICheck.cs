@@ -24,6 +24,7 @@ namespace GodotXOPS.Dev
             CheckPlayerValues(game);
             CheckConsole(game);
             CheckConsoleLoading(game);
+            CheckUiScript(game);
 
             game.UnloadMission();
             GD.Print($"UI 창구 점검 {m_checks}항목 — 문제 {m_problems.Count}건");
@@ -34,6 +35,64 @@ namespace GodotXOPS.Dev
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GetTree().Quit(m_problems.Count == 0 ? 0 : 1);
+        }
+
+        /// <summary>
+        /// 화면 스크립트의 등록과 로드: 등록 파일로 스크립트를 찾아 샌드박스에 올리고, 거절해야 하는 경우(설정 끔, 없는 파일, .sgd 가 아닌 파일, 문법 오류)를 거절한다.
+        /// 스크립트가 화면을 그리는 쪽(XopsScriptScreen)은 개발용 인자 --ui-script 와 스크린샷으로 본다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        private void CheckUiScript(GameBridge game)
+        {
+            const string folder = "build/ui_check";
+            const string sample = "godotdata/ui/samples/hud.json";
+            System.IO.Directory.CreateDirectory(GamePath.Resolve(folder));
+            void Write(string name, string text) => System.IO.File.WriteAllText(GamePath.Resolve($"{folder}/{name}"), text);
+
+            game.SetUiScriptOverride(string.Empty);
+            Expect(game.UiScriptLoad("maingame") == null, "등록한 것이 없는데 메인게임의 화면 스크립트가 올라옴 (godotdata/ui 에 등록 파일이 있는지 확인)");
+
+            game.SetUiScriptOverride(sample);
+            Node node = game.UiScriptLoad("maingame");
+            Expect(node != null && node.HasMethod("init") && node.HasMethod("build") && node.HasMethod("frame"), "예제 화면 스크립트를 올리지 못했거나 함수가 없음");
+            Expect(node != null && node.GetParent() == null && node.Get("restrictions").AsBool(), "화면 스크립트의 노드가 트리에 있거나 격리가 걸리지 않음");
+            Expect(game.UiScriptExceptions() == 0, "올리기만 한 화면 스크립트에 예외가 셈");
+            Expect(game.UiScriptLoad("briefing") == null, "등록하지 않은 화면의 스크립트가 올라옴");
+            Expect(game.UiScriptImage(0) == null && game.UiScriptImage(-1) == null, "없는 번호의 이미지가 null 이 아님");
+
+            ConfigManager config = ConfigManager.Instance;
+            bool saved = config.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, true);
+            config.SetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, false);
+            Expect(game.UiScriptLoad("maingame") == null, "AllowUiScript 를 껐는데 화면 스크립트가 올라옴");
+            config.SetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, saved);
+
+            Write("images.json", "{ \"screen\": \"maingame\", \"scriptPath\": \"godotdata/ui/samples/hud.sgd\", \"images\": [\"data/title.dds\", \"../outside.png\", \"data/none.png\"] }");
+            game.SetUiScriptOverride($"{folder}/images.json");
+            Expect(game.UiScriptLoad("MainGame") != null, "화면 이름의 대소문자가 다르면 찾지 못함");
+            Expect(game.UiScriptImage(0) != null, "이미지 목록의 이미지를 읽지 못함");
+            Expect(game.UiScriptImage(1) == null && game.UiScriptImage(2) == null && game.UiScriptImage(3) == null, "게임 폴더 밖이거나 없는 이미지가 null 이 아님");
+
+            Write("plain.gd", "func frame(v, delta):\n\treturn 0\n");
+            Write("plain.json", $"{{ \"screen\": \"maingame\", \"scriptPath\": \"{folder}/plain.gd\" }}");
+            game.SetUiScriptOverride($"{folder}/plain.json");
+            Expect(game.UiScriptLoad("maingame") == null, "일반 GDScript 파일이 화면 스크립트로 올라옴");
+
+            Write("broken.sgd", "func frame(:\n\treturn\n");
+            Write("broken.json", $"{{ \"screen\": \"maingame\", \"scriptPath\": \"{folder}/broken.sgd\" }}");
+            game.SetUiScriptOverride($"{folder}/broken.json");
+            Expect(game.UiScriptLoad("maingame") == null, "문법이 틀린 화면 스크립트가 올라옴");
+
+            Write("outside.json", "{ \"screen\": \"maingame\", \"scriptPath\": \"../outside.sgd\" }");
+            game.SetUiScriptOverride($"{folder}/outside.json");
+            Expect(game.UiScriptLoad("maingame") == null, "게임 폴더 밖의 화면 스크립트가 올라옴");
+
+            game.SetUiScriptOverride($"{folder}/missing.json");
+            Expect(game.UiScriptLoad("maingame") == null, "없는 등록 파일로 화면 스크립트가 올라옴");
+
+            game.UiScriptFree();
+            game.SetUiScriptOverride(string.Empty);
+            Godot.Collections.Dictionary values = game.HudValues();
+            Expect(values.ContainsKey("hp") && values.ContainsKey("weapon") && values.ContainsKey("message_text") && values.ContainsKey("result"), "화면 스크립트에 넘기는 값에 빠진 키가 있음");
         }
 
         /// <summary>

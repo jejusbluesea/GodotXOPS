@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
 using Godot;
 
 namespace GodotXOPS
@@ -12,36 +9,13 @@ namespace GodotXOPS
     /// </summary>
     public sealed class ScriptEventPack
     {
-        public const string ScriptExtension = ".sgd";
-
-        // 호출 한 번의 실행 예산 (확장의 기본값과 같다). 넘으면 그 호출이 끊기고 실패로 친다.
-        // 스크립트 안의 계산은 거의 들지 않고 API 호출이 예산을 쓴다: 이 값에서 단순한 호출은 약 1000번, 사전을 돌려주는 호출은 약 300번까지 된다 (script_probe 로 잰 값).
-        // 끝나지 않는 루프는 이 예산을 다 쓸 때까지 게임을 멈춘다 (한 번이고, 그 뒤 그 줄은 멈춘다).
-        private const int k_executionTimeout = 200;
-        // 샌드박스 안의 메모리 한도 (MB). 배열과 문자열은 호스트 쪽 값이라 이 한도에 잡히지 않는다 (알려진 한계).
-        private const int k_memoryMax = 16;
-        // 스크립트 파일 크기의 상한 (바이트).
-        private const long k_maxSourceBytes = 256 * 1024;
-
-        /// <summary>
-        /// 컴파일해 둔 스크립트. 파일이 바뀌지 않았으면 미션을 다시 시작할 때 다시 컴파일하지 않는다 (컴파일이 수십 ms 걸린다).
-        /// </summary>
-        private sealed class Compiled
-        {
-            public DateTime writeTime;
-            public long size;
-            public GodotObject script;
-        }
-
-        private static readonly Dictionary<string, Compiled> s_compiled = new Dictionary<string, Compiled>(StringComparer.OrdinalIgnoreCase);
+        public const string ScriptExtension = SandboxScript.ScriptExtension;
 
         private readonly EventApi m_api;
-        private Node m_node;
-        private GodotObject m_sandbox;
-        private GodotObject m_script;
+        private readonly SandboxScript m_sandbox = new SandboxScript();
 
         // 로그에 쓰는 이름 (스크립트의 exe 폴더 기준 경로).
-        public string Label { get; private set; } = string.Empty;
+        public string Label => m_sandbox.Label;
         // 이 묶음의 스크립트가 쓰는 API.
         public EventApi Api => m_api;
 
@@ -55,7 +29,7 @@ namespace GodotXOPS
         }
 
         // Godot Sandbox 확장이 로드돼 있는지.
-        public static bool Available => ClassDB.ClassExists("SafeGDScript") && ClassDB.ClassExists("Sandbox");
+        public static bool Available => SandboxScript.Available;
 
         /// <summary>
         /// 스크립트 파일을 읽어 샌드박스에 올리고 init(api) 를 부른다.
@@ -65,48 +39,13 @@ namespace GodotXOPS
         /// <returns>올렸으면 true.</returns>
         public bool Load(string relativePath, out string error)
         {
-            Free();
-            Label = relativePath ?? string.Empty;
+            if (!m_sandbox.Load(relativePath, "event", out error)) return false;
 
-            if (!Available)
+            if (m_sandbox.HasFunction("init"))
             {
-                error = "Godot Sandbox extension is not loaded";
-                return false;
-            }
-            if (!string.Equals(Path.GetExtension(Label), ScriptExtension, StringComparison.OrdinalIgnoreCase))
-            {
-                error = $"event script must be a {ScriptExtension} file: {Label}";
-                return false;
-            }
-            string fullPath = GamePath.Resolve(Label);
-            if (fullPath == null || !File.Exists(fullPath))
-            {
-                error = $"event script open failed: {Label}";
-                return false;
-            }
-
-            if (!Compile(fullPath, out m_script, out error)) return false;
-
-            // 제한은 스크립트를 붙인 직후, 무엇도 부르기 전에 건다. 걸리지 않았으면 쓰지 않는다.
-            m_node = new Node { Name = "EventScript" };
-            m_node.SetScript(Variant.From(m_script));
-            m_node.Set("restrictions", true);
-            m_node.Set("execution_timeout", k_executionTimeout);
-            m_node.Set("memory_max", k_memoryMax);
-            Variant sandbox = m_script.Call("get_sandbox_for", m_node);
-            m_sandbox = sandbox.VariantType == Variant.Type.Object ? sandbox.AsGodotObject() : null;
-            if (m_sandbox == null || !m_node.Get("restrictions").AsBool())
-            {
-                Free();
-                error = $"event script could not be isolated: {Label}";
-                return false;
-            }
-
-            if (m_node.HasMethod("init"))
-            {
-                int exceptions = Exceptions();
-                m_node.Call("init", m_api.Table);
-                if (Exceptions() != exceptions)
+                int exceptions = m_sandbox.Exceptions();
+                m_sandbox.Node.Call("init", m_api.Table);
+                if (m_sandbox.Exceptions() != exceptions)
                 {
                     Free();
                     error = $"event script failed in init(): {Label}";
@@ -125,7 +64,7 @@ namespace GodotXOPS
         /// <returns>있으면 true.</returns>
         public bool HasFunction(string function)
         {
-            return m_node != null && !string.IsNullOrEmpty(function) && m_node.HasMethod(function);
+            return m_sandbox.HasFunction(function);
         }
 
         /// <summary>
@@ -140,16 +79,16 @@ namespace GodotXOPS
         public bool Call(string function, Godot.Collections.Dictionary parameters, Godot.Collections.Dictionary state, out int result, out string error)
         {
             result = 0;
-            if (m_node == null)
+            if (m_sandbox.Node == null)
             {
                 error = "script is not loaded";
                 return false;
             }
 
             m_api.BeginCall();
-            int exceptions = Exceptions();
-            Variant value = m_node.Call(function, parameters, state);
-            if (Exceptions() != exceptions)
+            int exceptions = m_sandbox.Exceptions();
+            Variant value = m_sandbox.Node.Call(function, parameters, state);
+            if (m_sandbox.Exceptions() != exceptions)
             {
                 error = "script error or execution limit";
                 return false;
@@ -175,72 +114,7 @@ namespace GodotXOPS
         /// </summary>
         public void Free()
         {
-            if (m_node != null && GodotObject.IsInstanceValid(m_node)) m_node.Free();
-            m_node = null;
-            m_sandbox = null;
-            m_script = null;
-        }
-
-        /// <summary>
-        /// 샌드박스가 지금까지 센 예외 횟수. 스크립트 안의 오류, 막힌 호출, 실행 예산 초과가 모두 여기에 잡힌다.
-        /// </summary>
-        /// <returns>예외 횟수.</returns>
-        private int Exceptions()
-        {
-            return m_sandbox.Call("get_exceptions").AsInt32();
-        }
-
-        /// <summary>
-        /// 스크립트 파일을 컴파일한다. 같은 파일을 전에 컴파일했고 그 뒤로 바뀌지 않았으면 그것을 돌려준다.
-        /// </summary>
-        /// <param name="fullPath">스크립트 전체 경로.</param>
-        /// <param name="script">컴파일된 SafeGDScript.</param>
-        /// <param name="error">실패한 이유 (영어). 성공하면 null.</param>
-        /// <returns>컴파일했으면 true.</returns>
-        private bool Compile(string fullPath, out GodotObject script, out string error)
-        {
-            script = null;
-            string source;
-            DateTime writeTime;
-            long size;
-            try
-            {
-                var info = new FileInfo(fullPath);
-                writeTime = info.LastWriteTimeUtc;
-                size = info.Length;
-                if (size > k_maxSourceBytes)
-                {
-                    error = $"event script is larger than {k_maxSourceBytes / 1024} KB: {Label}";
-                    return false;
-                }
-                if (s_compiled.TryGetValue(fullPath, out Compiled cached) && cached.writeTime == writeTime && cached.size == size)
-                {
-                    script = cached.script;
-                    error = null;
-                    return true;
-                }
-                source = File.ReadAllText(fullPath);
-            }
-            catch (IOException e)
-            {
-                error = $"event script read failed: {Label} ({e.Message})";
-                return false;
-            }
-
-            script = ClassDB.Instantiate("SafeGDScript").AsGodotObject();
-            script.Call("set_source_code", source);
-            string compileError = script.Call("get_compile_error").AsString();
-            if (!string.IsNullOrEmpty(compileError))
-            {
-                script = null;
-                int lineEnd = compileError.IndexOf('\n');
-                error = $"event script compile error: {Label} ({(lineEnd < 0 ? compileError : compileError.Substring(0, lineEnd))})";
-                return false;
-            }
-
-            s_compiled[fullPath] = new Compiled { writeTime = writeTime, size = size, script = script };
-            error = null;
-            return true;
+            m_sandbox.Free();
         }
     }
 }

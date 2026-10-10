@@ -7,7 +7,7 @@
 **GodotXOPS** — Godot 4.7.2 (.NET) 프로젝트. 일본 인디 FPS XOPS(2000년)의 오픈소스 구현 OpenXOPS를, 그 Unity 포팅본인 UnityXOPS를 참고해 Godot으로 옮긴다.
 
 - 참고 원본: `C:\Users\twoj2\Desktop\Project\UnityXOPS` (브랜치 `QoL-road-to-multiplay(0.4)`), C++ 원본은 그 안의 `OpenXOPS/`
-- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 을 릴리즈했다 (2026-10-05, 태그 `v1.0.0`). 최신 릴리즈는 1.1.0 이다 (2026-10-10, 태그 `v1.1.0`, 커밋 `45f3c84`). 다음은 1.2.0 이고 설계 중이다: 화면(씬 UI)을 `.sgd` 로 바꿀 수 있게 한다 (`ROADMAP.md`, `TODO.md`).
+- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 을 릴리즈했다 (2026-10-05, 태그 `v1.0.0`). 최신 릴리즈는 1.1.0 이다 (2026-10-10, 태그 `v1.1.0`, 커밋 `45f3c84`). 다음은 1.2.0 이고 작업 중이다: 화면(씬 UI)을 `.sgd` 로 바꿀 수 있게 한다 (아래 "화면 스크립트", `ROADMAP.md`, `TODO.md`).
 - **1.1.0 다음의 방향** (사용자 결정, 2026-10-10): 쇼케이스를 만들어 배포에 넣기로 한 것은 취소했다. GodotXOPS 는 쇼케이스 없이 그대로 공개하면서 간다. 여기에 넣는 것은 **원본과 크게 달라지지 않으면서 누구나 커스터마이징에 쓸 만한 범용 기능**이다. 기본 데이터와 기본 미션은 원본 그대로 둔다.
 
 ## 확정된 설계
@@ -108,7 +108,8 @@ dotnet build GodotXOPS.csproj
 - `--ui-shot 경로.png [--ui-time 초]` — 화면을 PNG 로 저장하고 종료한다.
 - `--ui-state 값` — 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` / `console` 상태로 시작한다. `console`은 어느 화면에서든 설정 파일과 무관하게 디버그 콘솔을 허용한다 (콘솔을 화면으로 확인할 때 `--ui-click "key:F11 text:help key:Enter"`와 함께 쓴다).
 - `--ui-click "목록"` — 가짜 입력을 차례로 넣는다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 친다. 띄어쓰기는 `key:Space`). 좌표는 창 픽셀이고 실제 커서를 옮긴다. 버튼을 눌러 본 결과를 `--ui-shot`으로 볼 때 쓴다 (`--window 640x480`과 함께).
-- `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다.
+- `--ui-quit 초` — 그 시간 뒤 종료한다. `--headless`와 함께 써서 화면 스크립트에 오류가 없는지 본다. `.sgd` 화면 스크립트가 실패해 기본 화면으로 돌아갔으면 종료 코드 1 이다.
+- `--ui-script 경로.json` — `.sgd` 화면 스크립트의 등록 파일 하나를 지정한다 (`godotdata/ui` 를 훑지 않는다). `--ui-script-stats` 는 메인게임을 떠날 때 `frame` 한 번의 평균 시간을 찍는다.
 
 `play_test.tscn` 은 AI 와 이벤트를 켠 채로 돈다. `--noai` 로 끄고 시작하고, 창에서는 F2(AI 정지/재개), F4(전원 비전투), End(전원 경계), F9+↑/↓(복제), Insert(플레이어 무적), Home(디버그 텍스트 켜기/끄기)을 쓴다. `--invincible`, `--notext` 로 켜고 끈 채 시작할 수 있다. AI 가 꺼져 있어야 하는 점검 도구는 `AIController.Enabled = false` 로 둔다 (`WeaponCheck` 참조).
 
@@ -197,6 +198,18 @@ dotnet build GodotXOPS.csproj
 - **블록 움직이기와 끄기** (이벤트 58 Move Block / 59 Toggle Block, 사용자 요청 2026-10-09. `src/Map/Block/BlockMotion.cs`): 블록은 자기 위치나 회전이 없으므로 **처음 모양 기준의 변위**(이동량과 오일러 각)를 블록이 들고, 바뀔 때마다 면의 법선·중심·범위 상자를 처음 모양에서 다시 구한다 (`ApplyBlockTransform`). 그래서 블록의 판정 정보를 로드 뒤에 바꾸는 코드는 `base*` 값도 함께 봐야 한다. 움직이는 블록이 있을 때만 틱(5)에 등록하고 메시 노드는 틱 사이를 보간한다. 끈 블록은 `layerMask` 0 이고 판정 목록은 블록 번호 순서로 다시 만든다 (순서가 같아야 결과가 같다). **블록은 파일 안의 순번으로 가리킨다** (사용자 결정. BD2 에 식별번호를 넣는 것은 형식 변경이라 미뤘다). **사람은 블록과 함께 움직이지 않고, 끼거나 올라탄 경우는 평소의 충돌 처리에 맡긴다** (사용자 결정). 미션을 다시 시작하면(`UnloadPointData`) `ResetBlockMotion` 이 되돌린다. 스크립트의 파라미터 이름 `x`, `y`, `z`, `yaw`, `id` 는 포인트의 값으로 예약돼 있어 쓸 수 없다 (그래서 dx, dy, dz, turn).
 - **이벤트의 소리** (이벤트 56 Play Sound / 57 Stop Sound, 사용자 결정): 스크립트는 파일 경로를 받지 않으므로 소리 목록(`SoundParameterData`, `godotdata/sound_data.json`, 미션은 MIF2 의 `addonSoundDataPath` 로 10000 부터)의 번호로 재생한다. 기본 목록에는 원본의 효과음을 파일 이름 순서로 넣어 두었다. `SoundManager.PlaySlot` / `StopSlot` 의 칸 16개이고, 되풀이하는 소리는 멈추거나 맵을 내릴 때까지 다시 재생한다. 없는 번호와 읽지 못한 파일은 경고만 남기고 줄은 멈추지 않는다. AI 는 이 소리를 듣지 않는다.
 - 기본 제공 이벤트를 고치면 `base.json`, `base.sgd`, `docs/modding.md` 의 표, `event_check` 를 함께 고친다. 번호는 20개 단위로 끊는다 (20 대기, 40 동작, 60 흐름, 70 화면 글자. 사용자 결정).
+
+## 화면 스크립트
+
+- 1.2.0 의 작업이다 (사용자 결정, 2026-10-10): UnityXOPS 의 Lua 처럼 `.sgd` 로 화면을 바꿀 수 있게 한다. **기본 화면은 지금의 GDScript 이고, `godotdata/ui/*.json` 에 등록된 화면만 스크립트가 대신 그린다.** 대상은 화면 5종(오프닝, 메뉴, 브리핑, 메인게임, 결과)이고 OPTION 과 디버그 콘솔은 뺀다. **지금은 메인게임(HUD)만 연결돼 있다.**
+- 샌드박스에 올리는 것은 `SandboxScript`(`src/Scripting/`)이고 `ScriptEventPack` 과 함께 쓴다. `Game.UiScriptLoad(화면 이름)` 이 등록을 찾아 올린 노드(트리 밖)를 돌려주고, GDScript 의 `XopsScriptScreen`(`ui/common/xops_script_screen.gd`)이 그 노드를 부르며 요소를 `XopsUI` 로 만든다. 이것도 외부 스크립트이므로 격리 없이 돌리지 않는다.
+- 계약: `init(api)` → `build(ctx)` → 프레임마다 `frame(v, delta)`. **값은 게임이 사전 하나로 넘기고(`Game.HudValues()`), 요소는 번호로 가리키며 `set_many` 로 묶어 고친다** (API 호출 횟수가 비용이다. `script_probe` 의 `CheckFrameCost`). 스크립트에 노드를 넘기지 않고, 스크립트가 준 값은 `XopsScriptScreen` 이 형과 범위를 확인한다.
+- 스크립트는 파일 경로를 받지 않는다. 이미지는 등록 파일의 `images` 목록의 번호로 가리킨다.
+- **실패하면 그 화면을 기본 GDScript 화면으로 되돌린다** (예외, 실행 예산, 요소 512개, 호출 2000번). 화면 쪽은 `frame` 이 false 를 돌려주면 스크립트를 내리고 기본 화면을 만든다.
+- **이벤트가 놓는 글자는 화면 스크립트와 별개다** (사용자 결정): 게임이 늘 그린다. **미션은 HUD 를 들고 오지 않는다** (사용자 결정): 화면 스크립트는 설치형뿐이고 MIF2 에 넣지 않는다.
+- 화면 스크립트는 `references_max` 를 8000 으로 올린다 (기본 100 으로는 `build` 가 돌지 못한다). 스크립트 이벤트는 기본값 그대로다.
+- 설정 `General` / `AllowUiScript`(기본 true)는 `AllowEventScript` 처럼 OPTION 화면에 없고 RESET 이 건드리지 않는다.
+- 예제 `godotdata/ui/samples/hud.sgd` 는 기본 HUD 를 그대로 옮긴 것이다. **`ui/maingame.gd` 의 기본 HUD 를 고치면 이 예제도 같이 고친다.** 확인은 `--ui-script godotdata/ui/samples/hud.json` 과 `--ui-shot` 으로 기본 화면과 픽셀을 견준다 (3D 무기 표시는 도는 중이라 조금 다르다). API 를 고치면 `docs/modding.md` 의 "화면 스크립트"도 고친다.
 
 ## 에디터
 
