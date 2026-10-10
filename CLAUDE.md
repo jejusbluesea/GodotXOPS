@@ -7,7 +7,8 @@
 **GodotXOPS** — Godot 4.7.2 (.NET) 프로젝트. 일본 인디 FPS XOPS(2000년)의 오픈소스 구현 OpenXOPS를, 그 Unity 포팅본인 UnityXOPS를 참고해 Godot으로 옮긴다.
 
 - 참고 원본: `C:\Users\twoj2\Desktop\Project\UnityXOPS` (브랜치 `QoL-road-to-multiplay(0.4)`), C++ 원본은 그 안의 `OpenXOPS/`
-- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 을 릴리즈했다 (2026-10-05, 태그 `v1.0.0`). 최신 릴리즈는 1.0.1 이다 (2026-10-05, 태그 `v1.0.1`). 다음은 1.1.0 이고 릴리즈 준비를 마쳤다 (쇼케이스가 남았다) (`ROADMAP.md`, `TODO.md`).
+- 첫 목표: **완전 포팅**. 편의성 현대화(인게임 설정, 일시정지 메뉴, 체크포인트)와 모딩은 포팅이 끝난 뒤에 한다. 포팅은 10단계까지 끝났고 1.0.0 을 릴리즈했다 (2026-10-05, 태그 `v1.0.0`). 최신 릴리즈는 1.0.1 이다 (2026-10-05, 태그 `v1.0.1`). 다음은 1.1.0 이고 릴리즈 준비를 마쳤다 (게시만 남았다) (`ROADMAP.md`, `TODO.md`).
+- **1.1.0 다음의 방향** (사용자 결정, 2026-10-10): 쇼케이스를 만들어 배포에 넣기로 한 것은 취소했다. 사용자가 파생 모드 **Operation X** 를 만들고, 거기에 필요한 코어 요소가 생기면 GodotXOPS 에 넣고 버전을 올린다. **Operation X 는 Godot 파생 프로젝트가 아니라 GodotXOPS 의 모드다**: 엔진 코드를 갈라 고치지 않고 모딩 수단으로만 만든다.
 
 ## 확정된 설계
 
@@ -151,7 +152,7 @@ dotnet build GodotXOPS.csproj
 - 떨어진 무기 200, 탄환 160 은 원본 상수이고 가득 차면 새로 만들지 않고 버린다 (게임 결과에 영향을 주므로 가변으로 바꾸지 않는다). 이펙트 풀만 데이터로 정하고 모자라면 묶음 단위로 늘린다 (`effect_data.json`의 `poolInitialSize`, `poolGrowStep`, `poolMaxSize`). 맵을 내릴 때(`MapLoader.UnloadPointData`) 풀을 모두 비운다.
 - 틱에서 일어난 일의 이펙트를 무기 모델 위치에 맞춰야 하면(총구 화염, 탄피) 틱에서는 표시만 해 두고 `Human._Process`에서 낸다. 무기 모델은 틱 사이를 보간해 움직이므로 틱에서 내면 어긋난다.
 - 이펙트 프리셋·텍스처는 `effect_data.json`(`effectData`, `effectTextureData`), 호출하는 쪽은 인덱스(무기 모델·탄환·사람 종류 데이터에 있다)와 위치만 넘긴다. 이펙트 머티리얼은 `MaterialManager.CreateEffectMaterial`, 투명도는 인스턴스 유니폼 `effect_alpha`다.
-- 블록 면 위에서 나는 이펙트(착탄, 벽 혈흔)는 `EffectManager.PlayOnSurface(번호, 위치, 면 위의 점, 법선)`로 낸다. 빌보드 emitter 는 `Play`와 똑같이 나오고, `NoBillboard` emitter(데칼)만 면에 눕혀 `decalSurfaceOffset`만큼 띄운다. 법선은 판정이 이미 구한 레이캐스트에서 받는다 (이펙트 때문에 판정을 바꾸지 않는다). 기본 데이터에 탄흔은 없다 (원본에 없다. 쇼케이스·에드온이 넣는다).
+- 블록 면 위에서 나는 이펙트(착탄, 벽 혈흔)는 `EffectManager.PlayOnSurface(번호, 위치, 면 위의 점, 법선)`로 낸다. 빌보드 emitter 는 `Play`와 똑같이 나오고, `NoBillboard` emitter(데칼)만 면에 눕혀 `decalSurfaceOffset`만큼 띄운다. 법선은 판정이 이미 구한 레이캐스트에서 받는다 (이펙트 때문에 판정을 바꾸지 않는다). 기본 데이터에 탄흔은 없다 (원본에 없다. 에드온이 넣는다).
 - 이펙트의 블렌드 모드는 emitter 의 `blendMode`다. Godot 의 `blend_mix` / `blend_add` 는 컴파일 타임 설정이라 셰이더가 두 개이고(`effect_blend`, `effect_blend_add`), 머티리얼 캐시 키가 (텍스처 번호, 블렌드 모드)다. 가산일 때만 `brightness` 가 발광 세기로 쓰이고 인스턴스 유니폼 `effect_bright` 로 들어간다. 원본에는 가산이 없다.
 - 소리는 `SoundManager.PlayAt(경로, 위치, 볼륨)`으로 낸다. `AudioStreamPlayer3D`를 쓰지 않는다 (원본의 선형 감쇠를 낼 수 없다). 헤드리스에서는 실제 재생을 하지 않는다.
 - 소리가 나는 자리에서는 `WorldSound.EmitPointSound`로 AI 에게도 알린다 (듣는 거리는 `aiHear*` 데이터).
