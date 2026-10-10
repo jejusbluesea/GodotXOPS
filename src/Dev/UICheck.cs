@@ -56,19 +56,19 @@ namespace GodotXOPS.Dev
             Node node = game.UiScriptLoad("maingame");
             Expect(node != null && node.HasMethod("init") && node.HasMethod("build") && node.HasMethod("frame"), "예제 화면 스크립트를 올리지 못했거나 함수가 없음");
             Expect(node != null && node.GetParent() == null && node.Get("restrictions").AsBool(), "화면 스크립트의 노드가 트리에 있거나 격리가 걸리지 않음");
-            Expect(game.UiScriptExceptions() == 0, "올리기만 한 화면 스크립트에 예외가 셈");
+            Expect(game.UiScriptExceptions("maingame") == 0, "올리기만 한 화면 스크립트에 예외가 셈");
             Expect(game.UiScriptLoad("briefing") == null, "등록하지 않은 화면의 스크립트가 올라옴");
 
             // 예제 폴더를 통째로 지정하면 화면 다섯 개가 전부 등록돼 있어야 한다.
             game.SetUiScriptOverride("godotdata/ui/samples");
-            foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result" })
+            foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result", "option" })
             {
                 Node loaded = game.UiScriptLoad(screen);
-                Expect(loaded != null && loaded.HasMethod("frame") && game.UiScriptExceptions() == 0, $"예제 화면 스크립트를 올리지 못함: {screen}");
+                Expect(loaded != null && loaded.HasMethod("frame") && game.UiScriptExceptions(screen) == 0, $"예제 화면 스크립트를 올리지 못함: {screen}");
             }
             game.SetUiScriptOverride(sample);
             game.UiScriptLoad("maingame");
-            Expect(game.UiScriptImage(0) == null && game.UiScriptImage(-1) == null, "없는 번호의 이미지가 null 이 아님");
+            Expect(game.UiScriptImage("maingame", 0) == null && game.UiScriptImage("maingame", -1) == null, "없는 번호의 이미지가 null 이 아님");
 
             ConfigManager config = ConfigManager.Instance;
             bool saved = config.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, true);
@@ -79,8 +79,8 @@ namespace GodotXOPS.Dev
             Write("images.json", "{ \"screen\": \"maingame\", \"scriptPath\": \"godotdata/ui/samples/hud.sgd\", \"images\": [\"data/title.dds\", \"../outside.png\", \"data/none.png\"] }");
             game.SetUiScriptOverride($"{folder}/images.json");
             Expect(game.UiScriptLoad("MainGame") != null, "화면 이름의 대소문자가 다르면 찾지 못함");
-            Expect(game.UiScriptImage(0) != null, "이미지 목록의 이미지를 읽지 못함");
-            Expect(game.UiScriptImage(1) == null && game.UiScriptImage(2) == null && game.UiScriptImage(3) == null, "게임 폴더 밖이거나 없는 이미지가 null 이 아님");
+            Expect(game.UiScriptImage("maingame", 0) != null, "이미지 목록의 이미지를 읽지 못함");
+            Expect(game.UiScriptImage("maingame", 1) == null && game.UiScriptImage("maingame", 2) == null && game.UiScriptImage("maingame", 3) == null, "게임 폴더 밖이거나 없는 이미지가 null 이 아님");
 
             Write("plain.gd", "func frame(v, delta):\n\treturn 0\n");
             Write("plain.json", $"{{ \"screen\": \"maingame\", \"scriptPath\": \"{folder}/plain.gd\" }}");
@@ -99,7 +99,7 @@ namespace GodotXOPS.Dev
             game.SetUiScriptOverride($"{folder}/missing.json");
             Expect(game.UiScriptLoad("maingame") == null, "없는 등록 파일로 화면 스크립트가 올라옴");
 
-            game.UiScriptFree();
+            foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result", "option" }) game.UiScriptFree(screen);
             game.SetUiScriptOverride(string.Empty);
             Godot.Collections.Dictionary values = game.HudValues();
             Expect(values.ContainsKey("hp") && values.ContainsKey("weapon") && values.ContainsKey("message_text") && values.ContainsKey("result"), "화면 스크립트에 넘기는 값에 빠진 키가 있음");

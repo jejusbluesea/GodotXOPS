@@ -117,10 +117,7 @@ var _addon_exists := false
 var _page := 0
 var _scroll_index := 0
 var _scrollable := false
-var _dragging := false
 var _grab_offset := 0.0
-# 마우스를 누른 순간 그 아래 있던 요소. 뗄 때 같은 요소 위에 있어야 클릭이 된다.
-var _press_capture: Object = null
 
 var _layers: Array[XopsLayer] = []
 var _pointer_layer: XopsLayer
@@ -138,12 +135,12 @@ var _back_bg: ColorRect
 var _credit_panel: ColorRect
 var _credit_label: Label
 var _exit_panel: ColorRect
-var _option: MenuOption
+# OPTION 화면. 메뉴와는 따로 도는 덮개 화면이고 (기본 화면이든 화면 스크립트든), 열려 있는 동안 메뉴는 입력을 받지 않는다.
+var _option: XopsOption
+var _buttons := XopsButtons.new()
 var _ui: CanvasLayer
 # 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
-# OPTION 화면은 스크립트로 바꾸지 않는다: 스크립트가 open_option 을 부르면 여기의 MenuOption 을 띄운다.
 var _script: XopsScriptScreen
-var _script_layer: XopsLayer
 
 # 버튼 하나 = {"shadow": XopsText, "main": XopsText, "x": 기준 x, "y": 기준 y}.
 var _up_slot: Dictionary
@@ -176,25 +173,25 @@ func _ready() -> void:
 		"version": Game.Version(), "credit": Game.CreditText(), "state": state,
 		"official_count": Game.OfficialMissionCount(), "addon_pages": Game.AddonPageCount(), "addon_exists": _addon_exists,
 	})
+	_option = XopsOption.new(_ui, MENU_ORDER, Callable(self, "_apply_ui_scale"))
 	if _script == null:
 		_build_default()
-		return
-
-	# 스크립트가 그리는 동안에도 OPTION 화면과 그 BACK 버튼은 여기서 만든 것을 쓴다.
-	_script_layer = _layer(_ui, MENU_ORDER)
-	_build_back(_script_layer)
-	_option = MenuOption.new(self, _script_layer)
-	_script_show_option(false)
-	if state.begins_with("option"):
-		if state.begins_with("option-"):
-			_option.select_tab(state.trim_prefix("option-").capitalize())
-		_script_show_option(true)
+	elif state.begins_with("option"):
+		_open_option(state)
 
 
 func _exit_tree() -> void:
+	if _option != null:
+		_option.stop()
 	if _script != null:
 		_script.stop()
 		_script = null
+
+
+## OPTION 화면을 연다. state 가 "option-탭" 이면 그 탭에서 시작한다 (개발용 시작 상태).
+func _open_option(state := "") -> void:
+	_screen = "option"
+	_option.open(state.trim_prefix("option-").capitalize() if state.begins_with("option-") else "")
 
 
 ## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
@@ -212,9 +209,7 @@ func _build_default() -> void:
 
 	_build_scroll(_layer(ui, SCROLL_ORDER))
 	_build_mission_list(_layer(ui, MISSION_ORDER))
-	var menu_layer := _layer(ui, MENU_ORDER)
-	_build_menu(menu_layer)
-	_option = MenuOption.new(self, menu_layer)
+	_build_menu(_layer(ui, MENU_ORDER))
 
 	_pointer_layer = XopsUI.layer(ui, POINTER_ORDER, true)
 	_pointer_h = XopsUI.panel_stretch(_pointer_layer, XopsUI.Stretch.TOP, 0, 0, 0, 1, POINTER_COLOR)
@@ -236,10 +231,10 @@ func _build_default() -> void:
 	_update_scroll_thumb()
 	_update_switch_text()
 	var state: String = Dev.value("--ui-state", "")
-	if state.begins_with("option-"):
-		_option.select_tab(state.trim_prefix("option-").capitalize())
-		state = "option"
-	_set_screen(state if state in ["credit", "exit", "option"] else "main")
+	_set_screen(state if state in ["credit", "exit"] else "main")
+	if state.begins_with("option"):
+		_set_screen("option")
+		_open_option(state)
 	if state == "addon" and _addon_exists:
 		_switch_tab(true)
 
@@ -264,13 +259,20 @@ func _process(delta: float) -> void:
 	_pointer_h.position.y = mouse.y
 	_pointer_v.position.x = mouse.x
 
+	# OPTION 이 열려 있는 동안에는 그 화면이 입력을 받는다. 닫히면 미션 목록으로 돌아온다.
+	if _screen == "option":
+		_option.update(delta)
+		if not _option.is_open():
+			_set_screen("main")
+		return
+
 	var allowed := _time >= CLICK_ALLOW_TIME
 	var pressed: bool = allowed and InputManager.WasClickPressed()
 	var clicked: bool = allowed and InputManager.WasClickReleased()
 	var held: bool = InputManager.IsClickPressed()
 	var escape: bool = allowed and InputManager.WasPressed("escape")
 	if pressed:
-		_press_capture = null
+		_buttons.press_capture = null
 
 	match _screen:
 		"main":
@@ -279,9 +281,7 @@ func _process(delta: float) -> void:
 			_update_exit(pressed, clicked, held, escape)
 		_:
 			if _button(_back_slot, pressed, clicked, held) or escape:
-				_back_to_main()
-			elif _screen == "option":
-				_option.update(delta, pressed, clicked, held)
+				_set_screen("main")
 
 
 # ============================================================
@@ -375,32 +375,21 @@ func _build_back(layer: XopsLayer) -> void:
 	_back_slot = _row_button(_back_bg, 0, BACK_TEXT, Vector2(BACK_BG["w"], MENU_ROW_HEIGHT))
 
 
-## 그림자와 본문 두 겹으로 된 글자 버튼을 만든다. 판정 사각형은 기준점에서 pivot 정렬로 hit 크기만큼이다.
 func _text_pair(parent: Control, pivot: Vector2, align: Vector2, x: float, y: float, value: String,
 		color: Color, font: Vector2, hit: Vector2) -> Dictionary:
-	var shadow := XopsUI.text(parent, pivot, align, value, x + 1, y - 1, font.x, font.y, SHADOW_COLOR)
-	var main := XopsUI.text(parent, pivot, align, value, x, y, font.x, font.y, color)
-	main.hit_size = hit
-	main.hit_pivot = pivot
-	return {"shadow": shadow, "main": main, "pivot": pivot, "x": x, "y": y}
+	return _buttons.text_pair(parent, pivot, align, x, y, value, color, font, hit)
 
 
-## 왼쪽 아래 버튼 한 줄: 판정은 줄 전체(왼쪽 아래 기준), 글자는 줄의 세로 가운데.
 func _row_button(parent: Control, y: float, value: String, row: Vector2) -> Dictionary:
-	var slot := _text_pair(parent, XopsUI.BOTTOM_LEFT, XopsUI.MIDDLE_LEFT, 0, y + row.y * 0.5, value, BUTTON_NORMAL, SWITCH_FONT, row)
-	var main: XopsText = slot["main"]
-	main.hit_pivot = XopsUI.MIDDLE_LEFT
-	return slot
+	return _buttons.row_button(parent, y, value, row, SWITCH_FONT)
 
 
 func _set_slot_text(slot: Dictionary, value: String) -> void:
-	(slot["shadow"] as XopsText).text = value
-	(slot["main"] as XopsText).text = value
+	_buttons.set_text(slot, value)
 
 
 func _set_slot_visible(slot: Dictionary, visible: bool) -> void:
-	(slot["shadow"] as XopsText).visible = visible
-	(slot["main"] as XopsText).visible = visible
+	_buttons.set_visible(slot, visible)
 
 
 # ============================================================
@@ -485,8 +474,7 @@ func _set_screen(screen: String) -> void:
 	_track.visible = main
 	_switch_bg.visible = main and _addon_exists
 	_menu_bg.visible = main
-	_back_bg.visible = screen == "credit" or screen == "option"
-	_option.set_visible(screen == "option")
+	_back_bg.visible = screen == "credit"
 	_credit_panel.visible = screen == "credit"
 	_exit_panel.visible = screen == "exit"
 	_set_page_bar_visible(main and _is_addon and _multiple_pages())
@@ -494,18 +482,7 @@ func _set_screen(screen: String) -> void:
 		_fit_credit_text.call_deferred()
 
 
-## OPTION 이나 CREDIT 에서 미션 목록으로 돌아간다. OPTION 이었으면 저장하지 않은 변경을 되돌린다.
-func _back_to_main() -> void:
-	if _screen == "option":
-		ConfigManager.RevertToSaved()
-		_apply_ui_scale()
-	if _script != null:
-		_script_show_option(false)
-	else:
-		_set_screen("main")
-
-
-## 설정의 UIScale 을 메뉴의 층들에 다시 적용한다 (OPTION 에서 SAVE 할 때와 BACK 으로 되돌릴 때).
+## 설정의 UIScale 을 메뉴의 층들에 다시 적용한다 (OPTION 에서 SAVE 할 때와 닫으며 되돌릴 때 XopsOption 이 부른다).
 func _apply_ui_scale() -> void:
 	var ui_scale: float = ConfigManager.GetFloat("General", "UIScale", 1.0)
 	for layer in _layers:
@@ -534,28 +511,16 @@ func _fit_credit_text() -> void:
 #  입력
 # ============================================================
 
-## 누른 순간 이 요소 위였으면 누름을 이 요소가 갖는다. 반환: 지금 누름을 이 요소가 갖고 있는지.
 func _owns_press(id: Object, hovered: bool, pressed: bool) -> bool:
-	if pressed and hovered:
-		_press_capture = id
-	return _press_capture == id
+	return _buttons.owns_press(id, hovered, pressed)
 
 
-## 버튼 하나의 색·눌림 표시를 갱신하고, 클릭됐는지 돌려준다.
 func _button(slot: Dictionary, pressed: bool, clicked: bool, held: bool, disabled := false) -> bool:
-	var main: XopsText = slot["main"]
-	var hovered := not _dragging and main.is_hovered()
-	var owned := _owns_press(main, hovered, pressed)
-
-	main.color = BUTTON_DISABLED if disabled else (BUTTON_HOVER if hovered else BUTTON_NORMAL)
-	_set_pressed(slot, hovered and held and owned and not disabled)
-	return clicked and hovered and owned and not disabled
+	return _buttons.button(slot, pressed, clicked, held, disabled)
 
 
-## 눌린 동안 본문을 그림자 자리로 옮겨 눌린 것처럼 보이게 한다.
 func _set_pressed(slot: Dictionary, pressed: bool) -> void:
-	var offset := 1.0 if pressed else 0.0
-	XopsUI.move(slot["main"], slot["pivot"], slot["x"] + offset, slot["y"] - offset)
+	_buttons.set_pressed(slot, pressed)
 
 
 func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> void:
@@ -573,9 +538,9 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 		var from_top := _track.get_local_mouse_position().y
 		if pressed and XopsUI.hovered(_track):
 			_grab_offset = clampf(from_top - track_range * _scroll_index / max_index, 0.0, bar_height)
-			_dragging = true
-			_press_capture = _track
-		if _dragging:
+			_buttons.dragging = true
+			_buttons.press_capture = _track
+		if _buttons.dragging:
 			if held:
 				var ratio := clampf((from_top - _grab_offset) / track_range, 0.0, 1.0)
 				_thumb.position.y = track_range * ratio
@@ -584,7 +549,7 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 					_scroll_index = index
 					_refresh_items()
 			else:
-				_dragging = false
+				_buttons.dragging = false
 				_update_scroll_thumb()
 
 	var scrolled := false
@@ -620,6 +585,8 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 	for i in _menu_slots.size():
 		if _button(_menu_slots[i], pressed, clicked, held):
 			_set_screen(MENU_SCREENS[i])
+			if MENU_SCREENS[i] == "option":
+				_open_option()
 			return
 
 	for i in ITEM_COUNT:
@@ -627,7 +594,7 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 			continue
 		var slot := _item_slots[i]
 		var main: XopsText = slot["main"]
-		var hovered := not _dragging and main.is_hovered()
+		var hovered := not _buttons.dragging and main.is_hovered()
 		var owned := _owns_press(main, hovered, pressed)
 		main.color = ITEM_HOVER if hovered else ITEM_NORMAL
 		_set_pressed(slot, hovered and held and owned)
@@ -636,7 +603,7 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 			return
 
 	if _scrollable:
-		var state := "pressed" if _dragging else ("hover" if XopsUI.hovered(_thumb) else "normal")
+		var state := "pressed" if _buttons.dragging else ("hover" if XopsUI.hovered(_thumb) else "normal")
 		_thumb.color = SCROLL_OUTLINE[state]
 		_thumb_inner.color = SCROLL_INNER[state]
 
@@ -686,23 +653,19 @@ func console_restart() -> void:
 #  화면 스크립트
 # ============================================================
 
-## 화면 스크립트의 frame 을 부른다. OPTION 이 열려 있는 동안의 입력은 여기서 처리한다.
+## 화면 스크립트의 frame 을 부른다. OPTION 이 열려 있는 동안에는 그 화면이 입력을 받는다.
 ## 반환: 스크립트가 이 프레임을 맡았으면 true. 실패했으면 기본 화면을 만들고 false.
 func _process_script(delta: float) -> bool:
 	_time += delta
-	if _screen == "option":
-		var allowed := _time >= CLICK_ALLOW_TIME
-		var pressed: bool = allowed and InputManager.WasClickPressed()
-		var clicked: bool = allowed and InputManager.WasClickReleased()
-		var held: bool = InputManager.IsClickPressed()
-		if pressed:
-			_press_capture = null
-		if _button(_back_slot, pressed, clicked, held) or (allowed and InputManager.WasPressed("escape")):
-			_back_to_main()
-		else:
-			_option.update(delta, pressed, clicked, held)
+	# OPTION 이 이번 프레임에 닫혔어도 이 프레임까지는 열려 있던 것으로 알린다.
+	# 그러지 않으면 OPTION 을 닫은 ESC 를 메뉴 스크립트가 같은 프레임에 또 읽어 종료 확인을 띄운다.
+	var option_open := _screen == "option"
+	if option_open:
+		_option.update(delta)
+		if not _option.is_open():
+			_screen = "main"
 
-	var values := {"option_open": _screen == "option", "player_exists": Game.PlayerExists()}
+	var values := {"option_open": option_open, "player_exists": Game.PlayerExists()}
 	if values["player_exists"]:
 		var at: Vector3 = Game.PlayerPosition()
 		values["player"] = [at.x, at.y, at.z]
@@ -713,23 +676,11 @@ func _process_script(delta: float) -> bool:
 	_script = null
 	if _left:
 		return true
-	# 스크립트용으로 만들어 둔 OPTION 층을 걷고 기본 화면을 통째로 만든다.
-	if _screen == "option":
-		ConfigManager.RevertToSaved()
-	_option = null
-	_layers.clear()
-	_script_layer.get_parent().remove_child(_script_layer)
-	_script_layer.free()
-	_script_layer = null
+	var was_option := _screen == "option"
 	_build_default()
+	if was_option:
+		_set_screen("option")
 	return false
-
-
-## OPTION 화면과 그 BACK 버튼을 보이거나 숨긴다 (화면 스크립트가 그리는 동안).
-func _script_show_option(open: bool) -> void:
-	_screen = "option" if open else "main"
-	_back_bg.visible = open
-	_option.set_visible(open)
 
 
 ## 메뉴가 화면 스크립트에 더 내주는 함수. 인자는 사전 하나다.
@@ -803,7 +754,7 @@ func _script_load_mission(arguments: Dictionary) -> Dictionary:
 func _script_open_option(_arguments: Dictionary) -> bool:
 	if _left or _screen == "option":
 		return false
-	_script_show_option(true)
+	_open_option()
 	return true
 
 

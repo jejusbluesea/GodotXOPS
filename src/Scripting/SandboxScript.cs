@@ -99,6 +99,16 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 다음 호출부터의 실행 예산을 기본값의 몇 배로 할지 정한다. 요소를 한꺼번에 만드는 호출처럼 한 번만 무거운 호출에 쓴다.
+        /// 예산이 클수록 끝나지 않는 루프가 게임을 오래 멈춘다.
+        /// </summary>
+        /// <param name="scale">배수 (1 이상).</param>
+        public void SetBudgetScale(int scale)
+        {
+            if (Node != null) Node.Set("execution_timeout", k_executionTimeout * Math.Max(1, scale));
+        }
+
+        /// <summary>
         /// 스크립트에 그 이름의 함수가 있는지 본다.
         /// </summary>
         /// <param name="function">함수 이름.</param>

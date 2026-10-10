@@ -16,10 +16,24 @@ namespace GodotXOPS
 
         // 화면 스크립트의 함수 한 번이 만들 수 있는 값(사전, 배열, 글자)의 수. 확장의 기본값 100 으로는 요소 수십 개를 만드는 build 가 돌지 못한다.
         private const int k_uiMaxReferences = 8000;
+        // 화면을 만드는 호출(init, build)의 실행 예산은 평소의 이 배수다. OPTION 처럼 요소가 200개를 넘는 화면은 평소 예산으로 만들지 못한다.
+        private const int k_uiBuildBudgetScale = 8;
+        // 프레임마다의 호출(frame)의 실행 예산도 스크립트 이벤트보다 크게 준다. 사전과 배열을 다루는 것도 예산을 쓰는데, 탭을 바꿀 때처럼 요소 수백 개를 한 프레임에 고치는 일이 있다.
+        // 끝나지 않는 루프는 이 예산만큼(약 2초) 게임을 멈춘 뒤 끊기고, 그 화면은 기본 화면으로 돌아간다.
+        private const int k_uiFrameBudgetScale = 4;
 
-        private readonly SandboxScript m_uiScript = new SandboxScript();
-        private readonly List<string> m_uiImagePaths = new List<string>();
-        private readonly Dictionary<int, Texture2D> m_uiImages = new Dictionary<int, Texture2D>();
+        /// <summary>
+        /// 올려 둔 화면 스크립트 하나: 샌드박스와 그 등록 파일의 이미지 목록.
+        /// </summary>
+        private sealed class UiScriptSlot
+        {
+            public readonly SandboxScript script = new SandboxScript();
+            public readonly List<string> imagePaths = new List<string>();
+            public readonly Dictionary<int, Texture2D> images = new Dictionary<int, Texture2D>();
+        }
+
+        // 화면 이름 → 올려 둔 스크립트. 화면 위에 다른 화면이 덮일 수 있어서(메뉴 위의 OPTION) 여럿이 함께 올라가 있을 수 있다.
+        private readonly Dictionary<string, UiScriptSlot> m_uiScripts = new Dictionary<string, UiScriptSlot>(StringComparer.OrdinalIgnoreCase);
         private string m_uiOverride = string.Empty;
 
         // 화면 스크립트가 실패해 기본 화면으로 되돌린 횟수 (개발용 인자가 종료 코드에 쓴다).
@@ -36,20 +50,21 @@ namespace GodotXOPS
 
         /// <summary>
         /// 그 화면을 맡겠다고 등록한 스크립트를 샌드박스에 올린다. 스크립트의 함수는 부르지 않는다.
-        /// 한 번에 화면 하나의 스크립트만 올라가 있다 (전에 올린 것은 내린다).
+        /// 같은 화면의 것이 이미 올라가 있으면 내리고 다시 올린다. 다른 화면의 것은 그대로 둔다.
         /// </summary>
         /// <param name="screen">화면 이름 (예: "maingame").</param>
         /// <returns>스크립트가 붙은 노드 (트리 밖). 등록이 없거나, 설정에서 꺼져 있거나, 올리지 못했으면 null.</returns>
         public Node UiScriptLoad(string screen)
         {
-            UiScriptFree();
             if (string.IsNullOrEmpty(screen)) return null;
+            UiScriptFree(screen);
             if (!ConfigManager.Instance.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, true)) return null;
 
             UiPackData pack = FindUiPack(screen, out string source);
             if (pack == null) return null;
 
-            if (!m_uiScript.Load(pack.scriptPath, "screen", out string error, k_uiMaxReferences))
+            var slot = new UiScriptSlot();
+            if (!slot.script.Load(pack.scriptPath, "screen", out string error, k_uiMaxReferences))
             {
                 Debugger.LogError($"{error} (registered in {source}). Using the built-in screen.", nameof(GameBridge));
                 return null;
@@ -59,66 +74,92 @@ namespace GodotXOPS
             {
                 foreach (string path in pack.images)
                 {
-                    if (m_uiImagePaths.Count >= k_uiMaxImages) break;
-                    m_uiImagePaths.Add(path ?? string.Empty);
+                    if (slot.imagePaths.Count >= k_uiMaxImages) break;
+                    slot.imagePaths.Add(path ?? string.Empty);
                 }
             }
-            return m_uiScript.Node;
+            m_uiScripts[screen] = slot;
+            return slot.script.Node;
         }
 
         /// <summary>
-        /// 올려 둔 화면 스크립트의 샌드박스가 지금까지 센 예외 횟수. 호출 앞뒤의 값을 견줘 그 호출이 실패했는지 안다.
+        /// 그 화면의 스크립트의 샌드박스가 지금까지 센 예외 횟수. 호출 앞뒤의 값을 견줘 그 호출이 실패했는지 안다.
         /// </summary>
-        /// <returns>예외 횟수.</returns>
-        public int UiScriptExceptions()
+        /// <param name="screen">화면 이름.</param>
+        /// <returns>예외 횟수. 올라가 있지 않으면 0.</returns>
+        public int UiScriptExceptions(string screen)
         {
-            return m_uiScript.Exceptions();
+            return FindUiScript(screen)?.script.Exceptions() ?? 0;
         }
 
         /// <summary>
         /// 화면 스크립트가 실패한 이유를 로그(디버그 콘솔)에 남긴다.
         /// </summary>
+        /// <param name="screen">화면 이름.</param>
         /// <param name="message">이유 (영어).</param>
-        public void UiScriptLogError(string message)
+        public void UiScriptLogError(string screen, string message)
         {
             UiScriptFailures++;
-            Debugger.LogError($"Screen script {m_uiScript.Label}: {message}. Using the built-in screen.", nameof(GameBridge));
+            Debugger.LogError($"Screen script {UiScriptLabel(screen)}: {message}. Using the built-in screen.", nameof(GameBridge));
         }
 
         /// <summary>
         /// 화면 스크립트가 남기는 글을 로그(디버그 콘솔)에 경고로 남긴다.
         /// </summary>
+        /// <param name="screen">화면 이름.</param>
         /// <param name="message">글.</param>
-        public void UiScriptLog(string message)
+        public void UiScriptLog(string screen, string message)
         {
-            Debugger.LogWarning($"[{m_uiScript.Label}] {message}", nameof(GameBridge));
+            Debugger.LogWarning($"[{UiScriptLabel(screen)}] {message}", nameof(GameBridge));
         }
 
         /// <summary>
-        /// 등록 파일의 이미지 목록에서 그 번호의 이미지를 텍스처로 읽는다. 한 번 읽은 것은 스크립트를 내릴 때까지 갖고 있는다.
+        /// 그 화면의 등록 파일의 이미지 목록에서 그 번호의 이미지를 텍스처로 읽는다. 한 번 읽은 것은 스크립트를 내릴 때까지 갖고 있는다.
         /// </summary>
+        /// <param name="screen">화면 이름.</param>
         /// <param name="index">이미지 목록의 번호 (0 부터).</param>
         /// <returns>텍스처. 없는 번호이거나 읽지 못하면 null.</returns>
-        public Texture2D UiScriptImage(int index)
+        public Texture2D UiScriptImage(string screen, int index)
         {
-            if (index < 0 || index >= m_uiImagePaths.Count) return null;
-            if (m_uiImages.TryGetValue(index, out Texture2D cached)) return cached;
+            UiScriptSlot slot = FindUiScript(screen);
+            if (slot == null || index < 0 || index >= slot.imagePaths.Count) return null;
+            if (slot.images.TryGetValue(index, out Texture2D cached)) return cached;
 
             // 경로는 등록 파일이 정한 것이고 게임 폴더 밖을 가리키면 Resolve 가 거절한다.
-            Texture2D texture = LoadTexture(m_uiImagePaths[index]);
-            if (texture == null) Debugger.LogWarning($"Screen script image {index} could not be read: {m_uiImagePaths[index]}", nameof(GameBridge));
-            m_uiImages[index] = texture;
+            Texture2D texture = LoadTexture(slot.imagePaths[index]);
+            if (texture == null) Debugger.LogWarning($"Screen script image {index} could not be read: {slot.imagePaths[index]}", nameof(GameBridge));
+            slot.images[index] = texture;
             return texture;
         }
 
         /// <summary>
-        /// 올려 둔 화면 스크립트를 내린다.
+        /// 그 화면의 스크립트를 내린다.
         /// </summary>
-        public void UiScriptFree()
+        /// <param name="screen">화면 이름.</param>
+        public void UiScriptFree(string screen)
         {
-            m_uiScript.Free();
-            m_uiImagePaths.Clear();
-            m_uiImages.Clear();
+            if (string.IsNullOrEmpty(screen) || !m_uiScripts.Remove(screen, out UiScriptSlot slot)) return;
+            slot.script.Free();
+        }
+
+        /// <summary>
+        /// 그 화면의 스크립트의 실행 예산을 정한다. 화면을 만드는 init / build 는 요소를 한꺼번에 만들므로 더 큰 예산을 주고, frame 은 평소 예산으로 돌린다.
+        /// </summary>
+        /// <param name="screen">화면 이름.</param>
+        /// <param name="building">true 면 화면을 만드는 호출의 예산, false 면 평소 예산.</param>
+        public void UiScriptSetBuilding(string screen, bool building)
+        {
+            FindUiScript(screen)?.script.SetBudgetScale(building ? k_uiBuildBudgetScale : k_uiFrameBudgetScale);
+        }
+
+        private UiScriptSlot FindUiScript(string screen)
+        {
+            return !string.IsNullOrEmpty(screen) && m_uiScripts.TryGetValue(screen, out UiScriptSlot slot) ? slot : null;
+        }
+
+        private string UiScriptLabel(string screen)
+        {
+            return FindUiScript(screen)?.script.Label ?? screen ?? string.Empty;
         }
 
         /// <summary>

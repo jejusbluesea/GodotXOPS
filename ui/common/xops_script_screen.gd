@@ -76,6 +76,8 @@ static func start(root: Node, screen: String, extra: Dictionary, ctx: Dictionary
 	host._sources = sources
 	ctx["saved"] = (s_saved.get(screen, {}) as Dictionary).duplicate()
 	host._build_api(extra)
+	# 화면을 만드는 호출은 요소를 한꺼번에 만들므로 더 큰 실행 예산으로 돌린다.
+	Game.UiScriptSetBuilding(screen, true)
 	if not node.has_method("frame"):
 		host._fail("frame(v, delta) is missing")
 	elif node.has_method("init"):
@@ -85,6 +87,7 @@ static func start(root: Node, screen: String, extra: Dictionary, ctx: Dictionary
 	if host.failed():
 		host.stop()
 		return null
+	Game.UiScriptSetBuilding(screen, false)
 	return host
 
 
@@ -151,7 +154,7 @@ func stop() -> void:
 		Game.FreeWeaponView()
 		_weapon_view_used = false
 	_node = null
-	Game.UiScriptFree()
+	Game.UiScriptFree(_screen)
 
 
 # ============================================================
@@ -160,9 +163,9 @@ func stop() -> void:
 
 func _invoke(function: String, arguments: Array) -> bool:
 	_calls = 0
-	var before: int = Game.UiScriptExceptions()
+	var before: int = Game.UiScriptExceptions(_screen)
 	_node.callv(function, arguments)
-	if Game.UiScriptExceptions() != before:
+	if Game.UiScriptExceptions(_screen) != before:
 		_fail("script error or execution limit in %s()" % function)
 	return not failed()
 
@@ -170,7 +173,7 @@ func _invoke(function: String, arguments: Array) -> bool:
 func _fail(message: String) -> void:
 	if _failure.is_empty():
 		_failure = message
-		Game.UiScriptLogError(message)
+		Game.UiScriptLogError(_screen, message)
 
 
 ## API 함수의 첫머리에서 부른다. 호출 수를 세고, 이미 실패했으면 false.
@@ -510,7 +513,7 @@ func _apply_source(item: Dictionary, source) -> void:
 	if item["kind"] == KIND_IMAGE:
 		var texture: Texture2D = null
 		if source is int:
-			texture = Game.UiScriptImage(source)
+			texture = Game.UiScriptImage(_screen, source)
 		elif source is String and source == SOURCE_SCOPE:
 			var scope: Dictionary = Game.ActiveScope()
 			if not scope.is_empty():
@@ -574,7 +577,7 @@ func _api_key_pressed(key_name = "") -> bool:
 
 func _api_log(message = "") -> void:
 	if _enter():
-		Game.UiScriptLog(_text(message))
+		Game.UiScriptLog(_screen, _text(message))
 
 
 ## 마우스의 자리를 그 층의 좌표로 돌려준다: 층의 왼쪽 위(기준점 0)에서의 오프셋이고 아래로 갈수록 y 가 작아진다.

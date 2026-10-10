@@ -1,0 +1,530 @@
+# GodotXOPS sample screen script: the built-in OPTION screen rewritten as a screen script.
+# To use it, copy option.json into godotdata/ui/.
+# The OPTION screen is laid over another screen (the main menu). ctx: tab (tab to start on, may be empty), sections (names of the config sections).
+# A value goes into the game the moment it is changed; SAVE writes the file and applies the window mode, resolution and UIScale.
+# BACK and Escape call close(), which undoes everything that was not saved.
+# v["bind_listening"] is the action that waits for a key, v["bind_captured"] is true on the frame the key arrived.
+# State is kept as numbers (the selected section and the waiting action are positions in their lists), not as texts:
+# comparing two texts that come from different places can come out wrong in a screen script.
+# Everything hangs from the top left of the screen (pivot 0) except BACK (bottom left, 6) and SAVE / RESET (bottom right, 8).
+
+var api
+var shown = {}
+var changes = {}
+var hover = {}
+var capture = 0
+
+var font_w = 17.0
+var row_h = 25.0
+var left = 20.0
+var arrow_w = 34.0
+var layer = 0
+
+var sections = []
+var section_page = 0
+# Position of the selected section in sections.
+var selected = 0
+var section_prev = []
+var section_next = []
+var section_slots = []
+var groups = {}
+var checks = {}
+var steppers = {}
+var color_cells = {}
+var resolution_cells = {}
+var resolution_info = {}
+var bind_actions = ["jump", "walk", "drop", "fire", "zoom", "previous", "next", "reload", "first", "second", "interact"]
+var bind_slots = {}
+var bind_paths = {}
+var back_button = []
+var save_button = []
+var reset_button = []
+# Position in bind_actions of the action that waits for a key, or -1.
+var listening = -1
+
+var presets = [["White", 1.0, 1.0, 1.0], ["Black", 0.0, 0.0, 0.0], ["Red", 1.0, 0.0, 0.0], ["Green", 0.0, 1.0, 0.0],
+	["Blue", 0.0, 0.0, 1.0], ["Cyan", 0.0, 1.0, 1.0], ["Magenta", 1.0, 0.0, 1.0], ["Yellow", 1.0, 1.0, 0.0]]
+var short_keys = {"leftButton": "LMB", "rightButton": "RMB", "middleButton": "MMB", "leftShift": "LShift", "rightShift": "RShift",
+	"leftCtrl": "LCtrl", "rightCtrl": "RCtrl", "leftAlt": "LAlt", "rightAlt": "RAlt", "space": "Space", "escape": "Esc", "enter": "Enter",
+	"tab": "Tab", "upArrow": "Up", "downArrow": "Down", "leftArrow": "Left", "rightArrow": "Right"}
+
+func init(a):
+	api = a
+
+# Remembers what each element shows and collects only the values that changed. flush() sends them in one call.
+func put(id, key, value):
+	if not shown.has(id):
+		shown[id] = {}
+	var seen = shown[id]
+	if seen.has(key) and seen[key] == value:
+		return
+	seen[key] = value
+	if not changes.has(id):
+		changes[id] = {}
+	changes[id][key] = value
+
+func flush():
+	if changes.size() > 0:
+		api["set_many"].call(changes)
+		changes = {}
+
+func rgb(r, g, b):
+	return int(r * 255.0 + 0.5) * 65536 + int(g * 255.0 + 0.5) * 256 + int(b * 255.0 + 0.5)
+
+# A number as text with the given number of decimal places.
+func fmt(value, decimals):
+	var scale = 1
+	for i in range(decimals):
+		scale = scale * 10
+	var n = int(value * scale + 0.5)
+	if decimals == 0:
+		return str(n)
+	var frac = str(n % scale)
+	while frac.length() < decimals:
+		frac = "0" + frac
+	return str(int(n / scale)) + "." + frac
+
+# ---- building blocks
+
+# A text with its shadow. tab is the group it is shown with ("" = always). Returns [shadow, main, x, y].
+func pair(tab, pivot, align, x, y, value, hit_w):
+	var shadow = api["text"].call(layer, {"pivot": pivot, "align": align, "x": x + 1, "y": y - 1, "text": value, "font_w": font_w, "font_h": 22, "color": 0x000000})
+	var main = api["text"].call(layer, {"pivot": pivot, "align": align, "x": x, "y": y, "text": value, "font_w": font_w, "font_h": 22, "hit_w": hit_w, "hit_h": row_h, "hit_pivot": align})
+	if tab != "":
+		groups[tab].append(shadow)
+		groups[tab].append(main)
+	return [shadow, main, x, y]
+
+# The dark background of one row. Returns its top left corner.
+func row_bg(tab, x, y, w):
+	groups[tab].append(api["rect"].call(layer, {"pivot": 0, "x": x, "y": y, "w": w, "h": row_h, "color": 0x000000, "alpha": 0.5}))
+	return [x, y]
+
+# A text in a cell of a row: cx is the left of the cell inside the row, w its width. centered = false puts the text at the left of the cell.
+func cell(tab, bg, cx, w, value, centered):
+	if centered:
+		return pair(tab, 0, 4, bg[0] + cx + w * 0.5, bg[1] - row_h * 0.5, value, w)
+	return pair(tab, 0, 3, bg[0] + cx, bg[1] - row_h * 0.5, value, w)
+
+func set_text(slot, value):
+	put(slot[0], "text", value)
+	put(slot[1], "text", value)
+
+func row_y(index):
+	return -150.0 - index * 30.0
+
+func checkbox_width(label):
+	return label.length() * font_w + 40.0 + 3.0 * font_w
+
+func selector_width(label, value_chars, label_gap):
+	return label.length() * font_w + label_gap + arrow_w + 10.0 + value_chars * font_w + 10.0 + arrow_w
+
+# "name [*]"
+func checkbox(tab, x, y, label, section, key):
+	var label_w = label.length() * font_w
+	var bg = row_bg(tab, x, y, checkbox_width(label))
+	cell(tab, bg, 0.0, label_w, label, true)
+	checks[tab].append({"slot": cell(tab, bg, label_w + 40.0, 3.0 * font_w, "[ ]", true), "section": section, "key": key})
+
+# "name << [value] >>" starting at x inside the row. Returns the three cells.
+func selector(tab, bg, x, label, value_chars, label_gap):
+	var label_w = label.length() * font_w
+	var value_w = value_chars * font_w
+	cell(tab, bg, x, label_w, label, true)
+	var cx = x + label_w + label_gap
+	return {
+		"prev": cell(tab, bg, cx, arrow_w, "<<", true),
+		"value": cell(tab, bg, cx + arrow_w + 10.0, value_w, "", true),
+		"next": cell(tab, bg, cx + arrow_w + 10.0 + value_w + 10.0, arrow_w, ">>", true),
+	}
+
+# A number setting inside a row. decimals < 0 means an integer setting.
+func stepper_in(tab, bg, x, label, value_chars, label_gap, section, key, step, decimals):
+	var s = selector(tab, bg, x, label, value_chars, label_gap)
+	s["section"] = section
+	s["key"] = key
+	s["step"] = step
+	s["decimals"] = decimals
+	s["direction"] = 0
+	s["time"] = 0.0
+	s["min"] = 0.0
+	s["max"] = 0.0
+	steppers[tab].append(s)
+
+# A number setting with its own row.
+func stepper(tab, x, y, label, value_chars, label_gap, section, key, step, decimals):
+	var bg = row_bg(tab, x, y, selector_width(label, value_chars, label_gap))
+	stepper_in(tab, bg, 0.0, label, value_chars, label_gap, section, key, step, decimals)
+
+# ---- build
+
+func build(ctx):
+	layer = api["layer"].call(5, false)
+	sections = ctx["sections"]
+	for name in ["General", "Input", "Graphic", "Sound"]:
+		groups[name] = []
+		checks[name] = []
+		steppers[name] = []
+	var start = sections.find(ctx["tab"])
+	if start >= 0:
+		selected = start
+		section_page = int(start / 3)
+
+	# Section bar under the title: << three names >>.
+	api["rect"].call(layer, {"pivot": 0, "x": left, "y": -115, "w": 600, "h": row_h, "color": 0x000000, "alpha": 0.5})
+	section_prev = pair("", 0, 0, left, -115.0, "<<", arrow_w)
+	var slot_w = (600.0 - arrow_w * 2.0) / 3.0
+	for i in range(3):
+		section_slots.append(pair("", 0, 4, left + arrow_w + slot_w * i + slot_w * 0.5, -127.5, "", slot_w))
+	section_next = pair("", 0, 2, left + 600.0, -115.0, ">>", arrow_w)
+
+	# General
+	checkbox("General", left, row_y(0), "ShowFPS", "General", "ShowFPS")
+	stepper("General", left, row_y(1), "UIScale", 5, 40.0, "General", "UIScale", 0.1, 1)
+	var header = row_bg("General", left, row_y(3), 3.0 * font_w)
+	cell("General", header, 0.0, 3.0 * font_w, "Aim", true)
+	var length_w = selector_width("Length", 5, 40.0)
+	var length_bg = row_bg("General", left, row_y(4), length_w)
+	stepper_in("General", length_bg, 0.0, "Length", 5, 40.0, "General", "aimLength", 1, -1)
+	checkbox("General", left + length_w + 10.0, row_y(4), "Static", "General", "StaticAim")
+	var gap_w = selector_width("Gap", 5, 40.0)
+	var gap_bg = row_bg("General", left, row_y(5), gap_w + selector_width("Thick", 5, 40.0) + 10.0)
+	stepper_in("General", gap_bg, 0.0, "Gap", 5, 40.0, "General", "aimGap", 1, -1)
+	stepper_in("General", gap_bg, gap_w + 10.0, "Thick", 5, 40.0, "General", "aimThick", 1, -1)
+	var color_bg = row_bg("General", left, row_y(6), selector_width("Color", 7, 40.0))
+	color_cells = selector("General", color_bg, 0.0, "Color", 7, 40.0)
+
+	# Input: sensitivity, invert, then the key bindings two in a row.
+	stepper("Input", left, row_y(0), "Sensitivity", 6, 40.0, "Input", "sensitivity", 0.01, 2)
+	checkbox("Input", left, row_y(1), "Invert Mouse", "Input", "invertY")
+	var label_w = 8.0 * font_w
+	var key_w = 7.0 * font_w
+	var unit_w = label_w + 15.0 + key_w
+	var bind_bg = []
+	for i in range(bind_actions.size()):
+		var column = i % 2
+		if column == 0:
+			bind_bg = row_bg("Input", left, row_y(2 + int(i / 2)), 2.0 * unit_w + 30.0)
+		var x = column * (unit_w + 30.0)
+		cell("Input", bind_bg, x, label_w, bind_actions[i], false)
+		bind_slots[bind_actions[i]] = cell("Input", bind_bg, x + label_w + 15.0, key_w, "", true)
+
+	# Graphic
+	checkbox("Graphic", left, row_y(0), "Fullscreen", "Graphic", "fullscreen")
+	var resolution_bg = row_bg("Graphic", left, row_y(1), selector_width("Resolution", 11, 40.0))
+	resolution_cells = selector("Graphic", resolution_bg, 0.0, "Resolution", 11, 40.0)
+	checkbox("Graphic", left, row_y(2), "VSync", "Graphic", "vsync")
+	checkbox("Graphic", left + checkbox_width("VSync") + 10.0, row_y(2), "LimitFrame", "Graphic", "limitFrame")
+	stepper("Graphic", left, row_y(3), "FrameLimit", 5, 40.0, "Graphic", "frameLimit", 1, -1)
+	stepper("Graphic", left, row_y(4), "Bright", 6, 10.0, "Graphic", "brightness", 0.01, 2)
+	stepper("Graphic", left + selector_width("Bright", 6, 10.0) + 10.0, row_y(4), "Gamma", 5, 10.0, "Graphic", "gamma", 0.1, 1)
+	stepper("Graphic", left, row_y(5), "FOV", 4, 40.0, "Graphic", "fov", 1, -1)
+
+	# Sound
+	stepper("Sound", left, row_y(0), "MasterVolume", 6, 40.0, "Sound", "MasterVolume", 0.01, 2)
+
+	# SAVE and RESET at the bottom right, BACK at the bottom left.
+	var save_w = 8.0 * font_w
+	var reset_w = 9.0 * font_w
+	api["rect"].call(layer, {"pivot": 8, "x": -5, "y": 14, "w": save_w + reset_w, "h": row_h, "color": 0x000000, "alpha": 0.5})
+	save_button = pair("", 8, 4, -5.0 - reset_w - save_w * 0.5, 26.5, "< SAVE >", save_w)
+	reset_button = pair("", 8, 4, -5.0 - reset_w * 0.5, 26.5, "< RESET >", reset_w)
+	api["rect"].call(layer, {"pivot": 6, "x": 5, "y": 14, "w": 136, "h": row_h, "color": 0x000000, "alpha": 0.5})
+	back_button = pair("", 6, 3, 5.0, 26.5, "< BACK >", 136.0)
+
+	show_tab()
+	flush()
+
+# ---- showing values
+
+func show_tab():
+	for i in range(sections.size()):
+		var name = sections[i]
+		if groups.has(name):
+			var visible = i == selected
+			for id in groups[name]:
+				put(id, "visible", visible)
+	for i in range(3):
+		var index = section_page * 3 + i
+		var exists = index < sections.size()
+		put(section_slots[i][0], "visible", exists)
+		put(section_slots[i][1], "visible", exists)
+		if exists:
+			set_text(section_slots[i], sections[index])
+	refresh()
+
+# Reads every value again (when a tab opens, after RESET).
+func refresh():
+	for name in checks:
+		for check in checks[name]:
+			show_check(check)
+		for s in steppers[name]:
+			read_stepper(s)
+	refresh_color()
+	refresh_resolution()
+	for i in range(bind_actions.size()):
+		bind_paths[bind_actions[i]] = api["binding"].call({"action": bind_actions[i]})
+		refresh_bind(i)
+
+func show_check(check):
+	if api["config_bool"].call(check["section"], check["key"]):
+		set_text(check["slot"], "[*]")
+	else:
+		set_text(check["slot"], "[ ]")
+
+func read_stepper(s):
+	s["number"] = api["config_number"].call(s["section"], s["key"])
+	var limits = api["config_range"].call({"section": s["section"], "key": s["key"]})
+	s["min"] = limits["min"]
+	s["max"] = limits["max"]
+	if s["decimals"] < 0:
+		set_text(s["value"], "[" + str(int(s["number"])) + "]")
+	else:
+		set_text(s["value"], "[" + fmt(s["number"], s["decimals"]) + "]")
+
+func near(a, b):
+	var d = a - b
+	return d < 0.001 and d > -0.001
+
+# Number of the preset that equals the crosshair color, or -1.
+func color_index():
+	var r = api["config_number"].call("General", "aimColorR")
+	var g = api["config_number"].call("General", "aimColorG")
+	var b = api["config_number"].call("General", "aimColorB")
+	for i in range(presets.size()):
+		if near(r, presets[i][1]) and near(g, presets[i][2]) and near(b, presets[i][3]):
+			return i
+	return -1
+
+# The color name is written in the crosshair color itself.
+func refresh_color():
+	var index = color_index()
+	if index >= 0:
+		set_text(color_cells["value"], presets[index][0])
+	else:
+		set_text(color_cells["value"], "Custom")
+	color_cells["rgb"] = rgb(api["config_number"].call("General", "aimColorR"), api["config_number"].call("General", "aimColorG"), api["config_number"].call("General", "aimColorB"))
+	color_cells["index"] = index
+
+func refresh_resolution():
+	resolution_info = api["resolution"].call()
+	set_text(resolution_cells["value"], "[" + resolution_info["label"] + "]")
+
+# A binding path looks like "<Keyboard>/leftShift": the last part is shown, shortened when it has a short name.
+func refresh_bind(index):
+	var action = bind_actions[index]
+	if listening == index:
+		set_text(bind_slots[action], "[...]")
+		return
+	var path = bind_paths[action]
+	var key = path.get_slice("/", path.get_slice_count("/") - 1)
+	if key == "":
+		key = "?"
+	elif short_keys.has(key):
+		key = short_keys[key]
+	else:
+		key = key.to_upper()
+	set_text(bind_slots[action], "[" + key + "]")
+
+# ---- input
+
+# Updates the color and the pressed look of a button and returns true when it was clicked.
+func click(slot, v, disabled):
+	var main = slot[1]
+	var over = hover.has(main)
+	if v["click_pressed"] and over:
+		capture = main
+	var owned = capture == main
+	var color = 0xFFFFFF
+	if disabled:
+		color = 0x999999
+	elif over:
+		color = 0x00FFFF
+	put(main, "color", color)
+	press_look(slot, over and v["click_held"] and owned and not disabled)
+	return v["click_released"] and over and owned and not disabled
+
+# While pressed, the text moves onto its shadow.
+func press_look(slot, pressed):
+	var offset = 0.0
+	if pressed:
+		offset = 1.0
+	put(slot[1], "x", slot[2] + offset)
+	put(slot[1], "y", slot[3] - offset)
+
+# A << >> pair. Returns the direction that was clicked: -1, 0 or 1.
+func arrows(prev, next, can_prev, can_next, v):
+	var direction = 0
+	if click(prev, v, not can_prev):
+		direction = -1
+	if click(next, v, not can_next):
+		direction = 1
+	return direction
+
+func frame(v, delta):
+	hover = {}
+	for id in api["hovered"].call():
+		hover[id] = true
+	if v["click_pressed"]:
+		capture = 0
+
+	if click(back_button, v, false) or api["pressed"].call("escape"):
+		flush()
+		api["close"].call()
+		return
+
+	update_sections(v)
+	var tab = ""
+	if selected < sections.size():
+		tab = sections[selected]
+	if checks.has(tab):
+		for check in checks[tab]:
+			if click(check["slot"], v, false):
+				api["config_set"].call({"section": check["section"], "key": check["key"], "value": not api["config_bool"].call(check["section"], check["key"])})
+				show_check(check)
+		for s in steppers[tab]:
+			update_stepper(s, v, delta)
+	if tab == "General":
+		update_color(v)
+	elif tab == "Input":
+		update_binds(v)
+	elif tab == "Graphic":
+		update_resolution(v)
+
+	if click(save_button, v, false):
+		api["config_save"].call()
+	if click(reset_button, v, false):
+		api["config_reset"].call()
+		refresh()
+	flush()
+
+func update_sections(v):
+	var count = sections.size()
+	var pages = int((count + 2) / 3)
+	if pages < 1:
+		pages = 1
+	var direction = arrows(section_prev, section_next, section_page > 0, section_page < pages - 1, v)
+	for i in range(3):
+		var index = section_page * 3 + i
+		if index >= count:
+			continue
+		# The selected section stays gray and cannot be clicked.
+		var is_selected = index == selected
+		if click(section_slots[i], v, is_selected):
+			selected = index
+			stop_listening()
+			show_tab()
+	if direction != 0:
+		section_page += direction
+		show_tab()
+
+# Arrows of a number setting: one step when pressed, then repeated every 0.03 s after holding for 0.5 s.
+func update_stepper(s, v, delta):
+	var half = s["step"] * 0.5
+	var at_min = s["number"] <= s["min"] + half
+	var at_max = s["number"] >= s["max"] - half
+	var prev = s["prev"][1]
+	var next = s["next"][1]
+	var prev_over = hover.has(prev)
+	var next_over = hover.has(next)
+	if v["click_pressed"] and prev_over:
+		capture = prev
+	if v["click_pressed"] and next_over:
+		capture = next
+
+	arrow_color(prev, at_min, prev_over)
+	arrow_color(next, at_max, next_over)
+	press_look(s["prev"], prev_over and v["click_held"] and capture == prev and not at_min)
+	press_look(s["next"], next_over and v["click_held"] and capture == next and not at_max)
+
+	var direction = 0
+	if v["click_held"] and prev_over and capture == prev and not at_min:
+		direction = -1
+	elif v["click_held"] and next_over and capture == next and not at_max:
+		direction = 1
+
+	if direction != s["direction"]:
+		s["direction"] = direction
+		s["time"] = 0.0
+		if direction != 0:
+			step(s, direction)
+	elif direction != 0:
+		s["time"] += delta
+		while s["time"] >= 0.5:
+			step(s, direction)
+			s["time"] -= 0.03
+
+func arrow_color(id, disabled, over):
+	if disabled:
+		put(id, "color", 0x999999)
+	elif over:
+		put(id, "color", 0x00FFFF)
+	else:
+		put(id, "color", 0xFFFFFF)
+
+func step(s, direction):
+	var value = s["number"] + direction * s["step"]
+	if s["decimals"] < 0:
+		value = int(s["number"]) + direction * int(s["step"])
+	api["config_set"].call({"section": s["section"], "key": s["key"], "value": value})
+	read_stepper(s)
+
+func update_color(v):
+	put(color_cells["value"][1], "color", color_cells["rgb"])
+	var index = color_cells["index"]
+	var direction = arrows(color_cells["prev"], color_cells["next"], index > 0, index < presets.size() - 1, v)
+	if direction == 0:
+		return
+	# From a color that is not a preset, >> goes to the first preset.
+	var to = 0
+	if index >= 0:
+		to = index + direction
+	api["config_set"].call({"section": "General", "key": "aimColorR", "value": presets[to][1]})
+	api["config_set"].call({"section": "General", "key": "aimColorG", "value": presets[to][2]})
+	api["config_set"].call({"section": "General", "key": "aimColorB", "value": presets[to][3]})
+	api["config_set"].call({"section": "General", "key": "aimColorA", "value": 1.0})
+	refresh_color()
+	put(color_cells["value"][1], "color", color_cells["rgb"])
+
+func update_resolution(v):
+	var position = resolution_info["position"]
+	var direction = arrows(resolution_cells["prev"], resolution_cells["next"], position > 0, position < resolution_info["count"] - 1, v)
+	if direction != 0:
+		api["resolution_set"].call({"position": position + direction})
+		refresh_resolution()
+		# The upper limit of UIScale follows the resolution.
+		for s in steppers["General"]:
+			read_stepper(s)
+
+func stop_listening():
+	if listening >= 0:
+		var was = listening
+		listening = -1
+		api["bind_listen"].call({"action": ""})
+		refresh_bind(was)
+
+# Key bindings: clicking a cell makes it wait, and the game puts in the first key or mouse button pressed after that.
+func update_binds(v):
+	if listening >= 0 and v["bind_captured"]:
+		var done = listening
+		listening = -1
+		bind_paths[bind_actions[done]] = api["binding"].call({"action": bind_actions[done]})
+		refresh_bind(done)
+		# When a mouse button was captured, its release must not start waiting again on the same cell.
+		capture = 0
+
+	for i in range(bind_actions.size()):
+		var main = bind_slots[bind_actions[i]][1]
+		var over = hover.has(main)
+		if v["click_pressed"] and over:
+			capture = main
+		if listening == i:
+			put(main, "color", 0x999999)
+		elif over:
+			put(main, "color", 0x00FFFF)
+		else:
+			put(main, "color", 0xFFFFFF)
+		if v["click_released"] and listening < 0 and over and capture == main:
+			listening = i
+			api["bind_listen"].call({"action": bind_actions[i]})
+			refresh_bind(i)

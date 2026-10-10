@@ -355,6 +355,18 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 설정의 형을 반환한다 ("int", "float", "bool", "string"). 받은 값을 어느 Set 으로 넣을지 정할 때 쓴다.
+        /// </summary>
+        /// <param name="section">섹션 이름.</param>
+        /// <param name="name">설정 이름.</param>
+        /// <returns>형. 설정이 없으면 빈 문자열.</returns>
+        public string GetSettingType(string section, string name)
+        {
+            ConfigSetting setting = FindSetting(section, name);
+            return setting != null ? setting.type ?? string.Empty : string.Empty;
+        }
+
+        /// <summary>
         /// 설정의 허용 범위 최솟값을 반환한다. 설정 화면이 화살표를 끌 자리를 정할 때 쓴다.
         /// </summary>
         /// <param name="section">섹션 이름.</param>

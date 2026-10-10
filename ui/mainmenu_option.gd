@@ -1,9 +1,9 @@
 class_name MenuOption
 extends RefCounted
-## 메인메뉴의 OPTION 화면. 섹션 바(General / Input / Graphic / Sound)에서 탭을 고르고, 탭마다 설정 줄을 세로로 늘어놓는다.
+## OPTION 화면의 기본 내용 (XopsOption 이 띄운다). 섹션 바(General / Input / Graphic / Sound)에서 탭을 고르고, 탭마다 설정 줄을 세로로 늘어놓는다.
 ## 값은 바꾸는 즉시 ConfigManager 에 들어가 화면에 반영되고(밝기·감마, 음량), SAVE 를 눌러야 파일에 남는다.
-## 창 모드·해상도·VSync 와 UIScale 은 SAVE 때 적용한다 (UIScale 을 바로 적용하면 누르고 있던 화살표가 손 밑에서 움직인다). BACK 은 저장하지 않은 변경을 되돌린다 (메뉴 쪽이 처리).
-## 버튼의 색·눌림·클릭 판정은 메뉴의 것을 그대로 쓴다.
+## 창 모드·해상도·VSync 와 UIScale 은 SAVE 때 적용한다 (UIScale 을 바로 적용하면 누르고 있던 화살표가 손 밑에서 움직인다). BACK 은 저장하지 않은 변경을 되돌린다 (XopsOption 이 처리).
+## 버튼의 색·눌림·클릭 판정은 받은 XopsButtons 로 한다.
 
 # ----- 글자와 줄 -----
 const FONT := Vector2(17, 22)
@@ -89,8 +89,10 @@ const SAVE_TEXT := "< SAVE >"
 const RESET_TEXT := "< RESET >"
 const SAVE_RESET := {"x": -5, "y": 14}
 
-var _menu: Node
+var _buttons: XopsButtons
 var _layer: XopsLayer
+# SAVE 로 UIScale 이 바뀌었을 수 있을 때 부른다.
+var _on_scale: Callable
 var _visible := false
 
 var _section_bar: ColorRect
@@ -121,9 +123,10 @@ var _save_slot: Dictionary
 var _reset_slot: Dictionary
 
 
-func _init(menu: Node, layer: XopsLayer) -> void:
-	_menu = menu
+func _init(buttons: XopsButtons, layer: XopsLayer, on_scale: Callable) -> void:
+	_buttons = buttons
 	_layer = layer
+	_on_scale = on_scale
 	_build_section_bar()
 	_build_general()
 	_build_input()
@@ -141,11 +144,11 @@ func _build_section_bar() -> void:
 	_section_bar = XopsUI.panel(_layer, XopsUI.TOP_LEFT, LEFT, SECTION_BAR["y"], SECTION_BAR["w"], ROW_HEIGHT, PANEL_COLOR)
 	var arrow_width := ARROW_PREV.length() * FONT.x
 	var slot_width: float = (SECTION_BAR["w"] - arrow_width * 2) / SECTION_PER_PAGE
-	_section_prev = _menu._text_pair(_section_bar, XopsUI.TOP_LEFT, XopsUI.TOP_LEFT, 0, 0, ARROW_PREV, NORMAL, FONT,
+	_section_prev = _buttons.text_pair(_section_bar, XopsUI.TOP_LEFT, XopsUI.TOP_LEFT, 0, 0, ARROW_PREV, NORMAL, FONT,
 		Vector2(arrow_width, ROW_HEIGHT))
 	for i in SECTION_PER_PAGE:
 		_section_slots.append(_cell(_section_bar, arrow_width + slot_width * i, slot_width, ""))
-	_section_next = _menu._text_pair(_section_bar, XopsUI.TOP_RIGHT, XopsUI.TOP_RIGHT, 0, 0, ARROW_NEXT, NORMAL, FONT,
+	_section_next = _buttons.text_pair(_section_bar, XopsUI.TOP_RIGHT, XopsUI.TOP_RIGHT, 0, 0, ARROW_NEXT, NORMAL, FONT,
 		Vector2(arrow_width, ROW_HEIGHT))
 
 	_section_names = ConfigManager.GetSectionNames()
@@ -248,7 +251,7 @@ func _row_panel(tab: String, x: float, y: float, width: float) -> ColorRect:
 
 ## 줄 배경 안의 한 칸(왼쪽에서 x, 너비 w)에 글자를 놓는다. 판정은 그 칸 전체다.
 func _cell(parent: Control, x: float, w: float, value: String, align := XopsUI.CENTER) -> Dictionary:
-	var slot: Dictionary = _menu._text_pair(parent, XopsUI.TOP_LEFT, align, x + w * align.x, -ROW_HEIGHT * 0.5,
+	var slot: Dictionary = _buttons.text_pair(parent, XopsUI.TOP_LEFT, align, x + w * align.x, -ROW_HEIGHT * 0.5,
 		value, NORMAL, FONT, Vector2(w, ROW_HEIGHT))
 	(slot["main"] as XopsText).hit_pivot = align
 	return slot
@@ -343,7 +346,7 @@ func _show_tab() -> void:
 func refresh() -> void:
 	for tab: String in _checks:
 		for check: Dictionary in _checks[tab]:
-			_menu._set_slot_text(check["slot"], CHECK_ON if ConfigManager.GetBool(check["section"], check["key"], false) else CHECK_OFF)
+			_buttons.set_text(check["slot"], CHECK_ON if ConfigManager.GetBool(check["section"], check["key"], false) else CHECK_OFF)
 		for stepper: Dictionary in _steppers[tab]:
 			_refresh_stepper(stepper)
 	_refresh_color()
@@ -355,9 +358,9 @@ func refresh() -> void:
 func _refresh_section_bar() -> void:
 	for i in SECTION_PER_PAGE:
 		var index := _section_page * SECTION_PER_PAGE + i
-		_menu._set_slot_visible(_section_slots[i], index < _section_names.size())
+		_buttons.set_visible(_section_slots[i], index < _section_names.size())
 		if index < _section_names.size():
-			_menu._set_slot_text(_section_slots[i], _section_names[index])
+			_buttons.set_text(_section_slots[i], _section_names[index])
 
 
 func _stepper_value(stepper: Dictionary) -> float:
@@ -369,7 +372,7 @@ func _stepper_value(stepper: Dictionary) -> float:
 func _refresh_stepper(stepper: Dictionary) -> void:
 	var value := _stepper_value(stepper)
 	var shown: String = stepper["format"] % (int(value) if stepper["is_int"] else value)
-	_menu._set_slot_text(stepper["value"], "[" + shown + "]")
+	_buttons.set_text(stepper["value"], "[" + shown + "]")
 
 
 ## 지금 조준선 색과 같은 프리셋의 번호. 없으면 -1.
@@ -385,7 +388,7 @@ func _color_index() -> int:
 ## 색 이름을 지금 조준선 색으로 쓴다.
 func _refresh_color() -> void:
 	var index := _color_index()
-	_menu._set_slot_text(_color_value, COLOR_PRESETS[index]["name"] if index >= 0 else COLOR_CUSTOM)
+	_buttons.set_text(_color_value, COLOR_PRESETS[index]["name"] if index >= 0 else COLOR_CUSTOM)
 	(_color_value["main"] as XopsText).color = Color(ConfigManager.GetFloat("General", "aimColorR", 1.0),
 		ConfigManager.GetFloat("General", "aimColorG", 0.0), ConfigManager.GetFloat("General", "aimColorB", 0.0))
 
@@ -400,7 +403,7 @@ func _resolution_position() -> int:
 
 
 func _refresh_resolution() -> void:
-	_menu._set_slot_text(_resolution_value, "[" + ConfigManager.ResolutionOptionLabelAt(_resolution_position()) + "]")
+	_buttons.set_text(_resolution_value, "[" + ConfigManager.ResolutionOptionLabelAt(_resolution_position()) + "]")
 
 
 func _refresh_bind(action: String) -> void:
@@ -409,7 +412,7 @@ func _refresh_bind(action: String) -> void:
 		var path: String = InputManager.GetActionBinding(action)
 		var key := path.get_slice("/", path.get_slice_count("/") - 1)
 		shown = "[" + ("?" if key.is_empty() else BIND_ABBREV.get(key, key.to_upper())) + "]"
-	_menu._set_slot_text(_bind_slots[action], shown)
+	_buttons.set_text(_bind_slots[action], shown)
 
 
 # ============================================================
@@ -421,10 +424,10 @@ func update(delta: float, pressed: bool, clicked: bool, held: bool) -> void:
 	_update_section_bar(pressed, clicked, held)
 
 	for check: Dictionary in _checks.get(_selected, []):
-		if _menu._button(check["slot"], pressed, clicked, held):
+		if _buttons.button(check["slot"], pressed, clicked, held):
 			var value: bool = not ConfigManager.GetBool(check["section"], check["key"], false)
 			ConfigManager.SetBool(check["section"], check["key"], value)
-			_menu._set_slot_text(check["slot"], CHECK_ON if value else CHECK_OFF)
+			_buttons.set_text(check["slot"], CHECK_ON if value else CHECK_OFF)
 	for stepper: Dictionary in _steppers.get(_selected, []):
 		_update_stepper(stepper, delta, pressed, held)
 
@@ -436,11 +439,12 @@ func update(delta: float, pressed: bool, clicked: bool, held: bool) -> void:
 		"Graphic":
 			_update_resolution(pressed, clicked, held)
 
-	if _menu._button(_save_slot, pressed, clicked, held):
+	if _buttons.button(_save_slot, pressed, clicked, held):
 		ConfigManager.Save()
 		ConfigManager.ApplyGraphic()
-		_menu._apply_ui_scale()
-	if _menu._button(_reset_slot, pressed, clicked, held):
+		if _on_scale.is_valid():
+			_on_scale.call()
+	if _buttons.button(_reset_slot, pressed, clicked, held):
 		ConfigManager.ResetToDefaults()
 		refresh()
 
@@ -455,7 +459,7 @@ func _update_section_bar(pressed: bool, clicked: bool, held: bool) -> void:
 		if index >= count:
 			continue
 		# 고른 섹션은 회색으로 두고 누를 수 없다.
-		if _menu._button(_section_slots[i], pressed, clicked, held, _section_names[index] == _selected):
+		if _buttons.button(_section_slots[i], pressed, clicked, held, _section_names[index] == _selected):
 			_selected = _section_names[index]
 			_bind_listening = ""
 			_show_tab()
@@ -468,9 +472,9 @@ func _update_section_bar(pressed: bool, clicked: bool, held: bool) -> void:
 ## << >> 한 쌍을 처리하고 눌린 방향(-1 / 0 / 1)을 돌려준다.
 func _arrows(prev: Dictionary, next: Dictionary, can_prev: bool, can_next: bool, pressed: bool, clicked: bool, held: bool) -> int:
 	var direction := 0
-	if _menu._button(prev, pressed, clicked, held, not can_prev):
+	if _buttons.button(prev, pressed, clicked, held, not can_prev):
 		direction = -1
-	if _menu._button(next, pressed, clicked, held, not can_next):
+	if _buttons.button(next, pressed, clicked, held, not can_next):
 		direction = 1
 	return direction
 
@@ -487,12 +491,12 @@ func _update_stepper(stepper: Dictionary, delta: float, pressed: bool, held: boo
 	var next: XopsText = stepper["next"]["main"]
 	var prev_hovered := prev.is_hovered()
 	var next_hovered := next.is_hovered()
-	var prev_owned: bool = _menu._owns_press(prev, prev_hovered, pressed)
-	var next_owned: bool = _menu._owns_press(next, next_hovered, pressed)
+	var prev_owned: bool = _buttons.owns_press(prev, prev_hovered, pressed)
+	var next_owned: bool = _buttons.owns_press(next, next_hovered, pressed)
 	prev.color = DISABLED if at_min else (HOVER if prev_hovered else NORMAL)
 	next.color = DISABLED if at_max else (HOVER if next_hovered else NORMAL)
-	_menu._set_pressed(stepper["prev"], prev_hovered and held and prev_owned and not at_min)
-	_menu._set_pressed(stepper["next"], next_hovered and held and next_owned and not at_max)
+	_buttons.set_pressed(stepper["prev"], prev_hovered and held and prev_owned and not at_min)
+	_buttons.set_pressed(stepper["next"], next_hovered and held and next_owned and not at_max)
 
 	var direction := 0
 	if held and prev_hovered and prev_owned and not at_min:
@@ -559,7 +563,7 @@ func _update_binds(pressed: bool, clicked: bool) -> void:
 	for action: String in BIND_ACTIONS:
 		var main: XopsText = _bind_slots[action]["main"]
 		var hovered := main.is_hovered()
-		var owned: bool = _menu._owns_press(main, hovered, pressed)
+		var owned: bool = _buttons.owns_press(main, hovered, pressed)
 		main.color = DISABLED if _bind_listening == action else (HOVER if hovered else NORMAL)
 		if clicked and _bind_listening.is_empty() and hovered and owned:
 			_bind_listening = action
@@ -567,4 +571,4 @@ func _update_binds(pressed: bool, clicked: bool) -> void:
 
 	# 마우스 버튼으로 바꾼 경우, 그 누름을 뗄 때 같은 칸이 다시 기다리는 상태로 들어가지 않게 누름을 버린다.
 	if captured:
-		_menu._press_capture = null
+		_buttons.press_capture = null
