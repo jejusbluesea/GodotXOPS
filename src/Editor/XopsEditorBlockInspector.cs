@@ -75,6 +75,8 @@ namespace GodotXOPS.Editor
                 box.AddChild(flag);
             }
 
+            BuildCorrectUVControl(box);
+
             m_boardLabel = new Label
             {
                 Text = "Not a valid solid shape: nothing collides with this block, whatever the boxes above say (the original game's rule)",
@@ -131,6 +133,9 @@ namespace GodotXOPS.Editor
             AddUVButton(uvButtons, "Rotate", "Turn the texture by 90 degrees", UVOperation.Rotate);
             AddUVButton(uvButtons, "Flip U", "Mirror the texture horizontally", UVOperation.FlipU);
             AddUVButton(uvButtons, "Flip V", "Mirror the texture vertically", UVOperation.FlipV);
+            var editUV = new Button { Text = "Edit UV...", FocusMode = Control.FocusModeEnum.None, TooltipText = "Open the UV editor: the faces drawn over the texture, to drag their corners (U)" };
+            editUV.Pressed += OpenUVEditor;
+            face.AddChild(editUV);
 
             box.AddChild(new HSeparator());
             box.AddChild(new Label { Text = "Textures of this map" });
@@ -197,6 +202,7 @@ namespace GodotXOPS.Editor
             if (m_blockBox == null) return;
 
             m_blockBox.Visible = m_editMode == EditMode.Block;
+            RefreshUVEditor(false);
             if (!m_blockBox.Visible) return;
 
             List<BD2Block> blocks = m_document.Blocks.blocks;

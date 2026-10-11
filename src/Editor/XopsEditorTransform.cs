@@ -177,6 +177,8 @@ namespace GodotXOPS.Editor
             m_transformMode = TransformMode.None;
             if (m_transformingBlocks)
             {
+                // UV 를 고친 것도 같은 편집에 담겨 한 번에 되돌려진다.
+                if (m_correctUV) CorrectTransformedUVs();
                 m_history.Push(new BlockChangeCommand(name, m_document.Blocks.blocks, m_transformBlockIndices, m_transformBlockBefore));
                 m_blockDirty = true;
                 RebuildBlocks();

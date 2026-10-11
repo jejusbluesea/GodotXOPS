@@ -45,10 +45,12 @@ namespace GodotXOPS.Editor
         private const int k_menuNewAsset = 61;
         private const int k_menuShowGrid = 62;
         private const int k_menuShowFloorGrid = 63;
+        private const int k_menuUVEditor = 64;
         // 메뉴에는 없고 파일 창의 쓰임으로만 쓰는 번호: 텍스처로 쓸 이미지 고르기.
         private const int k_menuPickTexture = 40;
-        // Add 메뉴에서 포인트 종류가 아니라 상자 블록을 놓는 항목의 번호.
-        private const int k_menuAddBlock = -100;
+        // Add 메뉴에서 포인트 종류가 아니라 상자 블록을 놓는 항목의 번호. 포인트 종류(에드온 이벤트는 10000 부터)와 겹치지 않는 큰 수다.
+        // 음수로 두면 안 된다: PopupMenu 는 번호가 음수인 항목을 누르면 번호 대신 메뉴 안에서의 순번을 넘긴다 (그 순번의 포인트 종류가 놓였다).
+        private const int k_menuAddBlock = 1 << 30;
         private const int k_menuViewFront = 10;
         private const int k_menuViewBack = 11;
         private const int k_menuViewRight = 12;
@@ -178,6 +180,7 @@ namespace GodotXOPS.Editor
             edit.AddItem("Duplicate    Shift+D", k_menuDuplicate);
             edit.AddItem("Delete    X, Delete", k_menuDelete);
             edit.AddSeparator();
+            edit.AddItem("UV editor...    U", k_menuUVEditor);
             edit.AddItem("Messages...", k_menuMessages);
 
             // 새 포인트 놓기. 메뉴에서 고르면 3D 화면의 가운데 아래에, Shift+A 로 띄운 메뉴에서 고르면 마우스 아래에 놓인다.
@@ -321,6 +324,7 @@ namespace GodotXOPS.Editor
             BuildMissionPanel(root);
             BuildAssetPanel(root, layer);
             BuildMessageDialog(layer);
+            BuildUVWindow(layer);
 
             m_fileDialog = new FileDialog
             {
@@ -409,6 +413,7 @@ namespace GodotXOPS.Editor
             {
                 case k_menuSaveMissionAs: ShowFileDialog(k_menuSaveMissionAs, "Save mission as", "*" + MIF2File.Extension, true); break;
                 case k_menuMessages: ShowMessageDialog(); break;
+                case k_menuUVEditor: OpenUVEditor(); break;
                 case k_menuShowGrid:
                     m_showGrid = !m_showGrid;
                     m_viewMenu.SetItemChecked(m_viewMenu.GetItemIndex(k_menuShowGrid), m_showGrid);

@@ -452,6 +452,20 @@ namespace GodotXOPS.Editor
             }
             Expect(edgeThere, "누른 자리의 모서리가 선택되지 않음");
 
+            // 위쪽 Add 메뉴의 블록 항목: 번호가 음수면 PopupMenu 가 번호 대신 순번을 넘겨서 그 순번의 포인트가 놓인다.
+            int blockItem = m_addBarMenu.GetItemIndex(k_menuAddBlock);
+            bool menuIdsValid = blockItem >= 0;
+            for (int i = 0; i < m_addBarMenu.ItemCount; i++)
+            {
+                if (!m_addBarMenu.IsItemSeparator(i) && m_addBarMenu.GetItemSubmenuNode(i) == null && m_addBarMenu.GetItemId(i) < 0) menuIdsValid = false;
+            }
+            Expect(menuIdsValid, "Add 메뉴에 블록 항목이 없거나 번호가 음수인 항목이 있음");
+            int pointsBeforeBar = m_document.Points.points.Count;
+            AddFromBar(blockItem >= 0 ? m_addBarMenu.GetItemId(blockItem) : -1);
+            Expect(blocks.Count == count + 1 && m_document.Points.points.Count == pointsBeforeBar && m_editMode == EditMode.Block, "Add 메뉴의 블록 항목이 블록을 놓지 않음");
+            Undo();
+            Expect(blocks.Count == count, "Add 메뉴로 놓은 블록을 되돌리지 못함");
+
             // 새 블록: 화면 가운데 아래의 면 위에 한 변 1 m 의 상자가 놓이고 블록 단위로 선택된다.
             Vector2 center = ViewportCenter();
             bool surfaceThere = SurfaceUnder(center, out Vector3 surface);
@@ -653,6 +667,8 @@ namespace GodotXOPS.Editor
             Undo();
             Expect(textures[textureCount].diffusePath == firstTexture, "텍스처 바꾸기를 되돌리지 못함");
             Redo();
+
+            CheckBlockUV(added);
 
             // 저장: 다른 이름으로 저장하면 텍스처 목록도 그 옆에 따로 쓰인다.
             string saved = $"{k_selfTestFolder}/values.bd2";
@@ -1451,6 +1467,130 @@ namespace GodotXOPS.Editor
                 if (HasMesh(child)) return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// 블록의 UV 를 확인한다: 변형할 때 모양이 바뀐 면의 UV 만 따라 고쳐지는지(통째로 옮긴 면과 움직이지 않은 모서리는 그대로), 끄면 그대로인지, 한 번에 되돌려지는지,
+        /// UV 편집 화면이 선택한 면을 보여 주고 거기서 고친 것이 문서에 들어가고 되돌려지는지, 격자에 붙는 자리.
+        /// </summary>
+        /// <param name="added">시험에 쓸 블록의 번호 (한 변 1 m 의 상자).</param>
+        private void CheckBlockUV(int added)
+        {
+            const float tolerance = 1e-4f;
+            const int topFace = 0;
+            // 옆면 하나: 꼭짓점 4, 0, 1, 5. 가운데 둘(0, 1)이 윗면의 꼭짓점이다.
+            const int sideFace = 2;
+            const int corners = BD2Block.FaceVertexCount;
+            BD2Block block = m_document.Blocks.blocks[added];
+
+            SetBlockElement(BlockElement.Block);
+            m_blockSelection.Add(added * ElementStride);
+            UpdateDetails();
+            TransformFaceUV(UVOperation.Fit);
+            var fitted = (Vector2[])block.uvs.Clone();
+            Expect(m_correctUV && m_blockBox.Visible && m_correctUVButton.GetParent() == m_blockBox && m_correctUVButton.ButtonPressed, "블록 모드인데 Correct UVs 가 보이지 않거나 처음부터 꺼져 있음");
+
+            // 블록을 통째로 옮기면 모양이 그대로라 UV 도 그대로다.
+            TransformTyped(TransformMode.Move, TransformAxis.X, "2");
+            Expect(SameUVs(block.uvs, fitted, tolerance), "블록을 통째로 옮겼는데 UV 가 바뀜");
+            Undo();
+
+            // 윗면을 1 m 올리면 윗면의 UV 는 그대로이고, 옆면은 움직인 두 모서리의 UV 만 1 m 만큼(UV 1) 늘어난다.
+            SetBlockElement(BlockElement.Face);
+            m_blockSelection.Add(added * ElementStride + topFace);
+            UpdateDetails();
+            int undoBefore = m_history.UndoCount;
+            float topBefore = block.vertices[0].Y;
+            TransformTyped(TransformMode.Move, TransformAxis.Y, "1");
+            bool topKept = true;
+            for (int corner = 0; corner < corners; corner++)
+            {
+                topKept &= block.uvs[topFace * corners + corner].DistanceTo(fitted[topFace * corners + corner]) < tolerance;
+            }
+            Expect(Mathf.Abs(block.vertices[0].Y - topBefore - 1f) < tolerance && topKept, "윗면을 올렸는데 윗면이 올라가지 않았거나 윗면의 UV 가 바뀜");
+            Expect(block.uvs[sideFace * corners].DistanceTo(fitted[sideFace * corners]) < tolerance && block.uvs[sideFace * corners + 3].DistanceTo(fitted[sideFace * corners + 3]) < tolerance,
+                "윗면을 올렸는데 옆면의 움직이지 않은 모서리의 UV 가 바뀜");
+            Expect(block.uvs[sideFace * corners + 1].DistanceTo(new Vector2(2f, 0f)) < tolerance && block.uvs[sideFace * corners + 2].DistanceTo(new Vector2(2f, 1f)) < tolerance,
+                $"윗면을 올렸는데 옆면의 UV 가 늘어난 만큼 따라가지 않음 ({block.uvs[sideFace * corners + 1]}, {block.uvs[sideFace * corners + 2]})");
+            Expect(m_history.UndoCount == undoBefore + 1, "변형과 UV 고치기가 되돌리기 한 번으로 묶이지 않음");
+            Undo();
+            Expect(SameUVs(block.uvs, fitted, tolerance) && Mathf.Abs(block.vertices[0].Y - topBefore) < tolerance, "변형을 되돌렸는데 UV 나 꼭짓점이 처음으로 돌아가지 않음");
+
+            // 꺼 두면 UV 는 그대로다 (텍스처가 면과 함께 늘어난다).
+            m_correctUV = false;
+            TransformTyped(TransformMode.Move, TransformAxis.Y, "1");
+            Expect(SameUVs(block.uvs, fitted, tolerance), "Correct UVs 를 껐는데 UV 가 바뀜");
+            Undo();
+            m_correctUV = true;
+
+            // UV 편집 화면: 선택한 면을 보여 주고, 모서리를 옮기면 문서에 들어가고 선택은 남는다.
+            RefreshUVEditor(true);
+            Expect(m_uvCanvas.FaceCount == 1 && m_uvCanvas.GetFace(0)[2].DistanceTo(fitted[topFace * corners + 2]) < tolerance && m_uvCanvas.SelectedCount == 0,
+                "UV 편집 화면이 선택한 면의 UV 를 보여 주지 않음");
+            undoBefore = m_history.UndoCount;
+            var shift = new Vector2(0.5f, 0.25f);
+            m_uvCanvas.SelectCorner(0, 2, true);
+            m_uvCanvas.MoveSelected(shift);
+            Expect(block.uvs[topFace * corners + 2].DistanceTo(fitted[topFace * corners + 2] + shift) < tolerance && block.uvs[topFace * corners + 1].DistanceTo(fitted[topFace * corners + 1]) < tolerance
+                && m_history.UndoCount == undoBefore + 1, "UV 편집 화면에서 옮긴 모서리가 문서에 들어가지 않거나 다른 모서리가 바뀜");
+            Expect(m_uvCanvas.SelectedCount == 1 && m_uvCanvas.TryGetSelectedUV(out Vector2 shown) && shown.DistanceTo(fitted[topFace * corners + 2] + shift) < tolerance
+                && Mathf.Abs((float)m_uvValueBoxes[0].Value - shown.X) < 0.01f && Mathf.Abs((float)m_uvBoxes[4].Value - shown.X) < 0.01f, "UV 를 옮긴 뒤 선택이 풀리거나 숫자 칸이 따라오지 않음");
+            m_uvCanvas.SetSelectedAxis(0, 3f);
+            Expect(Mathf.Abs(block.uvs[topFace * corners + 2].X - 3f) < tolerance && Mathf.Abs(block.uvs[topFace * corners + 2].Y - (fitted[topFace * corners + 2].Y + shift.Y)) < tolerance,
+                "UV 편집 화면의 숫자 칸으로 U 만 바꾸지 못함");
+            Undo();
+            Undo();
+            // 점검 중에는 창이 떠 있지 않아서, 떠 있을 때 되돌리기가 하는 다시 맞추기를 직접 부른다.
+            RefreshUVEditor(true);
+            Expect(SameUVs(block.uvs, fitted, tolerance) && m_uvCanvas.GetFace(0)[2].DistanceTo(fitted[topFace * corners + 2]) < tolerance, "UV 편집을 되돌렸는데 문서나 UV 편집 화면이 처음으로 돌아가지 않음");
+
+            // 격자: 칸 수를 바꾸면 붙는 자리가 바뀐다.
+            m_uvCanvas.GridDivisions = 4;
+            Expect(m_uvCanvas.SnapUV(new Vector2(0.3f, 0.6f)).DistanceTo(new Vector2(0.25f, 0.5f)) < tolerance, "UV 격자에 붙는 자리가 칸 수와 맞지 않음");
+            m_uvCanvas.GridDivisions = 8;
+            Expect(m_uvCanvas.SnapUV(new Vector2(0.3f, 0.6f)).DistanceTo(new Vector2(0.25f, 0.625f)) < tolerance, "UV 격자의 칸 수를 바꿨는데 붙는 자리가 그대로임");
+
+            // 블록 단위에서는 여섯 면을 함께 보여 주고, 보여 주는 면이 바뀌면 선택을 푼다.
+            m_uvCanvas.SelectCorner(0, 0, true);
+            SetBlockElement(BlockElement.Block);
+            m_blockSelection.Add(added * ElementStride);
+            UpdateDetails();
+            RefreshUVEditor(true);
+            Expect(m_uvCanvas.FaceCount == BD2Block.FaceCount && m_uvCanvas.SelectedCount == 0, "블록 단위에서 UV 편집 화면이 여섯 면을 보여 주지 않거나 전의 선택이 남음");
+        }
+
+        /// <summary>
+        /// 선택한 것을 숫자를 쳐서 변형하고 확정한다 (점검용).
+        /// </summary>
+        /// <param name="mode">변형의 종류.</param>
+        /// <param name="axis">묶을 축.</param>
+        /// <param name="value">칠 숫자.</param>
+        private void TransformTyped(TransformMode mode, TransformAxis axis, string value)
+        {
+            BeginTransform(mode);
+            SetTransformAxis(axis);
+            foreach (char typed in value)
+            {
+                TypeNumeric(new InputEventKey { Unicode = typed, Pressed = true });
+            }
+            ConfirmTransform();
+        }
+
+        /// <summary>
+        /// 두 UV 배열이 같은지 본다.
+        /// </summary>
+        /// <param name="a">한쪽.</param>
+        /// <param name="b">다른 쪽.</param>
+        /// <param name="tolerance">같다고 볼 거리.</param>
+        /// <returns>길이와 값이 전부 같으면 true.</returns>
+        private static bool SameUVs(Vector2[] a, Vector2[] b, float tolerance)
+        {
+            if (a.Length != b.Length) return false;
+            for (int i = 0; i < a.Length; i++)
+            {
+                if (a[i].DistanceTo(b[i]) > tolerance) return false;
+            }
+            return true;
         }
 
         /// <summary>

@@ -108,6 +108,7 @@ namespace GodotXOPS.Editor
         public override void _Process(double delta)
         {
             RefreshGrid();
+            UpdateUVShot();
             if (m_screenshotCountdown >= 0)
             {
                 UpdateStatus();
@@ -358,6 +359,9 @@ namespace GodotXOPS.Editor
                     break;
                 case Key.F5:
                     PlayTest();
+                    break;
+                case Key.U:
+                    if (m_editMode == EditMode.Block) OpenUVEditor();
                     break;
                 case Key.Escape:
                     CancelPick();
@@ -628,7 +632,18 @@ namespace GodotXOPS.Editor
                 if (m_editMode == EditMode.Block) BlockSelectBox(rect, false);
                 else SelectBox(rect, false);
             }
+            float[] face = ParseNumbers(ArgumentValue(args, "--face"), 2);
+            if (face != null && (int)face[0] >= 0 && (int)face[0] < m_document.Blocks.blocks.Count && (int)face[1] >= 0 && (int)face[1] < BD2Block.FaceCount)
+            {
+                SetEditMode(EditMode.Block);
+                SetBlockElement(BlockElement.Face);
+                m_blockSelection.Add((int)face[0] * ElementStride + (int)face[1]);
+                RedrawBlocks();
+                UpdateDetails();
+            }
             if (Array.IndexOf(args, "--focus") >= 0) FocusSelection();
+            string uvShot = ArgumentValue(args, "--uv-shot");
+            if (uvShot != null) BeginUVShot(uvShot);
 
             m_screenshotPath = ArgumentValue(args, "--screenshot");
             if (m_screenshotPath != null) m_screenshotCountdown = k_screenshotWaitFrames;
