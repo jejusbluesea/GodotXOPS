@@ -13,6 +13,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 - [확장 포인트 데이터 (PD2)](#확장-포인트-데이터-pd2)
 - [확장 미션 데이터 (MIF2)](#확장-미션-데이터-mif2)
 - [스크립트 이벤트](#스크립트-이벤트)
+- [이벤트의 소리](#이벤트의-소리)
 - [이미지 목록](#이미지-목록)
 - [화면 스크립트](#화면-스크립트)
 - [블록 재질](#블록-재질)
@@ -54,7 +55,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `config.json` | 게임 설정과 키 바인딩. 메뉴의 OPTION 에서 SAVE 하면 덮어씁니다. `General`의 `AllowConsole`은 OPTION 에 없는 설정이고, `"true"`로 바꾸면 어느 화면에서든 F11 로 디버그 콘솔이 열립니다 ([개발 문서](development.md#디버그-콘솔)) `AllowEventScript` 도 OPTION 에 없는 설정이고, `"false"` 로 바꾸면 [스크립트 이벤트](#스크립트-이벤트)를 쓰는 미션을 로드하지 않습니다. `AllowUiScript` 도 OPTION 에 없는 설정이고, `"false"` 로 바꾸면 [화면 스크립트](#화면-스크립트)를 쓰지 않습니다 |
 | `global.json` | 제품 이름, 버전, 크레딧에 나오는 라이선스 문구 |
 | `mission_data.json` | 오프닝·메뉴 배경 맵, 공식 미션 목록 |
-| `sky_data.json` | 스카이 텍스처, 배경색, 안개, 시야 거리 |
+| `sky_data.json` | 스카이 모델과 텍스처, 안개 |
 | `effect_data.json` | 이펙트 텍스처와 프리셋 |
 | `block_material_data.json` | 블록 면의 재질 (발소리, 총알이 맞았을 때의 이펙트와 소리). BD2 맵에서만 쓰입니다 |
 | `sound_data.json` | [이벤트가 번호로 재생하는 소리](#이벤트의-소리)의 목록 |
@@ -72,7 +73,7 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 | `human/animation.json` | 다리 동작 |
 | `human/type.json` | 사람 종류 (이동 속도, 부위별 데미지 배수, 좀비 여부) |
 | `human/ai.json` | AI 수준별 값과 시야·청각·회전 등 AI 공통 값 |
-| `human/controller.json` | 중력, 낙하, 계단 높이, 몸 크기 |
+| `human/controller.json` | 중력, 낙하, 경사, 몸 크기 |
 | `human/hitbox.json` | 머리·몸·다리 피격 판정 |
 | `human/general.json` | 모델 배율과 높이, 팔 각도, 피격 시 조준 흐트러짐 |
 | `human/interaction.json` | 무기 줍기 범위 |
@@ -245,6 +246,47 @@ AI 가 쓰는 거리(`aiMaxRange`, `aiMinRange`)는 근접 무기가 아니어�
 | `caseWeaponIndex` | 가방으로 취급하는 무기 번호 목록 (미션 이벤트의 "가방 소지" 조건, AI 가 버리지 않음) |
 | `weaponScale` | 무기 모델 배율 |
 
+### `weapon/scope.json`
+
+`scopeData` 항목 하나가 스코프 한 종류입니다. 무기의 `scopeIndex` 가 이 목록의 번호를 가리킵니다.
+
+| 키 | 뜻 |
+|---|---|
+| `fovDegrees` | 스코프를 쓰는 동안의 시야각 (도). 0 이면 평소의 시야각 그대로입니다 |
+| `recoilAimVerticalAdjust`, `recoilAimHorizontalAdjust` | 스코프를 쓰는 동안 한 발 쏠 때마다 시점이 튀는 범위 (`min`, `max`, 도. 위와 오른쪽이 +). 그 사이에서 0.1 도 단위로 무작위로 뽑습니다. 무기 자체의 반동에 더해집니다 |
+| `texturePath` | 스코프를 쓰는 동안 화면을 덮는 그림. 비워 두면 그림이 없습니다 |
+| `textureAspect` | 그 그림의 가로 ÷ 세로. 이 비율을 지킨 채 화면에 가장 크게 넣고, 남는 바깥은 검게 가립니다. 0 이면 4:3 으로 칩니다 |
+| `hideCrosshair` | `true` 면 스코프를 쓰는 동안 무기의 조준선을 그리지 않습니다 |
+| `lines` | 스코프의 조준선. 선마다 `start`, `end`(화면 가운데에서의 위치), `color`(0 에서 1 사이), `width` |
+| `errorRangeAdjust` | 쓰이지 않습니다 |
+
+AI 가 스코프 무기를 다룰 때의 값은 `human/ai.json` 의 `aiScopeData` 에 따로 있습니다 ([AI](#humanaijson--ai)).
+
+### `weapon/accuracy.json`
+
+모든 무기에 함께 적용되는 조준 오차입니다. 값은 무기의 `errorRange` 와 같은 눈금이고, 클수록 탄이 퍼집니다.
+
+| 키 | 뜻 |
+|---|---|
+| `walkAccuracyPenalty`, `forwardAccuracyPenalty`, `backAccuracyPenalty`, `strafeAccuracyPenalty` | 걷는 중, 앞으로·뒤로·옆으로 달리는 중의 오차. 여러 개가 겹치면 하나만 적용됩니다 (옆 > 뒤 > 앞 > 걷기 순으로 우선) |
+| `airborneAccuracyPenalty` | 공중에 있을 때의 오차. 위의 것들을 대신합니다 |
+| `injuryHpThreshold`, `injuryAccuracyPenalty` | 체력이 이 값보다 낮으면 위의 오차에 더하는 값 |
+| `reactionRecoveryPerSecond` | 쏘거나 맞아서 생긴 흐트러짐이 초당 줄어드는 양 |
+
+### `weapon/drop_physics.json`
+
+떨어진 무기(버린 것, 죽은 사람이 놓친 것)의 움직임입니다. 들고 있는 무기와는 무관합니다.
+
+| 키 | 뜻 |
+|---|---|
+| `gravity` | 아래로 붙는 가속도 (m/s²) |
+| `terminalVelocityY` | 떨어지는 속도의 한계 (음수, m/s) |
+| `dropoffHorizontalSpeed` | 버릴 때 앞으로 던지는 속도 (m/s) |
+| `horizontalDampingPerSec` | 1초 뒤에 남는 수평 속도의 비율 (0 에서 1 사이. 작을수록 빨리 멈춥니다) |
+| `horizontalStopThreshold` | 수평 속도가 이 값보다 작아지면 멈춥니다 (m/s) |
+| `groundCollisionMargin` | 바닥이나 벽에서 띄워 두는 거리 (m) |
+| `deadlineY` | 이 높이 아래로는 떨어지지 않고 멈춥니다 (맵 밖으로 떨어진 무기) |
+
 ## 사람
 
 사람 하나는 `human/list.json`의 `humanData` 항목 하나입니다.
@@ -318,7 +360,89 @@ AI 가 쓰는 거리(`aiMaxRange`, `aiMinRange`)는 근접 무기가 아니어�
 | `search` | 탐색 능력. 클수록 멀리, 꼼꼼히 봅니다 |
 | `limitsError` | 발사를 허용하는 각도 보정. 음수면 더 정확히 겨눈 뒤에 쏩니다 |
 
-그 밖의 `ai*` 값은 모든 AI 가 함께 쓰는 값입니다: 시야각(`aiSearchFov*`), 발견 거리(`aiSearchDist*`), 회전 속도(`aiTurn*`), 경계 유지 시간(`aiCautionFrames`, 틱 단위), 소리를 듣는 거리(`aiHear*`), 경로 도착 판정 거리(`aiArrivalDist*`).
+`aiScopeData` 는 스코프 종류마다의 AI 값입니다. **0번은 스코프가 없는 무기와 맨손**이고, 스코프 무기는 `scopeIndex` + 1 번을 씁니다 (에드온 스코프는 같은 번호의 에드온 항목을 씁니다).
+
+| 키 | 뜻 |
+|---|---|
+| `aiShotAngle`, `aiShotAngleLong` | 근거리와 원거리에서, 겨눈 방향이 적에게서 이 각도(도) 안에 들어와야 쏩니다. AI 수준의 `limitsError` 가 여기에 더해집니다 |
+| `aiAddSearchDistNormal`, `aiAddSearchDistCaution` | 평소와 경계 중의 발견 거리에 더하는 값 (m) |
+
+그 밖의 `ai*` 값은 모든 AI 가 함께 쓰는 값입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `aiSearchFovHNear`, `aiSearchFovVNear` | 근거리의 시야각, 가로와 세로 (도. 전체 각이고 좌우·상하로 절반씩입니다) |
+| `aiSearchFovHLong`, `aiSearchFovVLong` | 원거리의 시야각 |
+| `aiSearchFovHNearCaution`, `aiSearchFovVNearCaution`, `aiSearchFovHLongCaution`, `aiSearchFovVLongCaution` | 경계 중일 때의 같은 값 |
+| `aiSearchDistBaseNormal`, `aiSearchDistCoeffNormal` | 평소의 발견 거리 = Base + Coeff × (AI 수준의 `search` − 2) + 스코프의 가산 (m) |
+| `aiSearchDistBaseCaution`, `aiSearchDistCoeffCaution` | 경계 중의 발견 거리 |
+| `aiShortAttackDist` | 근거리와 원거리를 가르는 거리 (m) |
+| `aiSearchLoopScale` | 한 틱에 살펴보는 사람 수 = AI 수준의 `search` × 이 값 |
+| `aiSearchPoolSize` | 살펴볼 사람을 뽑는 범위의 크기. 맵의 사람 수보다 크면 빈 자리를 뽑는 일이 생겨 발견이 그만큼 늦어집니다 (원본의 반응 지연이 여기서 나옵니다) |
+| `aiTurnRateDeg`, `aiTurnDamping`, `aiTurnDeadzoneDeg` | 조준을 돌리는 가속(틱당 도), 틱마다 남는 회전 속도의 비율, 이보다 느린 회전은 멈춤 |
+| `aiTurnMaxPitchDeg` | 위아래로 겨눌 수 있는 한계 (도) |
+| `aiActionCancelDist` | 적이 이보다 멀어지면 전투를 그만둡니다 (m) |
+| `aiCombatRetreatDist` | 전투 중 적이 이보다 가까우면 앞으로 움직이지 않습니다 (m) |
+| `aiCautionFrames` | 경계를 유지하는 시간 (틱) |
+| `aiZombieArmAngle` | 좀비가 공격할 때 드는 팔의 각도 (도. 0 이 수평, 음수가 아래) |
+| `aiHearGunfireDist`, `aiHearGunfireSilencerDist`, `aiHearGunfireAllyDist` | 적의 총소리, 소음기를 단 적의 총소리, 아군의 총소리를 듣는 거리 (m) |
+| `aiHearBulletDist` | 머리 옆을 스쳐 가는 총알을 듣는 거리. 수류탄처럼 중력을 받는 탄은 듣지 못합니다 |
+| `aiHearBulletWallHitDist`, `aiHearExplosionDist` | 총알이 벽에 맞는 소리, 폭발을 듣는 거리 |
+| `aiHearHitHumanHead`, `aiHearHitHumanBody`, `aiHearHitHumanLeg`, `aiHearHitHumanZombie`, `aiHearHitSmallObject` | 총알이 사람의 머리·몸·다리에 맞는 소리, 좀비의 공격이 맞는 소리, 총알이 오브젝트에 맞는 소리를 듣는 거리 |
+| `aiHearFootstepForward`, `aiHearFootstepSide`, `aiHearFootstepBack` | 다른 팀이 앞으로·옆으로·뒤로 달리는 발소리를 듣는 거리. 걷는 소리와 같은 팀의 발소리는 듣지 못합니다 |
+| `aiArrivalDistPath` | 경로의 포인트에 도착했다고 치는 거리 (m) |
+| `aiArrivalDistTracking`, `aiArrivalDistWalkTracking` | 사람을 따라갈 때 멈추는 거리와 걷기로 바꾸는 거리 |
+| `aiStop5SecFrames` | 경로의 "5초 대기" 포인트에서 기다리는 시간 (틱) |
+| `aiJumpCheckDist` | 앞의 이 거리 안에 걸리는 것이 있으면 점프를 시도합니다 (m) |
+
+소리를 들은 AI 는 경계 상태가 됩니다.
+
+### `human/controller.json` — 이동과 몸 크기
+
+`humanControllerData` 는 모든 사람이 함께 쓰는 이동 값입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `gravityAcceleration` | 아래로 붙는 가속도 (m/s²) |
+| `fallMaxSpeed` | 떨어지는 속도의 한계 (음수, m/s) |
+| `fallMinSpeed` | 이보다 빠르게 떨어져 착지하면 낙하 데미지를 받습니다 (음수, m/s) |
+| `fallDamageMax` | 한계 속도로 착지했을 때의 낙하 데미지. 그 사이의 속도는 비례합니다 |
+| `fallDamageRandomMax` | 낙하 데미지에 더하는 무작위 값의 상한 (0 이상 이 값 미만의 정수) |
+| `controllerSlopeLimit` | 이보다 가파른 면은 올라가지 못하고 미끄러집니다 (도) |
+| `controllerStepClimbSpeed` | 턱을 올라설 때 몸이 올라가는 속도 (m/s) |
+| `deadlineY` | 이 높이 아래로 떨어지면 죽습니다 |
+| `controllerStepOffset`, `controllerGroundProbeRadius`, `deadBodyFallAngularSpeed`, `deadBodyCollision` | 쓰이지 않습니다 |
+
+`controllerSizeData` 는 몸 크기의 목록이고, 사람 종류의 `controllerSizeIndex` 가 번호를 가리킵니다.
+
+| 키 | 뜻 |
+|---|---|
+| `height` | 키 (m). 맵과 사람끼리의 충돌에서 세로 범위입니다 |
+| `cameraHeight` | 눈높이 (m). 1인칭 카메라, AI 의 시야, 총알이 나가는 높이입니다 |
+| `mapRadius` | 맵의 블록과 부딪치는 반지름 |
+| `humanRadius` | 다른 사람과 부딪치는 반지름 |
+
+### `human/general.json` — 모습과 피격 반응
+
+| 키 | 뜻 |
+|---|---|
+| `humanBodyScale`, `humanArmScale`, `humanLegScale` | 몸통, 팔, 다리 모델의 배율 |
+| `humanBodyHeight`, `humanArmHeight`, `humanLegHeight` | 몸통, 팔, 다리 모델을 놓는 높이 (발에서, m) |
+| `armAngleInitial` | 무기를 든 사람이 처음에 겨누는 각도이자 AI 가 평소에 팔을 두는 각도 (도. 음수가 아래) |
+| `armAngleReloading` | 재장전하거나 무기를 바꾸는 동안의 팔 각도 |
+| `headHitReaction`, `bodyHitReaction`, `legHitReaction` | 총알이 머리·몸·다리에 맞았을 때 조준이 흐트러지는 양 (무기의 `errorRange` 와 같은 눈금) |
+| `grenadeHitReaction`, `zombieHitReaction` | 폭발에 휩쓸렸을 때와 좀비의 공격에 맞았을 때의 같은 값 |
+
+흐트러짐은 지금 값보다 클 때만 바뀌고, `weapon/accuracy.json` 의 `reactionRecoveryPerSecond` 만큼씩 줄어듭니다.
+
+### `human/interaction.json` — 무기 줍기
+
+맨손인 슬롯이 있는 사람은 떨어진 무기에 가까이 가면 줍습니다.
+
+| 키 | 뜻 |
+|---|---|
+| `weaponPickupRadius` | 주울 수 있는 수평 거리 (m) |
+| `weaponPickupVerticalRange` | 주울 수 있는 높이 차 (`min`, `max`. 무기의 높이 − 사람의 발 높이, m) |
 
 ### `human/hitbox.json` — 피격 판정
 
@@ -369,7 +493,14 @@ AI 가 쓰는 거리(`aiMaxRange`, `aiMinRange`)는 근접 무기가 아니어�
 | 1 | 상자 | `x`, `y`, `z` = 전체 크기 |
 | 2 | 캡슐 | `x` = 반지름, `y` = 높이, `z` = 방향 (0 X축, 1 Y축, 2 Z축) |
 
-`object/general.json`의 `addonObjectIndex`는 에드온 미션(.mif)이 직접 지정하는 오브젝트이 들어가는 자리입니다. 이 번호의 항목은 미션을 로드할 때마다 덮어쓰이므로 다른 용도로 쓰지 마세요.
+`object/general.json` 은 모든 오브젝트가 함께 쓰는 값입니다.
+
+| 키 | 뜻 |
+|---|---|
+| `modelScale` | 오브젝트 모델의 배율 |
+| `bulletDamageMultiplier` | 총알이 오브젝트에 주는 데미지 = 총알의 위력 × 이 값 (소수점 아래 버림) |
+| `bulletPenetrationAttenuation` | 오브젝트를 맞힌 뒤 총알에 남는 위력의 비율. 총알은 판정 모양을 지나는 동안 0.25 m 마다 다시 맞으므로, 두꺼운 오브젝트일수록 여러 번 깎입니다 |
+| `addonObjectIndex` | 에드온 미션(`.mif`)이 직접 지정하는 오브젝트가 들어가는 자리. 이 번호의 항목은 미션을 로드할 때마다 덮어쓰이므로 다른 용도로 쓰지 마세요 |
 
 ## 이펙트
 
@@ -448,7 +579,25 @@ AI 가 쓰는 거리(`aiMaxRange`, `aiMinRange`)는 근접 무기가 아니어�
 
 ### `sky_data.json`
 
-스카이 번호별 텍스처(`skyTexturePath`)와 안개 색(`skyColor`), 안개가 시작하고 끝나는 거리(`fogStart`, `fogEnd`), 보이는 거리(`farClippingPlane`)입니다.
+| 키 | 뜻 |
+|---|---|
+| `skyMeshPath` | 하늘을 그리는 모델 (`.x`). 비워 두면 하늘을 그리지 않습니다 |
+| `skyTexturePath` | 스카이 번호별 텍스처 |
+| `skyColor` | 스카이 번호별 안개의 색 (0 에서 255 사이의 정수) |
+| `fog` | `false` 면 안개를 쓰지 않습니다 |
+| `fogStart`, `fogEnd` | 안개가 시작하는 거리와 완전히 가리는 거리 (m) |
+| `nearClippingPlane`, `farClippingPlane` | 쓰이지 않습니다. 보이는 거리는 `config.json` 의 `Graphic` 에 있는 같은 이름의 값입니다 |
+
+### `global.json`
+
+메뉴의 버전 표시와 CREDIT 화면에 나오는 글입니다. 게임의 동작에는 영향이 없습니다.
+
+| 키 | 뜻 |
+|---|---|
+| `productName` | 제품 이름 |
+| `versionMajor`, `versionMinor`, `versionPatch` | 버전 (점으로 이어 붙여 보여 줍니다) |
+| `companyName` | 만든 이 |
+| `licenseType`, `licenseName`, `licenseLines` | 라이선스의 이름과 본문 |
 
 ## 확장 블록 데이터 (BD2)
 

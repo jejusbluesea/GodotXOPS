@@ -66,7 +66,7 @@ These are the defaults. You can change them in OPTION → Input in the menu.
 | Reload | R |
 | Scope | Left Shift |
 | Weapon slot 1 / 2 | 1 / 2 |
-| Switch fire mode (semi / full auto etc., previous / next) | Z / X |
+| Switch weapon type (semi / full auto, a grenade launcher attached to a gun, etc. Previous / next) | Z / X |
 | Drop weapon | G |
 | Interact (only when a mission's events use it) | F |
 | Switch view (first / third person) | F1 |
@@ -105,7 +105,7 @@ The `addon` folder is the first page of the addon list by default. To register m
 
 The documents are written in Korean.
 
-- [Modding guide](docs/modding.md) — how to edit weapons, humans, small objects, effects, and missions through the `godotdata/` JSON files, the extended file formats, script events, screen scripts, and addon pages
+- [Modding guide](docs/modding.md) — every key of the `godotdata/` JSON files (weapons, humans, AI, small objects, effects, missions), the extended file formats, a mission's addon data, script events, screen scripts, per-mission screens, images and font, and addon pages
 - [Development guide](docs/development.md) — building from source, code structure, check tools, the editor, the debug console, and behavior that differs from the original
 
 ## Differences from the original
