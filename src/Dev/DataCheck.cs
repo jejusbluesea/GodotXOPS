@@ -85,6 +85,7 @@ namespace GodotXOPS.Dev
                 case "effect_data.json": return data.EffectParameterData;
                 case "block_material_data.json": return data.BlockMaterialParameterData;
                 case "sound_data.json": return data.SoundParameterData;
+                case "image_data.json": return data.ImageParameterData;
                 case "sky_data.json": return data.SkyData;
                 case "mission_data.json": return data.MissionData;
                 case "global.json": return data.GlobalData;

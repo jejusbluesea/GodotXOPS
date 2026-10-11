@@ -32,6 +32,10 @@ namespace GodotXOPS
         private string m_addonBlockMaterialDataPath = string.Empty;
         private string m_addonSoundDataPath = string.Empty;
         private string m_addonEventDataPath = string.Empty;
+        private string m_addonImageDataPath = string.Empty;
+        private string m_briefingScriptPath = string.Empty;
+        private string m_hudScriptPath = string.Empty;
+        private string m_resultScriptPath = string.Empty;
 
         // 경로는 모두 전체 경로다. 해당 항목이 없으면 빈 문자열.
         public string MissionName => m_missionName;
@@ -195,7 +199,38 @@ namespace GodotXOPS
             loader.m_addonBlockMaterialDataPath = data.addonBlockMaterialDataPath ?? string.Empty;
             loader.m_addonSoundDataPath = data.addonSoundDataPath ?? string.Empty;
             loader.m_addonEventDataPath = data.addonEventDataPath ?? string.Empty;
+            loader.m_addonImageDataPath = data.addonImageDataPath ?? string.Empty;
+            loader.m_briefingScriptPath = data.briefingScriptPath ?? string.Empty;
+            loader.m_hudScriptPath = data.hudScriptPath ?? string.Empty;
+            loader.m_resultScriptPath = data.resultScriptPath ?? string.Empty;
+            LoadMissionImages();
             return true;
+        }
+
+        /// <summary>
+        /// 지금 미션이 그 화면을 대신 그리라고 적어 둔 화면 스크립트의 경로.
+        /// </summary>
+        /// <param name="screen">화면 이름 ("briefing", "maingame", "result").</param>
+        /// <returns>스크립트 경로 (exe 폴더 기준). 미션이 그 화면을 바꾸지 않으면 빈 문자열.</returns>
+        public static string MissionScreenScript(string screen)
+        {
+            MapLoader loader = Instance;
+            if (string.Equals(screen, "briefing", StringComparison.OrdinalIgnoreCase)) return loader.m_briefingScriptPath;
+            if (string.Equals(screen, "maingame", StringComparison.OrdinalIgnoreCase)) return loader.m_hudScriptPath;
+            if (string.Equals(screen, "result", StringComparison.OrdinalIgnoreCase)) return loader.m_resultScriptPath;
+            return string.Empty;
+        }
+
+        /// <summary>
+        /// 미션의 이미지 목록을 기본 목록 뒤(번호 10000 부터)에 붙인다. 다른 에드온 데이터는 맵을 로드할 때 붙지만,
+        /// 이미지는 맵이 아직 없는 브리핑과 맵을 내린 결과 화면에서도 쓰므로 미션 정보와 함께 붙이고 UnloadMissionData 가 뗀다.
+        /// </summary>
+        private static void LoadMissionImages()
+        {
+            DataList<ImageData> list = DataManager.Instance.ImageParameterData.imageData;
+            list.ClearAddon();
+            ImageParameterData image = LoadAddonFile<ImageParameterData>(Instance.m_addonImageDataPath);
+            if (image != null) list.SetAddon(image.imageData);
         }
 
         /// <summary>
@@ -254,6 +289,11 @@ namespace GodotXOPS
             loader.m_addonBlockMaterialDataPath = string.Empty;
             loader.m_addonSoundDataPath = string.Empty;
             loader.m_addonEventDataPath = string.Empty;
+            loader.m_addonImageDataPath = string.Empty;
+            loader.m_briefingScriptPath = string.Empty;
+            loader.m_hudScriptPath = string.Empty;
+            loader.m_resultScriptPath = string.Empty;
+            if (DataManager.Loaded) DataManager.Instance.ImageParameterData.imageData.ClearAddon();
         }
 
         /// <summary>

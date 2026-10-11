@@ -100,9 +100,59 @@ namespace GodotXOPS.Dev
             Expect(game.UiScriptLoad("maingame") == null, "없는 등록 파일로 화면 스크립트가 올라옴");
 
             foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result", "option" }) game.UiScriptFree(screen);
+            CheckMissionUiScript(game, folder);
             game.SetUiScriptOverride(string.Empty);
             Godot.Collections.Dictionary values = game.HudValues();
             Expect(values.ContainsKey("hp") && values.ContainsKey("armor") && values.ContainsKey("armor_max") && values.ContainsKey("helmet") && values.ContainsKey("helmet_max") &&values.ContainsKey("weapon") && values.ContainsKey("message_text") && values.ContainsKey("result"), "화면 스크립트에 넘기는 값에 빠진 키가 있음");
+        }
+
+        /// <summary>
+        /// 미션이 들고 오는 화면 스크립트와 이미지 목록: MIF2 에 적은 스크립트가 설치된 등록보다 먼저 올라오고, 올리지 못하면 설치된 것으로 넘어가지 않으며,
+        /// 미션이 바꾸지 않는 화면은 평소대로이고, 이미지는 미션의 목록(10000 부터)의 번호로 읽힌다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        /// <param name="folder">점검용 파일을 쓰는 폴더 (exe 폴더 기준).</param>
+        private void CheckMissionUiScript(GameBridge game, string folder)
+        {
+            System.IO.File.WriteAllText(GamePath.Resolve($"{folder}/mission_images.json"),
+                "{ \"imageData\": [ { \"name\": \"title\", \"imagePath\": \"data/title.dds\" }, { \"name\": \"missing\", \"imagePath\": \"data/none.png\" }, { \"name\": \"outside\", \"imagePath\": \"../outside.png\" } ] }");
+            var mission = new ExtendedMissionData
+            {
+                name = "UI", blockPath = $"{folder}/none.bd2", pointPath = $"{folder}/none.pd2",
+                addonImageDataPath = $"{folder}/mission_images.json",
+                hudScriptPath = "godotdata/ui/samples/hud.sgd", briefingScriptPath = $"{folder}/broken.sgd",
+            };
+            string missionPath = GamePath.Resolve($"{folder}/mission.mif2");
+            if (!IO.MIF2File.Write(missionPath, mission, out _) || !MapLoader.LoadMissionFile(missionPath))
+            {
+                Expect(false, "미션의 화면 스크립트 점검용 미션 파일을 읽지 못함");
+                return;
+            }
+
+            game.SetUiScriptOverride(string.Empty);
+            Node hud = game.UiScriptLoad("maingame");
+            Expect(hud != null && hud.HasMethod("frame") && hud.GetParent() == null && hud.Get("restrictions").AsBool(), "미션이 적은 HUD 스크립트가 올라오지 않았거나 격리가 걸리지 않음");
+            Expect(game.UiScriptImage("maingame", 10000) != null && game.ListImage(10000) != null, "미션의 이미지 목록의 이미지를 읽지 못함");
+            Expect(game.UiScriptImage("maingame", 10001) == null && game.UiScriptImage("maingame", 10002) == null && game.UiScriptImage("maingame", 10003) == null,
+                "없는 파일, 게임 폴더 밖, 목록에 없는 번호의 이미지가 null 이 아님");
+            Expect(game.UiScriptImage("maingame", 0) == null, "미션의 스크립트에서 10000 미만의 번호가 (비어 있는) 기본 이미지 목록을 가리키지 않음");
+
+            // 미션의 스크립트를 올리지 못하면 설치된 것이 있어도 기본 화면이고, 미션이 바꾸지 않는 화면은 설치된 것을 쓴다.
+            game.SetUiScriptOverride("godotdata/ui/samples");
+            Expect(game.UiScriptLoad("briefing") == null, "미션의 브리핑 스크립트가 깨졌는데 설치된 스크립트로 넘어감");
+            Expect(game.UiScriptLoad("result") != null, "미션이 바꾸지 않는 화면에서 설치된 스크립트가 올라오지 않음");
+            Expect(game.UiScriptLoad("maingame") != null && game.UiScriptImage("maingame", 0) == null, "설치된 것이 있을 때 미션의 HUD 스크립트가 먼저가 아님");
+
+            ConfigManager config = ConfigManager.Instance;
+            bool saved = config.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, true);
+            config.SetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, false);
+            Expect(game.UiScriptLoad("maingame") == null, "AllowUiScript 를 껐는데 미션의 화면 스크립트가 올라옴");
+            config.SetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, saved);
+
+            foreach (string screen in new[] { "briefing", "maingame", "result" }) game.UiScriptFree(screen);
+            game.SetUiScriptOverride(string.Empty);
+            game.UnloadMission();
+            Expect(game.UiScriptLoad("maingame") == null && game.ListImage(10000) == null, "미션을 내렸는데 그 미션의 화면 스크립트나 이미지가 남아 있음");
         }
 
         /// <summary>

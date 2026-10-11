@@ -6,7 +6,7 @@ using GodotXOPS.IO;
 
 namespace GodotXOPS
 {
-    // GameBridge 의 화면 스크립트 담당 partial: 등록 파일(godotdata/ui/*.json)을 찾아 SafeGDScript 를 샌드박스에 올리고,
+    // GameBridge 의 화면 스크립트 담당 partial: 미션이 적어 둔 스크립트나 등록 파일(godotdata/ui/*.json)을 찾아 SafeGDScript 를 샌드박스에 올리고,
     // 화면(GDScript 의 XopsScriptScreen)이 그 노드를 부른다. 격리는 SandboxScript 가 건다.
     public partial class GameBridge
     {
@@ -30,11 +30,15 @@ namespace GodotXOPS
             public readonly SandboxScript script = new SandboxScript();
             public readonly List<string> imagePaths = new List<string>();
             public readonly Dictionary<int, Texture2D> images = new Dictionary<int, Texture2D>();
+            // 미션이 들고 온 스크립트인지. 등록 파일이 없어 자기 이미지 목록도 없으므로, 번호는 전부 이미지 목록(이벤트와 같은 번호)을 가리킨다.
+            public bool fromMission;
         }
 
         // 화면 이름 → 올려 둔 스크립트. 화면 위에 다른 화면이 덮일 수 있어서(메뉴 위의 OPTION) 여럿이 함께 올라가 있을 수 있다.
         private readonly Dictionary<string, UiScriptSlot> m_uiScripts = new Dictionary<string, UiScriptSlot>(StringComparer.OrdinalIgnoreCase);
         private string m_uiOverride = string.Empty;
+        // 이미지 목록(번호)에서 읽어 둔 텍스처. 경로로 기억하고 미션 정보를 내릴 때 비운다 (같은 번호가 다음 미션에서는 다른 파일이다).
+        private readonly Dictionary<string, Texture2D> m_listImages = new Dictionary<string, Texture2D>(StringComparer.OrdinalIgnoreCase);
 
         // 화면 스크립트가 실패해 기본 화면으로 되돌린 횟수 (개발용 인자가 종료 코드에 쓴다).
         public int UiScriptFailures { get; private set; }
@@ -49,7 +53,8 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 그 화면을 맡겠다고 등록한 스크립트를 샌드박스에 올린다. 스크립트의 함수는 부르지 않는다.
+        /// 그 화면을 맡은 스크립트를 샌드박스에 올린다. 스크립트의 함수는 부르지 않는다.
+        /// 지금 미션이 그 화면의 스크립트를 적어 두었으면 그것이 설치된 등록보다 먼저다 (맵이 의도한 화면이 보여야 한다). 그 스크립트를 올리지 못하면 설치된 것으로 넘어가지 않고 기본 화면이다.
         /// 같은 화면의 것이 이미 올라가 있으면 내리고 다시 올린다. 다른 화면의 것은 그대로 둔다.
         /// </summary>
         /// <param name="screen">화면 이름 (예: "maingame").</param>
@@ -60,17 +65,24 @@ namespace GodotXOPS
             UiScriptFree(screen);
             if (!ConfigManager.Instance.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, true)) return null;
 
-            UiPackData pack = FindUiPack(screen, out string source);
-            if (pack == null) return null;
+            UiPackData pack = null;
+            string source = "the mission file";
+            string scriptPath = MapLoader.MissionScreenScript(screen);
+            if (string.IsNullOrEmpty(scriptPath))
+            {
+                pack = FindUiPack(screen, out source);
+                if (pack == null) return null;
+                scriptPath = pack.scriptPath;
+            }
 
-            var slot = new UiScriptSlot();
-            if (!slot.script.Load(pack.scriptPath, "screen", out string error, k_uiMaxReferences))
+            var slot = new UiScriptSlot { fromMission = pack == null };
+            if (!slot.script.Load(scriptPath, "screen", out string error, k_uiMaxReferences))
             {
                 Debugger.LogError($"{error} (registered in {source}). Using the built-in screen.", nameof(GameBridge));
                 return null;
             }
 
-            if (pack.images != null)
+            if (pack != null && pack.images != null)
             {
                 foreach (string path in pack.images)
                 {
@@ -114,14 +126,17 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 그 화면의 등록 파일의 이미지 목록에서 그 번호의 이미지를 텍스처로 읽는다. 한 번 읽은 것은 스크립트를 내릴 때까지 갖고 있는다.
+        /// 화면 스크립트가 번호로 가리킨 이미지를 텍스처로 읽는다. 10000 미만은 그 화면의 등록 파일의 이미지 목록(한 번 읽은 것은 스크립트를 내릴 때까지 갖고 있는다),
+        /// 10000 이상은 미션의 이미지 목록이다 (이벤트가 그리는 것과 같은 목록). 미션이 들고 온 스크립트는 등록 파일이 없으므로 10000 미만도 이미지 목록(godotdata/image_data.json)의 번호다.
         /// </summary>
         /// <param name="screen">화면 이름.</param>
-        /// <param name="index">이미지 목록의 번호 (0 부터).</param>
+        /// <param name="index">이미지의 번호.</param>
         /// <returns>텍스처. 없는 번호이거나 읽지 못하면 null.</returns>
         public Texture2D UiScriptImage(string screen, int index)
         {
             UiScriptSlot slot = FindUiScript(screen);
+            if (index >= DataList<ImageData>.AddonBase || (slot != null && slot.fromMission)) return ListImage(index);
+
             if (slot == null || index < 0 || index >= slot.imagePaths.Count) return null;
             if (slot.images.TryGetValue(index, out Texture2D cached)) return cached;
 
@@ -129,6 +144,25 @@ namespace GodotXOPS
             Texture2D texture = LoadTexture(slot.imagePaths[index]);
             if (texture == null) Debugger.LogWarning($"Screen script image {index} could not be read: {slot.imagePaths[index]}", nameof(GameBridge));
             slot.images[index] = texture;
+            return texture;
+        }
+
+        /// <summary>
+        /// 이미지 목록(godotdata/image_data.json, 10000 이상은 미션의 목록)의 그 번호의 이미지를 텍스처로 읽는다. 이벤트가 놓은 이미지를 메인게임이 그릴 때 쓴다.
+        /// </summary>
+        /// <param name="number">이미지 목록의 번호.</param>
+        /// <returns>텍스처. 없는 번호이거나 읽지 못하면 null.</returns>
+        public Texture2D ListImage(int number)
+        {
+            DataList<ImageData> list = DataManager.Instance.ImageParameterData.imageData;
+            if (!list.Has(number)) return null;
+
+            string path = list[number].imagePath ?? string.Empty;
+            if (m_listImages.TryGetValue(path, out Texture2D cached)) return cached;
+
+            Texture2D texture = LoadTexture(path);
+            if (texture == null) Debugger.LogWarning($"Image {number} could not be read: {path}", nameof(GameBridge));
+            m_listImages[path] = texture;
             return texture;
         }
 

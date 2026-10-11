@@ -158,6 +158,7 @@ namespace GodotXOPS
             }
 
             TickHud();
+            TickHudImages();
             TickStage();
 
             if (m_messageId != -1 && m_messageCnt < (int)(k_messageSeconds * SimClock.FrameRate))

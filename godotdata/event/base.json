@@ -1215,6 +1215,94 @@
       ]
     },
     {
+      "type": 74,
+      "name": "Show Image",
+      "function": "show_image",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "slot"
+        },
+        {
+          "name": "image",
+          "slot": "e0",
+          "kind": "image"
+        },
+        {
+          "name": "anchor",
+          "slot": "e1",
+          "kind": "anchor"
+        },
+        {
+          "name": "tx",
+          "slot": "e2",
+          "kind": "float"
+        },
+        {
+          "name": "ty",
+          "slot": "e3",
+          "kind": "float"
+        },
+        {
+          "name": "width",
+          "slot": "e4",
+          "kind": "float"
+        },
+        {
+          "name": "height",
+          "slot": "e5",
+          "kind": "float"
+        },
+        {
+          "name": "alpha",
+          "slot": "e6",
+          "kind": "float"
+        },
+        {
+          "name": "seconds",
+          "slot": "e7",
+          "kind": "float"
+        },
+        {
+          "name": "fade",
+          "slot": "e8",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 75,
+      "name": "Clear Image",
+      "function": "clear_image",
+      "parameters": [
+        {
+          "name": "slot",
+          "slot": "p2",
+          "kind": "slot"
+        },
+        {
+          "name": "fade",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
       "type": 80,
       "name": "Pause World",
       "function": "pause_world",

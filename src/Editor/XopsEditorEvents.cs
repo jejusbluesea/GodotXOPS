@@ -431,6 +431,7 @@ namespace GodotXOPS.Editor
                 case "objectdata":
                 case "effect":
                 case "sound":
+                case "image":
                 case k_kindMessage:
                 case k_kindLine:
                     return true;
@@ -512,6 +513,9 @@ namespace GodotXOPS.Editor
                 case "sound":
                     for (int i = 0; i < data.SoundParameterData.soundData.Count; i++) names.Add(data.SoundParameterData.soundData[i].name);
                     break;
+                case "image":
+                    for (int i = 0; i < data.ImageParameterData.imageData.Count; i++) names.Add(data.ImageParameterData.imageData[i].name);
+                    break;
                 case k_kindMessage:
                     foreach (string message in m_document.Messages) names.Add(Shorten(message));
                     break;
@@ -536,8 +540,17 @@ namespace GodotXOPS.Editor
             {
                 m_choiceMenu.AddItem($"{i}  {names[i]}", i);
             }
-            if (names.Count == 0) m_choiceMenu.AddItem("(nothing to choose)", 0);
-            m_choiceMenu.SetItemDisabled(0, names.Count == 0);
+            // 이미지는 기본 목록이 비어 있고 미션의 목록(10000 부터)을 주로 쓰므로 그것도 함께 보여 준다.
+            int extra = 0;
+            if (slot.kind == "image" && AddonListOf(typeof(ImageParameterData), nameof(ImageParameterData.imageData)) is System.Collections.IList addon)
+            {
+                for (int i = 0; i < addon.Count; i++, extra++)
+                {
+                    m_choiceMenu.AddItem($"{DataList<ImageData>.AddonBase + i}  {ItemName(addon[i])}", DataList<ImageData>.AddonBase + i);
+                }
+            }
+            if (names.Count + extra == 0) m_choiceMenu.AddItem("(nothing to choose)", 0);
+            m_choiceMenu.SetItemDisabled(0, names.Count + extra == 0);
             m_choiceMenu.Position = (Vector2I)(GetWindow().Position + button.GlobalPosition + new Vector2(0f, button.Size.Y));
             m_choiceMenu.Popup();
         }

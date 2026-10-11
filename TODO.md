@@ -23,6 +23,19 @@
 
 ## 다음 세션에서 이어 할 것 (2026-10-11 사용자 지시)
 
+**1.2.2 의 릴리즈를 내리고 미션마다의 화면과 이벤트의 이미지를 더 넣었다 (2026-10-11, 아래의 "1.2.2 를 릴리즈했다"보다 이것이 최신이다)**:
+- 사용자가 1.2.2 를 게시한 뒤 "이걸 했어야 하는데 잊었다"며 릴리즈를 취소했다. 내가 GitHub 의 릴리즈만 지웠다 (`gh release delete v1.2.2`, 첨부 포함). **태그 `v1.2.2`(커밋 `6b2c6ba`)는 남아 있다**: 다른 커밋으로 다시 내려면 태그를 옮기거나 지우고 새로 만들어야 한다 (사용자에게 알렸다). 다른 버전의 릴리즈 페이지(1.0.1, 1.1.0, 1.2.0)는 사용자가 일부러 지운 것이다 (실험용이고 하루 단위로 올라온 것이라 남길 필요가 없었다고 했다. 1.0.0 만 남아 있다. README 와 `ROADMAP.md` 의 옛 내려받기 링크는 깨져 있다).
+- **사용자 지시: 릴리즈된 것만 지우고 다른 것은 건드리지 않는다. README 와 CHANGELOG(릴리즈 노트)는 나중에 고친다.** 그래서 README 세 개의 "최신 릴리즈"(1.2.2 를 가리킨다), `ROADMAP.md` 의 1.2.2 "릴리즈됨"과 링크, 버전 번호(1.2.2)는 그대로 두었다. 다시 게시할 때 할 것: 익스포트, 릴리즈 폴더 `build/1.2.2/GodotXOPS/` 다시 만들기, 릴리즈 노트 `build/1.2.2/release_notes.md` 에 아래 기능 더하기, 태그.
+- **넣은 것** (사용자 요청: ① 브리핑·HUD·결과를 MIF2 단위로 바꾸는 sgd ② 이벤트에서 이미지 출력. 이미지 목록 JSON 하나를 넷이 함께 쓴다):
+  - 이미지 목록 `ImageParameterData`(`godotdata/image_data.json`, 비어 있다), MIF2 의 `addonImageDataPath`(10000 부터).
+  - MIF2 의 `briefingScriptPath` / `hudScriptPath` / `resultScriptPath` (`.sgd` 를 직접 가리킨다).
+  - 이벤트 74 Show Image / 75 Clear Image (기본 묶음 60종), API `hud_image` / `hud_image_clear`, 이미지 칸 16개.
+  - 에디터: 미션 모드의 경로 칸 넷, 에셋 모드의 Image data 종류, 이벤트의 이미지 칸에서 미션의 목록까지 고르기. 개발용 인자 `--mission-file`, `event_check` 의 `--image-sample`.
+  - 세부 결정은 `CLAUDE.md` 의 "화면 스크립트"(미션이 들고 오는 화면)와 "스크립트 이벤트"(이미지 목록과 이벤트의 이미지)에 있다. 사용자가 답하지 않은 채 내 권고로 간 것: 미션의 것이 설치한 것보다 먼저, `AllowUiScript` 하나로 함께 끔, HUD 스크립트가 화면 전체를 그림. **화면 스크립트에 미션 변수를 넘기는 것은 넣지 않았다** (물었고 답이 없었다).
+- **확인한 것**: 점검 15개 전부 종료 코드 0 (`event_check` 176항목, `ui_check` 149항목). 시험용 미션 `build/ui_test/`(공식 미션 0 을 변환, `make_ui_test.py`)의 스크린샷 640×480: 미션의 브리핑·결과 스크립트가 목록의 그림을 그림, 미션의 HUD 스크립트 위와 기본 HUD 위에서 이벤트의 이미지가 나옴(오른쪽 위 타이틀, 가운데 반투명 그림), 메시지가 이미지 위에 그려짐.
+- **확인하지 못한 것**: 사용자가 창에서 본 것은 없다. 페이드가 눈에 부드러운지(수치로만 봤다), 높은 해상도와 16:9, 에디터의 새 칸과 이미지 고르기 목록(창을 띄워 보지 않았다. selftest 는 통과), 에디터의 플레이 테스트(F5)에서 미션의 화면이 적용되는지(미션 설정을 그대로 쓰므로 될 것이지만 해 보지 않았다), 익스포트 빌드.
+- 시험 방법: `mif2_check` 의 `--convert-official 0 build/ui_test` → `python build/ui_test/make_ui_test.py .` → `event_check` 의 `--image-sample build/ui_test/mission00.pd2` → 콘솔의 `loadmissionmif build/ui_test/mission00.mif2 false`(브리핑부터) 나 `--mission-file`.
+
 **1.2.2 를 릴리즈했다 (2026-10-11)**: https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.2 , 태그 `v1.2.2` = 커밋 `6b2c6ba`, 첨부 `GodotXOPS_1.2.2.7z`. 태그·압축·게시는 사용자가 했다. 게시 뒤에 README 세 개의 "최신 릴리즈", `ROADMAP.md`, `CLAUDE.md` 를 고쳤다. **다음은 1.3 이고 넣을 것은 아래 "1.3 으로 미룬 것" 에서 고른다 (정해지지 않았다).** 아래는 준비할 때의 기록이다.
 
 **1.2.2 릴리즈 준비를 했다 (2026-10-11)**: 사용자 결정으로 1.2.2 를 실제로 릴리즈한다 (1.2.1 은 따로 내지 않고 여기에 담는다). 버전 1.2.2(`godotdata/global.json`, `export_presets.cfg`), README 세 개(기능 목록 한 줄, "앞으로 할 것"), `ROADMAP.md`(1.2.1 "따로 릴리즈하지 않음", 1.2.2 "릴리즈 준비 중"), 익스포트와 릴리즈 폴더 `build/1.2.2/GodotXOPS/`, 릴리즈 노트 `build/1.2.2/release_notes.md`. **게시(태그 `v1.2.2`, 압축, 릴리즈)는 사용자가 한다. 게시한 뒤에 할 것**: README 세 개의 "최신 릴리즈", `ROADMAP.md` 의 상태를 "릴리즈됨 (날짜)" 와 내려받기 링크로, `CLAUDE.md` 의 Project Overview.

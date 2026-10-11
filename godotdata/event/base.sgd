@@ -317,6 +317,20 @@ func clear_text(p, state):
 	api["hud_clear"].call(p["slot"])
 	return 0
 
+# Puts an image from the image list on the screen. Width and height are on a screen 480 high; 0 keeps the image's own size or ratio.
+# Alpha 0 means fully visible (so an event with empty values shows the image as it is). Fade is the time to appear and to disappear.
+func show_image(p, state):
+	var alpha = p["alpha"]
+	if alpha <= 0:
+		alpha = 1.0
+	api["hud_image"].call(p["slot"], p["image"], {"anchor": p["anchor"], "x": p["tx"], "y": p["ty"], "width": p["width"], "height": p["height"], "alpha": alpha, "seconds": p["seconds"], "fade": p["fade"]})
+	return 0
+
+# Slot -1 clears every image.
+func clear_image(p, state):
+	api["hud_image_clear"].call(p["slot"], p["fade"])
+	return 0
+
 func show_var(p, state):
 	api["hud_text"].call(p["slot"], format_value(api["get_var"].call(p["var"]), p["format"]), text_options(p, p["seconds"]))
 	return 0

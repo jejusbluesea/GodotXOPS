@@ -200,6 +200,7 @@ namespace GodotXOPS
         private void ResetHud()
         {
             ClearHudText(-1);
+            ResetHudImages();
             m_interactPending = false;
             m_interactNow = false;
         }

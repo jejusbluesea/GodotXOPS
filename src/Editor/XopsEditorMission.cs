@@ -89,7 +89,11 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Addon effect data", "*.json", m => m.addonEffectDataPath, (m, v) => m.addonEffectDataPath = v);
             AddMissionPath(grid, "Addon block material data", "*.json", m => m.addonBlockMaterialDataPath, (m, v) => m.addonBlockMaterialDataPath = v);
             AddMissionPath(grid, "Addon sound data", "*.json", m => m.addonSoundDataPath, (m, v) => m.addonSoundDataPath = v);
+            AddMissionPath(grid, "Addon image data", "*.json", m => m.addonImageDataPath, (m, v) => m.addonImageDataPath = v);
             AddMissionPath(grid, "Addon event pack", "*.json", m => m.addonEventDataPath, (m, v) => m.addonEventDataPath = v);
+            AddMissionPath(grid, "Briefing script", "*.sgd", m => m.briefingScriptPath, (m, v) => m.briefingScriptPath = v);
+            AddMissionPath(grid, "HUD script", "*.sgd", m => m.hudScriptPath, (m, v) => m.hudScriptPath = v);
+            AddMissionPath(grid, "Result script", "*.sgd", m => m.resultScriptPath, (m, v) => m.resultScriptPath = v);
             column.AddChild(new Label
             {
                 Text = "Numbers 10000 and up in the map point at the mission's addon data. The addon event pack adds this mission's own events to the Add menu.",

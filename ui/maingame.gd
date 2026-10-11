@@ -143,6 +143,10 @@ var _shown_scope := -1
 
 var _message: Label
 var _event_texts: Control
+var _event_images: Control
+# 그려 둔 이벤트 이미지: [칸 번호, 노드, 색의 투명도].
+var _event_image_nodes: Array = []
+var _last_image_revision := -1
 var _last_hud_revision := -1
 var _last_message := -1
 var _flash: ColorRect
@@ -212,6 +216,7 @@ func _process(delta: float) -> void:
 
 	if _script != null:
 		_update_event_texts()
+		_update_event_images()
 		if _process_script(delta):
 			return
 
@@ -257,6 +262,7 @@ func _process(delta: float) -> void:
 	_update_blind()
 	_update_message()
 	_update_event_texts()
+	_update_event_images()
 	_update_flash(delta)
 	_update_fade(delta)
 	_update_fps(delta)
@@ -308,8 +314,12 @@ func _update_stage() -> void:
 		_script.set_hud_visible(hud_visible)
 
 
-## 이벤트가 놓는 글자를 담을 자리. 메시지와 같은 층(화면 높이 480 기준으로 확대)에 둔다.
+## 이벤트가 놓는 이미지와 글자를 담을 자리. 메시지와 같은 층(화면 높이 480 기준으로 확대)에 둔다. 이미지가 먼저라 글자와 메시지 아래에 그려진다.
 func _build_event_texts() -> void:
+	_event_images = Control.new()
+	_event_images.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_event_images.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_layer(MESSAGE_ORDER, true).add_child(_event_images)
 	_event_texts = Control.new()
 	_event_texts.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_event_texts.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -657,6 +667,41 @@ func _update_event_texts() -> void:
 			var label := XopsUI.label(_event_texts, entry["text"], int(entry["size"]), entry["color"])
 			var box := label.get_minimum_size()
 			XopsUI.place(label, pivot, entry["x"], entry["y"], box.x, box.y)
+
+
+## 이벤트가 화면에 놓은 이미지 (EventManager.HudImages). 구성이 바뀌었을 때만 다시 만들고, 나타나고 사라지는 진하기는 매 프레임 읽는다.
+## 너비와 높이가 둘 다 0 이면 이미지의 픽셀 크기를, 하나만 0 이면 이미지의 비율을 따른다.
+func _update_event_images() -> void:
+	var revision: int = EventManager.HudImageRevision
+	if revision != _last_image_revision:
+		_last_image_revision = revision
+		for child in _event_images.get_children():
+			_event_images.remove_child(child)
+			child.free()
+		_event_image_nodes.clear()
+
+		for entry: Dictionary in EventManager.HudImages():
+			var texture: Texture2D = Game.ListImage(entry["image"])
+			if texture == null:
+				continue
+			var w: float = entry["width"]
+			var h: float = entry["height"]
+			var size := Vector2(texture.get_width(), texture.get_height())
+			if w <= 0.0 and h <= 0.0:
+				w = size.x
+				h = size.y
+			elif w <= 0.0:
+				w = h * size.x / maxf(size.y, 1.0)
+			elif h <= 0.0:
+				h = w * size.y / maxf(size.x, 1.0)
+			var anchor: int = entry["anchor"]
+			var pivot := Vector2((anchor % 3) * 0.5, (anchor / 3) * 0.5)
+			var color: Color = entry["color"]
+			var node := XopsUI.image(_event_images, pivot, texture, entry["x"], entry["y"], w, h, color)
+			_event_image_nodes.append([entry["slot"], node, color.a])
+
+	for item: Array in _event_image_nodes:
+		(item[1] as TextureRect).modulate.a = item[2] * EventManager.HudImageFade(item[0])
 
 
 ## 이벤트 메시지. 글은 바뀔 때만 다시 쓰고, 진하기는 EventManager 가 계산한 값을 매 프레임 쓴다.

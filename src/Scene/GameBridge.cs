@@ -164,6 +164,17 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 게임 폴더 기준 경로의 미션 파일 하나를 로드한다 (개발용 인자 --mission-file).
+        /// </summary>
+        /// <param name="relativePath">미션 파일 경로 (exe 폴더 기준).</param>
+        /// <returns>로드에 성공했으면 true. 게임 폴더 밖의 경로면 false.</returns>
+        public bool LoadMissionPath(string relativePath)
+        {
+            string path = string.IsNullOrEmpty(relativePath) ? null : GamePath.Resolve(relativePath);
+            return path != null && LoadMissionFile(path);
+        }
+
+        /// <summary>
         /// 미션 파일 없이 블록 파일과 포인트 파일을 직접 로드한다 (디버그 콘솔의 loadmap). 시뮬레이션은 멈춘 채로 둔다.
         /// </summary>
         /// <param name="blockPath">블록 데이터 파일 전체 경로.</param>
@@ -268,6 +279,7 @@ namespace GodotXOPS
         {
             UnloadMap();
             MapLoader.UnloadMissionData();
+            m_listImages.Clear();
         }
 
         /// <summary>

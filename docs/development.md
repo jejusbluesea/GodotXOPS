@@ -162,12 +162,12 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `play_test.tscn` | `-- --selftest` | 모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 |
 | `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 오브젝트, 통계 |
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
-| `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름, 화면 스크립트의 등록과 로드 |
+| `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름, 화면 스크립트의 등록과 로드, 미션이 들고 오는 화면 스크립트와 이미지 목록 |
 | `bd2_check.tscn` | — | 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정 결과가 같은지, 블록 플래그(판정별 통과), 그리지 않는 면, 재질(착탄 이펙트와 소리, 발소리와 박자), 깨진 파일, 레이 범위 거르기가 전부 훑은 결과와 같은지 |
 | `mif2_check.tscn` | — | 모든 공식 미션을 확장 형식(BD2, PD2, MIF2)으로 바꿔 미션 정보와 같은 난수 씨앗으로 돌린 100틱의 결과가 원본과 같은지, 에드온 데이터와 10000 번호 규칙, 에드온의 몸 크기와 히트박스(1 m 틈의 장벽 밑을 지나가는지, 절반 크기의 히트박스가 어느 높이에서 맞는지), MIF2 의 형식 오류, 미션 목록 스캔, MIF 추가 오브젝트의 변환 |
 | `pd2_check.tscn` | — | 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰된 사람·무기·오브젝트가 같은지, 255 를 넘는 번호, 추가 파라미터, 방향, 이벤트 줄 수, 깨진 파일 |
 | `effect_viewer.tscn` | `-- --selftest` | 이펙트 재생 수, 풀 증가, 블렌드 모드별 머티리얼, 발광 감쇠, 면 위 재생(데칼의 방향과 띄우는 거리) |
-| `event_check.tscn` | — | 스크립트 이벤트: 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 화면 글자와 Interact, 실패한 줄만 멈추는지, 로드 때 거절되는 경우, 기본 제공 묶음의 이벤트 전부 (연출 이벤트 포함). `-- --stage-sample 미션.pd2` 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더합니다 (눈으로 확인하는 용도. `mif2_check` 의 `--convert-official` 로 만든 미션에 씁니다). `-- --armor-sample 미션.pd2` 는 방어구·헬멧과 재정비 이벤트를 눈으로 보는 구성을 더합니다 (그 미션에 에드온 사람·무기와 값을 띄우는 미션 전용 이벤트가 함께 있어야 합니다) |
+| `event_check.tscn` | — | 스크립트 이벤트: 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 화면 글자와 Interact, 화면 이미지, 실패한 줄만 멈추는지, 로드 때 거절되는 경우, 기본 제공 묶음의 이벤트 전부 (연출 이벤트 포함). `-- --stage-sample 미션.pd2` 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더합니다 (눈으로 확인하는 용도. `mif2_check` 의 `--convert-official` 로 만든 미션에 씁니다). `-- --armor-sample 미션.pd2` 는 방어구·헬멧과 재정비 이벤트를 눈으로 보는 구성을 더합니다 (그 미션에 에드온 사람·무기와 값을 띄우는 미션 전용 이벤트가 함께 있어야 합니다). `-- --image-sample 미션.pd2` 는 화면 이미지를 놓고 지우는 줄을 더합니다 (그 미션의 이미지 목록에 10000 과 10001 이 있어야 합니다) |
 | `script_probe.tscn` | — | Godot Sandbox 의 격리와 자원 제한 (아래) |
 
 눈으로 확인하는 도구 (`--headless` 없이 실행):
@@ -223,7 +223,7 @@ godot --path . -- --scene editor
 | 텍스처 목록 | 블록 모드의 오른쪽 아래. Add 로 이미지 파일을 더하고 Replace 로 고른 자리의 파일을 바꿉니다. 자리를 지우는 기능은 없습니다 (뒤의 번호가 밀립니다) |
 | 새 맵 | File 의 New map. 블록도 포인트도 텍스처도 없는 상태에서 시작합니다. 블록 모드에서 텍스처를 더하고 블록을 놓은 뒤 Save blocks as 로 이름을 정합니다 |
 | 이벤트의 칸 | 이벤트 포인트 하나를 선택하면 P2 / P3 / Extra 대신 그 이벤트의 파라미터와 출구(→)가 이름으로 나옵니다. 스크립트 이벤트는 등록 파일(`godotdata/event/*.json`, 미션의 이벤트 묶음)의 이름·칸·`kind` 대로, 원본 이벤트(10 에서 19)는 에디터가 정한 이름대로입니다. 칸 아래에 값의 뜻이 나옵니다 (가리키는 포인트, 무기 이름, 메시지의 글 등). **Choose** 는 목록에서 고르고(비교, 무기, 오브젝트, 이펙트, 메시지, 글꼴, 기준점, 줄), **Pick** 은 누른 뒤 3D 화면에서 포인트를 클릭하면 그 식별번호가 들어갑니다 (사람, 사람 정보, 오브젝트, 경로, 이벤트. Esc 로 취소). **Add next** 는 새 이벤트를 옆에 놓고 그 출구를 잇습니다. 등록 정보가 없는 종류는 숫자 칸 그대로입니다 |
-| 이벤트 놓기 | Add 메뉴와 Shift+A 메뉴의 `Event: ...` 하위 메뉴 (Original, 기본 제공 묶음의 Wait / Action / Flow / Screen text, 그 밖의 묶음, 미션의 묶음 Mission). 새 이벤트의 식별번호는 모든 이벤트에서 가장 큰 번호의 다음입니다 |
+| 이벤트 놓기 | Add 메뉴와 Shift+A 메뉴의 `Event: ...` 하위 메뉴 (Original, 기본 제공 묶음의 Wait / Human state / Action / Flow / Screen text and images / Staging, 그 밖의 묶음, 미션의 묶음 Mission). 새 이벤트의 식별번호는 모든 이벤트에서 가장 큰 번호의 다음입니다 |
 | 이벤트 줄 | 왼쪽 목록의 보기를 Events 로 바꾸면 줄마다 시작 번호에서 출구를 따라간 순서대로 나오고(출구가 여럿이면 출구 이름과 함께 들여 씁니다. 고리는 `back to 번호`), 어느 줄에도 들지 않은 이벤트는 맨 아래에 모입니다. 그 위의 **Line starts** 칸에 줄의 시작 번호들을 쉼표로 적습니다 (번호 하나가 줄 하나) |
 | 연결선 | 3D 화면에 이벤트의 출구(줄마다 다른 색, 줄에 들지 않은 것은 회색), AI 경로의 다음 경로(노랑), 사람의 첫 경로(초록)가 화살표 선으로 그려집니다. View 의 Links between points 로 끕니다 |
 | 메시지 | Edit 의 Messages. 포인트 파일 옆의 `.msg` 의 줄들을 더하고, 고치고, 위아래로 옮기고, 지웁니다. 지우거나 옮기면 뒤의 줄 번호가 바뀌고, 그것을 가리키던 이벤트는 고쳐 주지 않습니다 |
@@ -248,6 +248,7 @@ godot --path . -- --scene editor
 |---|---|
 | `--window 너비x높이` | 설정의 전체화면 대신 그 크기의 창으로 띄웁니다 |
 | `--scene 이름 [--mission 번호 [--addon] [--page 번호]]` | 그 화면에서 시작합니다 (`mainmenu`, `briefing`, `maingame`, `result`) |
+| `--mission-file 경로` | `--mission` 대신 미션 파일(`.mif`, `.mif2`) 하나를 로드합니다 (게임 폴더 기준 경로). 미션이 들고 오는 화면 스크립트와 이벤트의 이미지를 `--scene` 과 `--ui-shot` 으로 볼 때 씁니다 |
 | `--ui-state 값` | 메뉴는 `credit` / `exit` / `addon` / `option` / `option-input` / `option-graphic` / `option-sound`, 메인게임은 `simple` / `off` 상태로 시작합니다. `console`은 어느 화면에서든 설정과 무관하게 디버그 콘솔을 허용합니다 |
 | `--ui-click "목록"` | 가짜 입력을 차례로 넣습니다: `x,y`(클릭), `x,y,초`(누르고 있기), `key:이름`(키 한 번), `text:글자`(글자를 차례로 침) |
 | `--ui-shot 경로.png [--ui-time 초]` | 화면을 PNG 로 저장하고 종료합니다 |
@@ -336,7 +337,7 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 - API 에 함수를 더할 때는 `EventApi` 생성자의 표에 한 줄을 더하고 [모딩 문서](modding.md#api)의 표도 고칩니다. 스크립트가 넘긴 값(범위, 유한한 수인지, 사전의 형식)은 받는 쪽에서 확인합니다.
 - 실패는 호출 앞뒤로 샌드박스의 예외 횟수를 비교해 알아냅니다 (스크립트 안의 오류, 막힌 호출, 실행 예산 초과가 모두 여기에 잡힙니다). 실패한 줄만 멈춥니다.
 - 스크립트 하나를 컴파일해 처음 올리는 데 약 150 ms 와 32 MB 가 듭니다. 그래서 종류마다가 아니라 묶음마다 스크립트 하나이고, 미션이 쓰는 묶음만 올리며, 컴파일 결과는 파일이 바뀌지 않으면 다시 씁니다.
-- Interact 키는 `PlayerController` 가 `EventManager.QueueInteract()` 로 넘기고 다음 틱 한 번 동안 읽힙니다. 화면 글자는 `EventManager` 가 칸(32개)으로 들고, HUD(`ui/maingame.gd`)가 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽어 다시 그립니다.
+- Interact 키는 `PlayerController` 가 `EventManager.QueueInteract()` 로 넘기고 다음 틱 한 번 동안 읽힙니다. 화면 글자는 `EventManager` 가 칸(32개)으로 들고, HUD(`ui/maingame.gd`)가 `HudRevision` 이 바뀔 때만 `HudTexts()` 를 읽어 다시 그립니다. 화면 이미지(칸 16개, `EventManagerImage.cs`)도 같은 방식이고(`HudImageRevision`, `HudImages()`), 나타나고 사라지는 진하기만 프레임마다 `HudImageFade(칸)` 으로 읽습니다. 텍스처는 `Game.ListImage(번호)` 가 이미지 목록에서 읽습니다.
 
 ## 화면 스크립트의 구조
 
@@ -356,6 +357,7 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 - 실행 예산도 스크립트 이벤트(200)보다 크게 줍니다: `frame` 은 4배, `init` / `build` 는 8배 (`Game.UiScriptSetBuilding`). 사전과 배열을 다루는 것도 예산을 쓰는데, 설정 화면은 요소가 240개쯤이라 기본 예산으로는 만들지도, 탭을 바꾸지도 못합니다. 대신 끝나지 않는 루프가 게임을 멈추는 시간이 그만큼 깁니다 (한 번 멈춘 뒤 기본 화면으로 돌아갑니다).
 - SafeGDScript 의 컴파일러가 일반 GDScript 와 다르게 도는 곳이 있습니다 (모딩 문서의 "스크립트를 쓸 때 조심할 것"). 변수에 든 글자끼리의 비교가 틀리게 나올 때가 있어서, 예제는 상태(고른 탭, 키를 기다리는 액션)를 글자가 아니라 목록에서의 자리(수)로 듭니다.
 - 실패(호출 앞뒤의 예외 횟수, 요소 수와 호출 수의 한도)하면 `XopsScriptScreen.frame` 이 false 를 돌려주고, 화면이 스크립트를 내린 뒤 기본 화면을 만듭니다.
+- 미션(MIF2)이 `briefingScriptPath` / `hudScriptPath` / `resultScriptPath` 에 적은 스크립트는 `Game.UiScriptLoad` 가 설치된 등록보다 먼저 올립니다 (`MapLoader.MissionScreenScript`). 등록 파일이 없으므로 이미지 번호는 전부 이미지 목록(`ImageParameterData`, 10000 이상은 미션의 것)을 가리킵니다. 미션의 이미지 목록은 다른 에드온 데이터와 달리 미션 정보를 읽을 때 붙고 `UnloadMissionData` 가 뗍니다 (브리핑과 결과 화면에서도 써야 합니다).
 - 화면 스크립트를 고친 뒤에는 `ui_check`(등록과 로드)를 돌리고, 화면은 `--ui-script` 와 `--ui-shot` 으로 기본 화면과 견줘 봅니다.
 
 ## 원본과 다르게 한 동작

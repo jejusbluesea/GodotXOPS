@@ -5,7 +5,9 @@ const FIRST_SCENE := "opening"
 
 
 func _ready() -> void:
-	if Dev.has("--mission"):
+	if Dev.has("--mission-file"):
+		Game.LoadMissionPath(Dev.value("--mission-file", ""))
+	elif Dev.has("--mission"):
 		var index := int(Dev.value("--mission", "0"))
 		var page := int(Dev.value("--page", "0"))
 		Game.LoadMission(index, Dev.has("--addon"), page)

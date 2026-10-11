@@ -12,6 +12,7 @@ namespace GodotXOPS.Dev
     /// 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 실패한 줄만 멈추는지, 로드 때 거절되는 경우.
     /// 이어서 기본 제공 묶음(godotdata/event/base.json)의 이벤트 전부를 한 미션에서 돌려 본다 (화면 글자, Interact, 카운트다운, 연출 포함).
     /// 명령행 인자("--" 뒤): --armor-sample 미션.pd2 는 점검 대신 그 PD2 에 방어구·헬멧과 재정비 이벤트의 시험용 구성을 더하고 종료한다 (에드온 데이터가 함께 있어야 한다. WriteArmorSample).
+    /// --image-sample 미션.pd2 는 점검 대신 그 PD2 에 화면 이미지(이벤트 74, 75)의 시험용 줄을 더하고 종료한다 (미션의 이미지 목록에 10000 과 10001 이 있어야 한다).
     /// --stage-sample 미션.pd2 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더하고 종료한다 (눈으로 확인하는 용도).
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/event_check.tscn
     /// </summary>
@@ -173,6 +174,15 @@ func bump(p, state):
                 return;
             }
 
+            int imageArg = Array.IndexOf(args, "--image-sample");
+            if (imageArg >= 0)
+            {
+                bool ok = imageArg + 1 < args.Length && WriteImageSample(args[imageArg + 1]);
+                if (!ok) GD.Print("사용법: --image-sample 미션.pd2 (경로는 exe 폴더 기준. 그 파일에 화면 이미지의 시험용 줄을 더해 덮어쓴다)");
+                GetTree().Quit(ok ? 0 : 1);
+                return;
+            }
+
             int armorArg = Array.IndexOf(args, "--armor-sample");
             if (armorArg >= 0)
             {
@@ -198,6 +208,7 @@ func bump(p, state):
                 CheckVitals();
                 CheckStaging();
                 CheckScreenText();
+                CheckScreenImages();
                 CheckDocumentExample();
             }
 
@@ -300,10 +311,13 @@ func bump(p, state):
             File.WriteAllText(Path.Combine(m_folder, scriptFile), script);
             File.WriteAllText(Path.Combine(m_folder, "pack.json"), JsonData.ToJson(pack));
             File.WriteAllLines(Path.Combine(m_folder, "map.msg"), new[] { "hello", "USE {interact} \uD55C" });
+            // 미션의 이미지 목록: 10000 은 읽을 수 있는 파일, 10001 은 없는 파일.
+            File.WriteAllText(Path.Combine(m_folder, "images.json"), "{ \"imageData\": [ { \"name\": \"title\", \"imagePath\": \"data/title.dds\" }, { \"name\": \"missing\", \"imagePath\": \"data/none.png\" } ] }");
             var mission = new ExtendedMissionData
             {
                 name = "EVENT", blockPath = $"{k_workFolder}/map.bd2", pointPath = $"{k_workFolder}/map.pd2",
                 addonEventDataPath = $"{k_workFolder}/pack.json",
+                addonImageDataPath = $"{k_workFolder}/images.json",
             };
             string missionPath = Path.Combine(m_folder, "event.mif2");
             return file.Write(Path.Combine(m_folder, "map.pd2"), out _) && MIF2File.Write(missionPath, mission, out _)
@@ -1315,6 +1329,127 @@ func bump(p, state):
             Expect(events.HudTexts().Count == 2 && FindText(events.HudTexts(), 3)["text"].AsString().Length == 256, "칸 번호의 범위나 글자 수의 상한이 듣지 않음");
             events.ForceEnd(false);
             Expect(events.HudTexts().Count == 0, "미션이 끝났는데 화면 글자가 남아 있음");
+        }
+
+        /// <summary>
+        /// PD2 하나에 화면 이미지의 시험용 줄을 더해 덮어쓴다 (눈으로 확인하는 용도. 미션의 이미지 목록에 10000 과 10001 이 있어야 한다).
+        /// 1초 뒤 오른쪽 위에 10000 을 서서히 놓고, 3초 뒤 화면 가운데에 10001 을 반투명으로 3초 동안 보여 주고, 다시 5초 뒤 처음 것을 서서히 지운다.
+        /// </summary>
+        /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
+        /// <returns>썼으면 true.</returns>
+        private static bool WriteImageSample(string path)
+        {
+            const int waitTicks = 25, showImage = 74, clearImage = 75;
+            const int firstId = 31000, topRight = 2, center = 4;
+
+            string full = GamePath.Resolve(path);
+            if (full == null || !PD2File.Read(full, out PD2File file, out _))
+            {
+                GD.Print($"PD2 를 읽지 못함: {path}");
+                return false;
+            }
+            if (file.points.Exists(point => point.id >= firstId))
+            {
+                GD.Print("이미 시험용 줄이 들어 있음");
+                return false;
+            }
+
+            int next = firstId;
+            file.eventEntryIds.Add(firstId);
+            void Add(int type, int p2, params int[] extra)
+            {
+                file.points.Add(new PD2Point { type = type, id = next, param1 = p2, param2 = next + 1, extra = extra });
+                next++;
+            }
+            int Cell(float value) => PD2File.FloatCell(value);
+
+            Add(waitTicks, 33);
+            Add(showImage, 0, 10000, topRight, Cell(-10f), Cell(-10f), Cell(160f), Cell(0f), Cell(0f), Cell(0f), Cell(0.5f));
+            Add(waitTicks, 100);
+            Add(showImage, 1, 10001, center, Cell(0f), Cell(0f), Cell(0f), Cell(300f), Cell(0.8f), Cell(3f), Cell(0.5f));
+            Add(waitTicks, 167);
+            Add(clearImage, 0, Cell(1f));
+
+            if (!file.Write(full, out string error))
+            {
+                GD.Print($"PD2 를 쓰지 못함: {error}");
+                return false;
+            }
+            GD.Print($"화면 이미지의 시험용 줄을 더함: {path} (이벤트 {next - firstId}개, 식별번호 {firstId} 부터)");
+            return true;
+        }
+
+        /// <summary>
+        /// 화면 이미지: 이미지 놓기와 지우기(기본 묶음 74, 75)를 한 미션에서 돌린다.
+        /// 미션의 이미지 목록(10000 부터)의 번호, 놓인 값, 나타나고 사라지는 진하기, 시간이 다 된 이미지, 목록에 없는 번호, 칸의 범위, 미션이 끝날 때 지워지는지를 본다.
+        /// </summary>
+        private void CheckScreenImages()
+        {
+            const int waitTicks = 25, setVar = 40, showImage = 74, clearImage = 75;
+            const int topRight = 2, title = 10000, missingFile = 10001, notListed = 10002;
+            // 0.3초 = 10틱.
+            int fade = PD2File.FloatCell(0.3f);
+
+            PD2File file = BaseFile();
+            file.eventEntryIds.Add(100);
+            // 이미지 놓기(오른쪽 위, 너비 100, 높이는 비율대로, 서서히) → 20틱 → 서서히 지우기 → 3틱짜리 이미지(파일이 없는 것) → 목록에 없는 번호 → 변수.
+            file.points.Add(Event(showImage, 100, 1, 101, title, topRight, PD2File.FloatCell(-10f), PD2File.FloatCell(-12f), PD2File.FloatCell(100f), PD2File.FloatCell(0f), PD2File.FloatCell(0f), PD2File.FloatCell(0f), fade));
+            file.points.Add(Event(waitTicks, 101, 20, 102));
+            file.points.Add(Event(clearImage, 102, 1, 103, fade));
+            file.points.Add(Event(showImage, 103, 2, 104, missingFile, 4, 0, 0, 0, 0, PD2File.FloatCell(0.5f), PD2File.FloatCell(0.09f), 0));
+            file.points.Add(Event(showImage, 104, 3, 105, notListed, 4, 0, 0, 0, 0, 0, 0, 0));
+            file.points.Add(Event(setVar, 105, 1, 106, 1));
+            file.points.Add(Event(waitTicks, 106, 1000, 107));
+
+            int errors = Debugger.ErrorCount;
+            if (!WriteAndLoad(BuildPack(), k_script, file))
+            {
+                Expect(false, $"화면 이미지 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+                return;
+            }
+
+            DataList<ImageData> list = DataManager.Instance.ImageParameterData.imageData;
+            Expect(list.Has(title) && list.Has(missingFile) && !list.Has(notListed) && list[title].imagePath == "data/title.dds", "미션의 이미지 목록이 10000 부터 붙지 않음");
+
+            EventManager events = EventManager.Instance;
+            events.BeginMission();
+            int revision = events.HudImageRevision;
+            SimClock.Step();
+
+            Godot.Collections.Array images = events.HudImages();
+            Godot.Collections.Dictionary shown = FindText(images, 1);
+            Expect(images.Count == 1 && shown != null && shown["image"].AsInt32() == title && shown["anchor"].AsInt32() == topRight && shown["x"].AsSingle() == -10f
+                && shown["y"].AsSingle() == -12f && shown["width"].AsSingle() == 100f && shown["height"].AsSingle() == 0f && shown["color"].AsColor().IsEqualApprox(Colors.White),
+                "이미지 놓기의 번호·기준점·위치·크기·색이 다름 (진하기 0 은 다 보이는 것으로 친다)");
+            Expect(events.HudImageRevision != revision && events.HudImageFade(1) <= 0.11f, $"놓자마자 다 보이거나 알림 값이 그대로임 (진하기 {events.HudImageFade(1)})");
+            for (int tick = 0; tick < 12; tick++) SimClock.Step();
+            Expect(Mathf.IsEqualApprox(events.HudImageFade(1), 1f), $"10틱이 지났는데 다 나타나지 않음 ({events.HudImageFade(1)})");
+            revision = events.HudImageRevision;
+            SimClock.Step();
+            Expect(events.HudImageRevision == revision, "구성이 그대로인데 화면 이미지의 알림 값이 오름");
+
+            for (int tick = 0; tick < 40 && events.GetVariable(1) == 0; tick++) SimClock.Step();
+            images = events.HudImages();
+            Godot.Collections.Dictionary timed = FindText(images, 2);
+            Expect(events.GetVariable(1) == 1, "목록에 없는 이미지 번호에서 줄이 멈춤");
+            Expect(FindText(images, 3) == null, "목록에 없는 번호의 이미지가 놓임");
+            Expect(timed != null && timed["image"].AsInt32() == missingFile && Mathf.IsEqualApprox(timed["color"].AsColor().A, 0.5f), "파일이 없는 이미지가 칸에 놓이지 않았거나 진하기가 다름 (그릴 때 건너뛴다)");
+            Expect(FindText(images, 1) != null && images.Count > 1 && images[images.Count - 1].AsGodotDictionary()["slot"].AsInt32() == 2, "서서히 지우는 이미지가 바로 사라졌거나, 나중에 놓은 이미지가 맨 뒤(맨 위)에 오지 않음");
+
+            for (int tick = 0; tick < 5; tick++) SimClock.Step();
+            float closing = events.HudImageFade(1);
+            Expect(FindText(events.HudImages(), 2) == null, "시간이 정해진 이미지가 사라지지 않음");
+            Expect(closing > 0f && closing < 1f, $"지우는 중의 진하기가 중간 값이 아님 ({closing})");
+            for (int tick = 0; tick < 8; tick++) SimClock.Step();
+            Expect(events.HudImages().Count == 0 && events.HudImageFade(1) == 0f, "서서히 지운 이미지가 남아 있음");
+
+            // 칸의 범위와 미션 종료.
+            Expect(!events.SetHudImage(EventManager.HudImageSlotCount, title, null) && !events.SetHudImage(-1, title, null) && !events.SetHudImage(0, -1, null), "범위 밖의 칸이나 번호에 이미지가 놓임");
+            Expect(events.SetHudImage(0, title, null) && events.HudImages().Count == 1 && events.HudImageFade(0) == 1f, "선택 값 없이 놓은 이미지가 바로 보이지 않음");
+            events.ForceEnd(false);
+            Expect(events.HudImages().Count == 0, "미션이 끝났는데 화면 이미지가 남아 있음");
+            MapLoader.UnloadMissionData();
+            Expect(!list.Has(title), "미션 정보를 내렸는데 미션의 이미지 목록이 남아 있음");
         }
 
         /// <summary>
