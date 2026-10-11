@@ -68,6 +68,8 @@ namespace GodotXOPS
 
         public Human Self => m_self;
         public AIBattleMode Mode => m_mode;
+        // 이번 틱에 정한 이동 의사 (경로·접근의 것과 전투 중 회피의 것을 합친 값). 컨트롤러의 이동 입력은 소비될 때까지 쌓이므로 점검 도구는 이것을 본다.
+        public HumanMoveFlag MoveIntent => m_moveIntent | m_combatMove;
         public Human Enemy => m_enemy;
         public AIMoveNavi Navi => m_nav;
         public bool NoFight => m_noFight;

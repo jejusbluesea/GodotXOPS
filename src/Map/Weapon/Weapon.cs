@@ -32,6 +32,14 @@ namespace GodotXOPS
         public int Magazine => m_magazine;
         // 예비 탄 (원본 bullets − Loadbullets).
         public int Reserve => m_reserve;
+        // 쏠 때 탄을 쓰는 무기인지 (WeaponData.consumeAmmo).
+        public bool UsesAmmo => m_data.consumeAmmo;
+        // 탄창이 비어서 재장전이나 교체가 필요한지 / 남은 탄이 하나도 없는지. 탄을 쓰지 않는 무기는 둘 다 늘 false 다.
+        public bool MagazineEmpty => m_data.consumeAmmo && m_magazine == 0;
+        public bool OutOfAmmo => m_data.consumeAmmo && m_magazine + m_reserve == 0;
+        // AI 가 이 무기를 쓰는 거리 (m, 0 이면 제한 없음). 처음 값은 무기 데이터의 것이고 이 한 자루의 값이다.
+        public float AiMaxRange { get; private set; }
+        public float AiMinRange { get; private set; }
         // 맨손 여부. 원본에서 weapon[selectweapon] == NULL 인 상태에 해당한다.
         public bool IsNone => m_weaponIndex == DataManager.Instance.WeaponParameterData.weaponGeneralData.noneWeaponIndex;
 
@@ -55,6 +63,7 @@ namespace GodotXOPS
 
             int modelIndex = m_data.modelIndex;
             m_modelData = parameter.weaponModelData.Has(modelIndex) ? parameter.weaponModelData[modelIndex] : null;
+            SetAiRange(m_data.aiMinRange, m_data.aiMaxRange);
 
             int magazineSize = m_data.magazineSize;
             if (magazine < 0) magazine = magazineSize;
@@ -66,12 +75,23 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 지금 쏠 수 있는 탄이 장전돼 있는지 본다 (ConsumeShot 이 성공할 조건).
+        /// AI 가 이 무기를 쓰는 거리를 정한다. 종류를 (다시) 설정하면 무기 데이터의 값으로 돌아간다.
+        /// </summary>
+        /// <param name="minRange">이보다 가까우면 쓰지 않는 거리 (m). 0 이하면 제한 없음.</param>
+        /// <param name="maxRange">이보다 멀면 쓰지 않는 거리 (m). 0 이하면 제한 없음.</param>
+        public void SetAiRange(float minRange, float maxRange)
+        {
+            AiMinRange = float.IsFinite(minRange) ? Mathf.Max(0f, minRange) : 0f;
+            AiMaxRange = float.IsFinite(maxRange) ? Mathf.Max(0f, maxRange) : 0f;
+        }
+
+        /// <summary>
+        /// 지금 쏠 수 있는 탄이 장전돼 있는지 본다 (ConsumeShot 이 성공할 조건). 탄을 쓰지 않는 무기는 탄창과 무관하다.
         /// </summary>
         /// <returns>쏠 수 있으면 true.</returns>
         public bool CanConsumeShot()
         {
-            return m_magazine > 0 && m_data.pelletCount > 0;
+            return m_data.pelletCount > 0 && (!m_data.consumeAmmo || m_magazine > 0);
         }
 
         /// <summary>
@@ -94,8 +114,10 @@ namespace GodotXOPS
         {
             depleted = false;
             autoReloaded = false;
-            if (m_magazine <= 0) return false;
             if (m_data.pelletCount <= 0) return false;
+            // 탄을 쓰지 않는 무기는 탄창을 건드리지 않고 쏜다.
+            if (!m_data.consumeAmmo) return true;
+            if (m_magazine <= 0) return false;
 
             m_magazine--;
             m_spentShells++;
@@ -118,11 +140,12 @@ namespace GodotXOPS
         /// <summary>
         /// 재장전을 시작할 수 있는지 본다. 원본 weapon::StartReload (object.cpp:2371-2379) 는 예비 탄이 없을 때만 막는다.
         /// 탄창이 가득 찬 경우도 막는다. 원본은 허용해서 남은 탄을 통째로 버리게 된다.
-        /// 자동 재장전 무기는 직접 재장전할 수 없다 (쏘면 저절로 채워진다).
+        /// 자동 재장전 무기는 직접 재장전할 수 없다 (쏘면 저절로 채워진다). 탄을 쓰지 않는 무기도 재장전하지 않는다.
         /// </summary>
         /// <returns>재장전할 수 있으면 true.</returns>
         public bool CanReload()
         {
+            if (!m_data.consumeAmmo) return false;
             if (m_data.reloadStyle == WeaponReloadStyle.AutoReload) return false;
             return m_data.magazineSize > 0 && m_reserve > 0 && m_magazine < m_data.magazineSize;
         }

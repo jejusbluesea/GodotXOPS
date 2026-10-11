@@ -14,11 +14,11 @@ namespace GodotXOPS
         private void HaveWeapon()
         {
             Weapon current = m_self.CurrentWeapon;
-            if (!current.IsNone && TotalBullets(current) > 0) return;
+            if (!current.IsNone && !current.OutOfAmmo) return;
 
             int other = (m_self.SelectWeapon + 1) % Human.WeaponSlotCount;
             Weapon next = m_self.GetWeapon(other);
-            if (!next.IsNone && TotalBullets(next) > 0) m_self.SetSelectWeapon(other);
+            if (!next.IsNone && !next.OutOfAmmo) m_self.SetSelectWeapon(other);
         }
 
         /// <summary>
@@ -38,7 +38,8 @@ namespace GodotXOPS
 
             int other = (m_self.SelectWeapon + 1) % Human.WeaponSlotCount;
 
-            if (current.Magazine == 0)
+            // 탄을 쓰지 않는 무기(근접 무기)는 탄창이 비었다고 재장전하거나 버리지 않는다.
+            if (current.MagazineEmpty)
             {
                 int react = m_mode == AIBattleMode.Normal ? k_emptyReactChanceNormal
                     : m_mode == AIBattleMode.Caution ? k_emptyReactChanceCaution
@@ -70,7 +71,7 @@ namespace GodotXOPS
                         under = 1;
                     }
 
-                    if (TotalBullets(current) == 0)
+                    if (current.OutOfAmmo)
                     {
                         m_self.DropCurrentWeapon();
                         return;
@@ -108,16 +109,6 @@ namespace GodotXOPS
             {
                 m_self.ApplyWeaponAction(action);
             }
-        }
-
-        /// <summary>
-        /// 무기에 남은 탄 전부 (장전된 탄 + 예비 탄). 원본 weapon 의 nbs.
-        /// </summary>
-        /// <param name="weapon">무기.</param>
-        /// <returns>탄 수.</returns>
-        private static int TotalBullets(Weapon weapon)
-        {
-            return weapon.Magazine + weapon.Reserve;
         }
     }
 }

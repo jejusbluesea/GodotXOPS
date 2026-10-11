@@ -69,8 +69,10 @@ namespace GodotXOPS.Dev
             CheckCaution();
             CheckLeadAim();
             CheckWeaponControl();
+            CheckWeaponRange();
             CheckGrenade();
             CheckZombie();
+            CheckArmedZombie();
             CheckPath();
             CheckEvents();
             CheckAutoJudge();
@@ -492,6 +494,82 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
+        /// 무기를 쓰는 거리(원본에 없는 값): 적이 최대 거리 밖이면 쏘지 않고 다가가고, 안으로 들어오면 쏜다. 최소 거리 안이면 쏘지 않는다. 값이 0 이면 거리와 무관하게 쏜다.
+        /// 탄을 쓰지 않는 무기는 탄이 없어도 버리지 않고 쏜다.
+        /// 이 점검은 이동 틱을 돌리지 않으므로 AI 가 그 틱에 정한 이동 의사(Brain.MoveIntent)를 본다. 사람들이 공중에 있어 뒤가 낭떠러지로 보이므로 물러나는 의사는 보지 않는다.
+        /// </summary>
+        private void CheckWeaponRange()
+        {
+            const float reach = 3f;
+
+            BeginPoints();
+            AddHuman(m_armedHuman, 1, 1, Arena(0f, 0f), 0f, 255);
+            AddHuman(m_armedHuman, 0, 2, Arena(0f, -10f), 180f, 255);
+            if (!LoadPoints())
+            {
+                Expect(false, "무기 거리 점검용 포인트 로드 실패");
+                return;
+            }
+
+            Human holder = MapLoader.SearchHuman(1);
+            Human enemy = MapLoader.SearchHuman(2);
+            int weaponIndex = holder.CurrentWeapon.WeaponIndex;
+            Expect(holder.CurrentWeapon.AiMaxRange == 0f && holder.CurrentWeapon.AiMinRange == 0f, "기본 무기에 AI 가 쓰는 거리가 적혀 있음");
+
+            // 틱을 돌리며 나간 탄환 수와, 앞으로 가려는 입력이 있던 틱 수를 센다.
+            (int shots, int forward) Run(int ticks)
+            {
+                int before = BulletManager.SpawnCount;
+                int forward = 0;
+                for (int tick = 0; tick < ticks; tick++)
+                {
+                    TickAI(holder);
+                    if ((holder.Brain.MoveIntent & HumanMoveFlag.Forward) != 0) forward++;
+                }
+                BulletManager.Instance.Clear();
+                return (BulletManager.SpawnCount - before, forward);
+            }
+
+            holder.CurrentWeapon.SetAiRange(0f, reach);
+            int toAction = TickUntil(holder, 800, () => holder.Brain.Mode == AIBattleMode.Action);
+            Expect(toAction > 0, "무기 거리 점검: 정면의 적을 보고 전투로 들어가지 않음");
+            BulletManager.Instance.Clear();
+
+            var far = Run(300);
+            Expect(far.shots == 0 && far.forward > 200, $"최대 거리 {reach} m 밖(10 m)의 적: {far.shots}발, 앞으로 가려던 틱 {far.forward}/300 (기대 0발, 대부분의 틱)");
+
+            enemy.Controller.Teleport(Arena(0f, -2f));
+            if (holder.Brain.Mode != AIBattleMode.Action) TickUntil(holder, 800, () => holder.Brain.Mode == AIBattleMode.Action);
+            var near = Run(400);
+            Expect(near.shots > 0, $"최대 거리 안(2 m)의 적에게 쏘지 않음 ({near.shots}발)");
+
+            holder.SetWeapon(holder.SelectWeapon, weaponIndex);
+            holder.CurrentWeapon.SetAiRange(5f, 0f);
+            if (holder.Brain.Mode != AIBattleMode.Action) TickUntil(holder, 800, () => holder.Brain.Mode == AIBattleMode.Action);
+            BulletManager.Instance.Clear();
+            var close = Run(300);
+            Expect(close.shots == 0 && close.forward == 0, $"최소 거리 5 m 안(2 m)의 적: {close.shots}발, 앞으로 가려던 틱 {close.forward} (기대 0, 0)");
+
+            // 종류를 다시 설정하면 무기 데이터의 값(0)으로 돌아가 거리와 무관하게 쏜다.
+            holder.SetWeapon(holder.SelectWeapon, weaponIndex);
+            Expect(holder.CurrentWeapon.AiMinRange == 0f, "무기를 다시 설정했는데 AI 가 쓰는 거리가 남아 있음");
+            if (holder.Brain.Mode != AIBattleMode.Action) TickUntil(holder, 800, () => holder.Brain.Mode == AIBattleMode.Action);
+            Expect(Run(400).shots > 0, "거리 값이 0 인 무기로 쏘지 않음");
+
+            // 탄을 쓰지 않는 무기: 탄이 하나도 없어도 버리거나 재장전하지 않고 쏜다.
+            WeaponData data = holder.CurrentWeapon.Data;
+            bool saved = data.consumeAmmo;
+            data.consumeAmmo = false;
+            int dropped = WeaponManager.Instance.CountActive();
+            holder.SetWeapon(holder.SelectWeapon, weaponIndex, 0, 0);
+            if (holder.Brain.Mode != AIBattleMode.Action) TickUntil(holder, 800, () => holder.Brain.Mode == AIBattleMode.Action);
+            int emptyShots = Run(400).shots;
+            Expect(emptyShots > 0 && !holder.CurrentWeapon.IsNone && !holder.IsReloading && WeaponManager.Instance.CountActive() == dropped,
+                $"탄을 쓰지 않는 무기를 든 AI: {emptyShots}발, 무기를 {(holder.CurrentWeapon.IsNone ? "버림" : "들고 있음")} (기대 1발 이상, 들고 있음)");
+            data.consumeAmmo = saved;
+        }
+
+        /// <summary>
         /// 수류탄: 수류탄을 든 채 전투에 들어가면 던지고, 수류탄이 남아 있는 동안에는 다른 슬롯의 총으로 바꾸지 않는다.
         /// </summary>
         private void CheckGrenade()
@@ -600,6 +678,54 @@ namespace GodotXOPS.Dev
             Expect(Mathf.Abs(zombie.Controller.Pitch - restPitch) < 1f, $"맨손 팔이 고정 자세에 닿기 전에 고정됨 (pitch {zombie.Controller.Pitch:0.0}, 고정 자세 {restPitch:0.0})");
             Expect(maxStep < 10f, $"맨손 팔이 내려오면서 한 틱에 {maxStep:0.0}° 움직임");
             GD.Print($"좀비: 전투 뒤 팔 {raisedPitch:0.0}° → {zombie.Controller.Pitch:0.0}° 내리는 데 {toFixed}틱, 한 틱 최대 {maxStep:0.0}°");
+        }
+
+        /// <summary>
+        /// 무기를 든 좀비: 탄이 닿는 거리(탄환의 판정과 같은 식)에서 멈춰 서서 치고, 총알은 나가지 않는다.
+        /// 수명이 0 인 탄(근접 무기)도 닿는 거리가 0 이 아니다: 전에는 수명 × 탄속으로 구해서 0 이 되고 맨손 반경으로 돌아갔다.
+        /// 값은 무기와 탄환 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// </summary>
+        private void CheckArmedZombie()
+        {
+            const float distance = 1.5f;
+
+            BeginPoints();
+            AddHuman(m_zombieHuman, 1, 1, Arena(0f, 0f), 0f, 255);
+            AddHuman(m_armedHuman, 0, 2, Arena(0f, -distance), 180f, 255);
+            if (!LoadPoints())
+            {
+                Expect(false, "무기를 든 좀비 점검용 포인트 로드 실패");
+                return;
+            }
+
+            Human zombie = MapLoader.SearchHuman(1);
+            Human victim = MapLoader.SearchHuman(2);
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            int weaponIndex = victim.CurrentWeapon.WeaponIndex;
+            WeaponData weapon = parameter.weaponData[weaponIndex];
+            BulletData bullet = parameter.bulletData[weapon.bulletIndex];
+            float savedSpeed = weapon.bulletSpeed;
+            float savedLifetime = bullet.lifetime;
+            weapon.bulletSpeed = 30f;
+            bullet.lifetime = 0f;
+            float reach = Mathf.Min(zombie.HumanTypeData.zombieMaxMeleeRange, Bullet.MaxReach(bullet, weapon.bulletSpeed));
+
+            zombie.SetWeapon(zombie.SelectWeapon, weaponIndex);
+            float hpBefore = victim.HP;
+            int toAction = TickUntil(zombie, 800, () => zombie.Brain.Mode == AIBattleMode.Action);
+            int bullets = BulletManager.SpawnCount;
+            int forward = 0;
+            for (int tick = 0; tick < 200; tick++)
+            {
+                TickAI(zombie);
+                if ((zombie.Brain.MoveIntent & HumanMoveFlag.Forward) != 0) forward++;
+            }
+            Expect(toAction > 0 && reach > distance, $"무기를 든 좀비 점검의 전제가 맞지 않음 (전투 진입 {toAction}틱, 닿는 거리 {reach:0.00} m, 적까지 {distance} m)");
+            Expect(victim.HP < hpBefore && forward == 0 && BulletManager.SpawnCount == bullets,
+                $"수명 0 인 탄의 무기를 든 좀비: 데미지 {hpBefore - victim.HP}, 앞으로 가려던 틱 {forward}, 나간 탄 {BulletManager.SpawnCount - bullets} (기대: 닿는 거리 {reach:0.00} m 안이라 서서 친다, 탄은 0)");
+
+            weapon.bulletSpeed = savedSpeed;
+            bullet.lifetime = savedLifetime;
         }
 
         /// <summary>

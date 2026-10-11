@@ -189,7 +189,7 @@ namespace GodotXOPS
             if (burstLimit > 0 && m_burstShots >= burstLimit) return false;
 
             // 무한 탄약: 쏠 때마다 예비 탄에 한 발을 먼저 더한다. 탄창은 그대로 줄어서 재장전은 한다. 먼저 더해야 수류탄 같은 자동 재장전 무기가 마지막 한 발에서 사라지지 않는다.
-            if (m_infiniteAmmo && weapon.CanConsumeShot()) weapon.AddReserve(1);
+            if (m_infiniteAmmo && weapon.UsesAmmo && weapon.CanConsumeShot()) weapon.AddReserve(1);
             if (!weapon.ConsumeShot(out bool depleted, out bool autoReloaded)) return false;
 
             m_burstShots++;
@@ -629,7 +629,7 @@ namespace GodotXOPS
                 }
 
                 if (BulletManager.Instance.Spawn(bulletData, this, m_team, attacks, data.penetration,
-                    shotPosition, pelletYaw, pelletPitch, speedPerTick, muzzle, onTargetWeight, data.armorPointDecay, data.helmetPointDecay) == null)
+                    shotPosition, pelletYaw, pelletPitch, speedPerTick, muzzle, onTargetWeight, data.armorPointDecay, data.helmetPointDecay, data.armorIgnore, data.helmetIgnore) == null)
                 {
                     // 풀이 가득 차면 남은 탄환은 버린다 (원본 GetNewBulletObject 실패 시 return).
                     return;

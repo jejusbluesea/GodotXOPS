@@ -41,6 +41,8 @@ namespace GodotXOPS.Dev
             CheckPenetration();
             CheckArmor();
             CheckRegeneration();
+            CheckNoAmmo();
+            CheckReach();
             CheckFireRate();
             CheckReloadAndSwitch();
             CheckReloadStyles();
@@ -306,7 +308,7 @@ namespace GodotXOPS.Dev
             BulletData bulletData = DataManager.Instance.WeaponParameterData.bulletData[0];
 
             // 표적 둘을 한 줄로 세우고 앞사람의 포인트를 정한 뒤 한 발을 쏜다. 돌려주는 것은 (앞사람이 잃은 HP, 뒷사람이 잃은 HP).
-            (float front, float back) Shoot(float feetY, float armor, float helmet, int penetration, float armorDecay, float helmetDecay)
+            (float front, float back) Shoot(float feetY, float armor, float helmet, int penetration, float armorDecay, float helmetDecay, float armorIgnore = 0f, float helmetIgnore = 0f)
             {
                 front.RestoreHP();
                 back.RestoreHP();
@@ -316,7 +318,7 @@ namespace GodotXOPS.Dev
                 front.SetHelmet(helmet);
                 float frontHp = front.HP;
                 float backHp = back.HP;
-                BulletManager.Instance.Spawn(bulletData, m_shooter, m_shooter.Team, 40, penetration, Eye, 0f, 0f, 3f, Eye, 1f, armorDecay, helmetDecay);
+                BulletManager.Instance.Spawn(bulletData, m_shooter, m_shooter.Team, 40, penetration, Eye, 0f, 0f, 3f, Eye, 1f, armorDecay, helmetDecay, armorIgnore, helmetIgnore);
                 TickBullets(4);
                 return (frontHp - front.HP, backHp - back.HP);
             }
@@ -350,6 +352,20 @@ namespace GodotXOPS.Dev
             float helmetLoss = 200f - front.Helmet;
             Expect(helmetLoss > 0f && front.Armor == 100f, $"머리에 맞음: 헬멧이 깎인 양 {helmetLoss}, 방어구 {front.Armor} (기대 0 초과, 100)");
             Expect(hit.front == (int)(helmetLoss * 2f * 0.25f), $"헬멧으로 줄인 데미지 {hit.front} (기대 {(int)(helmetLoss * 2f * 0.25f)})");
+
+            // 방어구를 무시하는 무기: 전부 무시하면 데미지가 그대로 들어가고, 절반만 무시하면 줄이는 비율이 절반이 된다 (0.5 → 0.25).
+            // 포인트는 배율대로 깎이고(여기서는 0 이라 그대로), 방어구가 있으므로 관통력 1 로는 여전히 뒤로 나가지 못한다.
+            hit = Shoot(bodyFeetY, 100f, 0f, 1, 0f, 1f, 1f, 0f);
+            Expect(hit.front >= 40f && hit.front <= 40 + add.max - 1 && front.Armor == 100f && hit.back == 0f,
+                $"방어구를 전부 무시하는 무기: 데미지 {hit.front}, 방어구 {front.Armor}, 뒷사람 {hit.back} (기대 40~{40 + add.max - 1}, 100, 0)");
+            hit = Shoot(bodyFeetY, 100f, 0f, 0, 1f, 1f, 0.5f, 0f);
+            float halfLoss = 100f - front.Armor;
+            Expect(hit.front == (int)(halfLoss * 0.75f), $"방어구를 절반 무시하는 무기의 데미지 {hit.front} (기대 {(int)(halfLoss * 0.75f)}: 데미지 {halfLoss} × 0.75)");
+            // 헬멧의 무시는 머리에만, 방어구의 무시는 몸통·다리에만 듣는다.
+            hit = Shoot(headFeetY, 0f, 200f, 0, 1f, 0f, 1f, 0f);
+            float ignoredElsewhere = hit.front;
+            hit = Shoot(headFeetY, 0f, 200f, 0, 1f, 0f, 0f, 1f);
+            Expect(hit.front > ignoredElsewhere * 2f && front.Helmet == 200f, $"헬멧을 무시하는 무기의 머리 데미지 {hit.front} (방어구만 무시할 때 {ignoredElsewhere}. 기대: 네 배쯤)");
 
             // 무적이면 포인트도 깎이지 않는다.
             front.SetInvincible(true);
@@ -436,6 +452,97 @@ namespace GodotXOPS.Dev
             type.regenerationDelay = savedDelay;
             type.regenerationRate = savedRate;
             type.regenerationMaxRatio = savedRatio;
+        }
+
+        /// <summary>
+        /// 탄을 쓰지 않는 무기(consumeAmmo 가 false): 탄창이 비어 있어도 쏘고, 탄창이 줄지 않고, 재장전하지 않고, 무한 탄약이 예비 탄을 불리지 않는다.
+        /// 값은 무기 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// </summary>
+        private void CheckNoAmmo()
+        {
+            if (!Reset()) { Expect(false, "탄을 쓰지 않는 무기: 준비 실패"); return; }
+
+            int mp5 = FindWeapon("MP5");
+            WeaponData data = DataManager.Instance.WeaponParameterData.weaponData[mp5];
+            bool saved = data.consumeAmmo;
+
+            // 발사 입력을 넣으며 무기 틱만 돌린다. 돌려주는 것은 그동안 나간 탄환 수.
+            int Fire(int ticks)
+            {
+                int before = BulletManager.SpawnCount;
+                for (int tick = 0; tick < ticks; tick++)
+                {
+                    m_shooter.QueueWeaponInput(HumanWeaponAction.Fire);
+                    m_shooter.TickWeapon();
+                }
+                BulletManager.Instance.Clear();
+                return BulletManager.SpawnCount - before;
+            }
+
+            // 탄을 쓰는 무기는 빈 탄창으로 쏘지 못한다 (대조군). 스폰 직후의 전환 대기가 끝나도록 넉넉히 돌린다.
+            m_shooter.SetWeapon(m_shooter.SelectWeapon, mp5, 0, 0);
+            Expect(Fire(60) == 0, "탄을 쓰는 무기가 빈 탄창으로 쏨");
+
+            data.consumeAmmo = false;
+            m_shooter.SetWeapon(m_shooter.SelectWeapon, mp5, 0, 0);
+            int shots = Fire(60);
+            Weapon weapon = m_shooter.CurrentWeapon;
+            Expect(shots > 1 && weapon.Magazine == 0 && weapon.Reserve == 0, $"탄을 쓰지 않는 무기: 빈 탄창으로 {shots}발, 탄 {weapon.Magazine}/{weapon.Reserve} (기대 2발 이상, 0/0)");
+            Expect(!m_shooter.ReloadWeapon() && !m_shooter.IsReloading && !weapon.MagazineEmpty && !weapon.OutOfAmmo, "탄을 쓰지 않는 무기가 재장전을 시작하거나 탄이 떨어진 것으로 보임");
+
+            m_shooter.SetWeapon(m_shooter.SelectWeapon, mp5, 20, 60);
+            m_shooter.SetInfiniteAmmo(true);
+            shots = Fire(60);
+            weapon = m_shooter.CurrentWeapon;
+            Expect(shots > 1 && weapon.Magazine == 20 && weapon.Reserve == 60, $"탄을 쓰지 않는 무기: {shots}발 뒤 탄 {weapon.Magazine}/{weapon.Reserve} (기대 20/60 그대로, 무한 탄약이 예비 탄을 불리지 않는다)");
+            m_shooter.SetInfiniteAmmo(false);
+
+            data.consumeAmmo = saved;
+        }
+
+        /// <summary>
+        /// 수명이 짧은 탄(근접 무기)이 닿는 거리: Bullet.MaxReach 가 실제 판정과 맞는지. 그 거리의 바로 안쪽에 선 사람은 맞고 바로 바깥은 맞지 않는다.
+        /// 사람은 원기둥이라 축까지의 거리로는 히트박스의 반지름만큼 더 닿는다.
+        /// </summary>
+        private void CheckReach()
+        {
+            if (!Reset()) { Expect(false, "닿는 거리: 준비 실패"); return; }
+
+            BulletData data = DataManager.Instance.WeaponParameterData.bulletData[0];
+            float savedLifetime = data.lifetime;
+            Human target = m_targets[0];
+            float feetY = Eye.Y - target.HitboxSize.body.position.Y;
+            float radius = target.HitboxSize.body.radius;
+
+            foreach ((float speed, float lifetime) in new[] { (30f, 0f), (30f, 0.06f), (10f, 0f), (4f, 0f) })
+            {
+                data.lifetime = lifetime;
+                float reach = Bullet.MaxReach(data, speed);
+                float speedPerTick = speed * SimClock.FrameTime;
+                int lifeTicks = Mathf.RoundToInt(lifetime * SimClock.FrameRate);
+
+                // 사람을 그 거리에 세우고 한 발을 쏜다. 돌려주는 것은 맞았는지.
+                bool Hits(float distance)
+                {
+                    target.RestoreHP();
+                    target.Controller.Teleport(new Vector3(0f, feetY, -distance));
+                    float before = target.HP;
+                    BulletManager.Instance.Spawn(data, m_shooter, m_shooter.Team, 40, 0, Eye, 0f, 0f, speedPerTick, Eye);
+                    TickBullets(lifeTicks + 4);
+                    BulletManager.Instance.Clear();
+                    return target.HP < before;
+                }
+
+                if (reach <= 0f)
+                {
+                    Expect(!Hits(0.3f), $"탄속 {speed} 는 판정 점이 하나도 없는데(닿는 거리 0) 0.3 m 앞의 사람이 맞음");
+                    continue;
+                }
+                Expect(Hits(reach + radius - 0.1f) && !Hits(reach + radius + 0.15f),
+                    $"탄속 {speed}, 수명 {lifetime} 초: 계산한 닿는 거리 {reach:0.00} m (+ 히트박스 반지름 {radius}) 의 안쪽이 안 맞거나 바깥이 맞음");
+            }
+            data.lifetime = savedLifetime;
+            GD.Print($"닿는 거리: 탄속 30 에 수명 0 이면 {Bullet.MaxReach(new BulletData(), 30f):0.00} m, 탄속 10 이면 {Bullet.MaxReach(new BulletData(), 10f):0.00} m, 탄속 4 면 {Bullet.MaxReach(new BulletData(), 4f):0.00} m");
         }
 
         /// <summary>

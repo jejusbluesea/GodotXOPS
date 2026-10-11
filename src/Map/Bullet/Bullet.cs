@@ -53,6 +53,9 @@ namespace GodotXOPS
         // 맞은 사람의 방어구 / 헬멧 포인트를 데미지의 몇 배만큼 깎는지 (쏜 무기의 값).
         private float m_armorPointDecay;
         private float m_helmetPointDecay;
+        // 맞은 사람의 방어구 / 헬멧이 데미지를 줄이는 것을 얼마나 무시하는지 (쏜 무기의 값).
+        private float m_armorIgnore;
+        private float m_helmetIgnore;
         private Vector3 m_position;
         private Vector3 m_prevPosition;
         private Vector3 m_direction;
@@ -102,12 +105,16 @@ namespace GodotXOPS
         /// <param name="onTargetWeight">명중 통계 가중치.</param>
         /// <param name="armorPointDecay">맞은 사람의 방어구 포인트를 데미지의 몇 배만큼 깎는지.</param>
         /// <param name="helmetPointDecay">맞은 사람의 헬멧 포인트를 데미지의 몇 배만큼 깎는지.</param>
+        /// <param name="armorIgnore">맞은 사람의 방어구가 데미지를 줄이는 것을 얼마나 무시하는지.</param>
+        /// <param name="helmetIgnore">맞은 사람의 헬멧이 데미지를 줄이는 것을 얼마나 무시하는지.</param>
         public void Spawn(BulletData data, Human owner, int team, int attacks, int penetration,
             Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin, float onTargetWeight,
-            float armorPointDecay, float helmetPointDecay)
+            float armorPointDecay, float helmetPointDecay, float armorIgnore, float helmetIgnore)
         {
             m_armorPointDecay = armorPointDecay;
             m_helmetPointDecay = helmetPointDecay;
+            m_armorIgnore = armorIgnore;
+            m_helmetIgnore = helmetIgnore;
             m_data = data;
             m_owner = owner;
             m_team = team;
@@ -127,6 +134,26 @@ namespace GodotXOPS
             m_onTargetWeight = onTargetWeight;
             m_passingSoundDone = false;
             m_active = true;
+        }
+
+        /// <summary>
+        /// 직선 탄이 사람을 맞힐 수 있는 가장 먼 거리 (발사 위치에서 마지막 판정 점까지). TickStraight 와 같은 계산이다:
+        /// 한 틱에 0.25 m 간격의 점을 Round(틱당 이동 거리 ÷ 0.25)개 검사하고, 수명의 틱 수 + 2 틱 동안 검사한다 (마지막 틱은 검사만 하고 사라진다).
+        /// 근접 무기(수명이 아주 짧은 탄)의 닿는 거리와, 무기를 든 좀비가 멈춰 서는 거리에 쓴다.
+        /// </summary>
+        /// <param name="data">탄환 데이터.</param>
+        /// <param name="bulletSpeed">탄속 (m/s, 무기 데이터의 값).</param>
+        /// <returns>거리 (m). 틱당 이동 거리가 판정 간격의 절반보다 짧아 점이 하나도 없으면 0.</returns>
+        public static float MaxReach(BulletData data, float bulletSpeed)
+        {
+            if (data == null || !(bulletSpeed > 0f)) return 0f;
+
+            float speedPerTick = bulletSpeed * SimClock.FrameTime;
+            int steps = Mathf.RoundToInt(speedPerTick / k_substep);
+            if (steps <= 0) return 0f;
+
+            int lifeTicks = Mathf.Max(0, Mathf.RoundToInt(data.lifetime * SimClock.FrameRate));
+            return (lifeTicks + 1) * speedPerTick + steps * k_substep;
         }
 
         /// <summary>
@@ -344,7 +371,7 @@ namespace GodotXOPS
         private void HitHuman(Human human, HumanHitPart part, float attenuation, Vector3 point)
         {
             float hpBefore = human.HP;
-            int baseDamage = human.HitBullet(part, m_attacks, m_armorPointDecay, m_helmetPointDecay, out bool armored);
+            int baseDamage = human.HitBullet(part, m_attacks, m_armorPointDecay, m_helmetPointDecay, m_armorIgnore, m_helmetIgnore, out bool armored);
             human.Controller.AddKnockback(m_yaw, 0f, k_hitKnockbackSpeed);
             human.SetHitYaw(m_yaw);
 

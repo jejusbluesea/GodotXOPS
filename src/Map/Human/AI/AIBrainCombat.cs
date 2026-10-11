@@ -51,6 +51,8 @@ namespace GodotXOPS
         /// 적을 겨누고 쏜다. 원본 AIcontrol::Action (ai.cpp:559-838).
         /// 총은 적의 이동을 앞질러 겨누고, 수류탄은 거리에 따라 위를 겨눈다. 조준 오차가 허용각 안에 들면 AI 레벨의 확률로 발사한다.
         /// 맨손이면 쏘지 않고, 적이 무장했으면 팔을 든다 (항복). 좀비는 쏘지 않고 다가가 근접 공격한다.
+        /// 든 무기에 AI 가 쓰는 거리가 적혀 있으면(원본에 없다. 0 이면 이 분기를 타지 않는다) 그 밖에서는 쏘지 않는다:
+        /// 멀면 적을 보고 달려가고, 가까우면 물러난다. 그동안에는 전투 중의 무작위 회피 이동을 하지 않는다.
         /// </summary>
         private void Action()
         {
@@ -82,6 +84,11 @@ namespace GodotXOPS
                     target.Z += movePerTick.Z * scale;
                 }
             }
+
+            // 무기를 쓰는 거리는 앞질러 겨누기 전의, 눈에서 눈까지의 거리로 본다.
+            float range = (enemyPosition + Vector3.Up * m_enemy.Controller.CameraHeight - eye).Length();
+            bool tooFar = !zombie && !unarmed && weapon.AiMaxRange > 0f && range > weapon.AiMaxRange;
+            bool tooClose = !zombie && !unarmed && !tooFar && weapon.AiMinRange > 0f && range < weapon.AiMinRange;
 
             Vector3 toTarget = target - eye;
             float deltaYaw = Coord.DeltaAngle(m_controller.Yaw, YawTo(toTarget));
@@ -135,7 +142,18 @@ namespace GodotXOPS
                     shotAngle = scope.aiShotAngleLong + k_shotAngleLevelLong * level.limitsError;
                 }
 
-                if (Mathf.Abs(deltaYaw) + Mathf.Abs(deltaPitch) < shotAngle)
+                if (tooFar || tooClose)
+                {
+                    // 쓸 수 없는 거리다. 적 쪽을 보고 있을 때만 움직인다 (무기를 든 좀비가 다가가는 것과 같은 조건).
+                    m_combatMove = HumanMoveFlag.None;
+                    if (Mathf.Abs(deltaYaw) <= k_zombieApproachTolerance)
+                    {
+                        // 물러날 때는 뒤가 막혔거나 낭떠러지면 서 있는다 (무작위 회피 이동과 같은 확인).
+                        if (tooFar) m_moveIntent |= HumanMoveFlag.Forward;
+                        else if (!BlockedOrCliff(-Coord.YawForward(m_controller.Yaw))) m_moveIntent |= HumanMoveFlag.Back;
+                    }
+                }
+                else if (Mathf.Abs(deltaYaw) + Mathf.Abs(deltaPitch) < shotAngle)
                 {
                     if (GetRand(level.attack + (m_longAttack ? 1 : 0)) == 0) m_self.ShotWeapon();
                 }
@@ -146,7 +164,7 @@ namespace GodotXOPS
             if (distanceSquared < shortDistanceSquared) m_longAttack = false;
             if (distanceSquared > shortDistanceSquared && !m_nav.Run2) m_longAttack = true;
 
-            if (!zombie) MoveRandom();
+            if (!zombie && !tooFar && !tooClose) MoveRandom();
 
             m_actionCnt++;
         }

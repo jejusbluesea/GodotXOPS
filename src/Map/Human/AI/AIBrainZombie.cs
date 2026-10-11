@@ -35,7 +35,8 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 좀비의 근접 공격이 닿는 수평 반경. 맨손이면 원본의 접촉 반경이고, 무기를 들었으면 min(사람 종류의 zombieMaxMeleeRange, 총알이 날아가는 거리)다.
+        /// 좀비의 근접 공격이 닿는 수평 반경. 맨손이면 원본의 접촉 반경이고, 무기를 들었으면 min(사람 종류의 zombieMaxMeleeRange, 그 무기의 탄이 닿는 거리)다.
+        /// 탄이 닿는 거리는 탄환의 판정과 같은 식(Bullet.MaxReach)으로 구한다: 같은 근접 무기는 좀비가 들어도 보통 사람이 들어도 같은 거리에서 닿는다.
         /// 쏠 수 없는 무기나 데이터가 0 이면 접촉 반경으로 돌아간다.
         /// </summary>
         /// <returns>반경 (m).</returns>
@@ -48,7 +49,7 @@ namespace GodotXOPS
             int bulletIndex = weapon.Data.bulletIndex;
             if (!bullets.Has(bulletIndex)) return k_zombieAttackRadius;
 
-            float bulletRange = bullets[bulletIndex].lifetime * weapon.Data.bulletSpeed;
+            float bulletRange = Bullet.MaxReach(bullets[bulletIndex], weapon.Data.bulletSpeed);
             float cap = m_self.HumanTypeData.zombieMaxMeleeRange;
             if (bulletRange <= 0f || cap <= 0f) return k_zombieAttackRadius;
 

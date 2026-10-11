@@ -1060,9 +1060,9 @@ func bump(p, state):
 
         /// <summary>
         /// PD2 하나에 방어구·헬멧과 재정비 이벤트(30~35)를 눈으로 보는 시험용 구성을 더해 덮어쓴다 (mif2_check 의 --convert-official 로 만든 미션에 쓴다).
-        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 10000(플레이어, 방어구와 헬멧), 10001(방어구 입은 표적), 10002(맨몸 표적), 무기 10002(바닥에 놓는 것),
-        /// 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 미션 전용 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~13번(안내 문구).
-        /// 놓는 것: 정면에 표적 두 줄(방어구 입은 표적 뒤에 맨몸 표적 / 맨몸 표적 둘), 오른쪽에 Interact 자리 넷(체력, 방어구, 헬멧, 쏘는 적 부르기).
+        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 10000(플레이어, 방어구와 헬멧), 10001(방어구 입은 표적), 10002(맨몸 표적), 10003(근접 무기를 든 적), 무기 10002 와 10003(바닥에 놓는 것. 10003 이 근접 무기),
+        /// 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 미션 전용 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~14번(안내 문구).
+        /// 놓는 것: 정면에 표적 두 줄(방어구 입은 표적 뒤에 맨몸 표적 / 맨몸 표적 둘), 오른쪽에 Interact 자리 다섯(체력, 방어구, 헬멧, 쏘는 적 부르기, 근접 무기를 든 적 부르기).
         /// </summary>
         /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
         /// <returns>썼으면 true.</returns>
@@ -1072,10 +1072,12 @@ func bump(p, state):
             const int showVitals = 10000;
             // 더하는 포인트의 첫 식별번호, 표적의 식별번호, 에드온 번호.
             const int firstId = 30000, targetId = 9001, addonFirst = 10000;
-            const int playerInfo = 30900, armoredInfo = 30901, plainInfo = 30902, shooterInfo = 30903;
+            const int playerInfo = 30900, armoredInfo = 30901, plainInfo = 30902, shooterInfo = 30903, knifeInfo = 30904;
             // 쏘는 적으로 쓰는 기본 사람 데이터의 번호와 표적의 팀.
             const int shooterData = 2, enemyTeam = 1;
             const float interactRadius = 1.5f;
+            // 바닥에 놓는 무기를 플레이어 포인트보다 얼마나 위에 두는지 (m).
+            const float weaponDropHeight = 1.5f;
 
             string full = GamePath.Resolve(path);
             if (full == null || !PD2File.Read(full, out PD2File file, out string error))
@@ -1104,6 +1106,7 @@ func bump(p, state):
             Info(armoredInfo, addonFirst + 1, enemyTeam);
             Info(plainInfo, addonFirst + 2, enemyTeam);
             Info(shooterInfo, shooterData, enemyTeam);
+            Info(knifeInfo, addonFirst + 3, enemyTeam);
             player.param1 = playerInfo;
 
             // 표적: 플레이어를 마주 보고 선다. 경로는 없다.
@@ -1134,7 +1137,9 @@ func bump(p, state):
             // 줄: 자동 판정을 끄고 무기를 하나 놓는다.
             Line();
             Add(setAutoJudge, 0, origin, -1);
-            Add(spawnWeapon, addonFirst + 2, At(-1.5f, 2f), -1, 60);
+            // 무기는 바닥보다 위에 놓는다. 플레이어 포인트의 높이에 그대로 놓으면 바닥에 묻혀 보이지 않았다. 놓인 뒤에는 떨어져 바닥에 얹힌다.
+            Add(spawnWeapon, addonFirst + 2, At(-1.5f, 2f) + Vector3.Up * weaponDropHeight, -1, 60);
+            Add(spawnWeapon, addonFirst + 3, At(-2.5f, 2f) + Vector3.Up * weaponDropHeight, -1, 0);
 
             // 줄: 값을 화면에 띄운다 (플레이어, 방어구 입은 표적, 그 뒤의 표적, 옆줄의 두 표적). 이 이벤트는 넘어가지 않는다.
             int[] shown = { 0, targetId, targetId + 1, targetId + 2, targetId + 3 };
@@ -1155,6 +1160,7 @@ func bump(p, state):
             Station(4f, 11, addArmor, 0, PD2File.FloatCell(60f), PD2File.FloatCell(120f));
             Station(8f, 12, addHelmet, 0, PD2File.FloatCell(60f), PD2File.FloatCell(120f));
             Station(12f, 13, spawnHuman, shooterInfo, targetId + 100, -1);
+            Station(16f, 14, spawnHuman, knifeInfo, targetId + 200, -1);
 
             if (!file.Write(full, out error))
             {

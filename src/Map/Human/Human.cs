@@ -288,9 +288,11 @@ namespace GodotXOPS
         /// <param name="attacks">총알의 현재 위력.</param>
         /// <param name="armorPointDecay">방어구 포인트를 데미지의 몇 배만큼 깎는지 (0 에서 1).</param>
         /// <param name="helmetPointDecay">헬멧 포인트를 데미지의 몇 배만큼 깎는지 (0 에서 1).</param>
+        /// <param name="armorIgnore">방어구가 데미지를 줄이는 것을 얼마나 무시하는지 (0 에서 1. 1 이면 줄이지 못한다).</param>
+        /// <param name="helmetIgnore">헬멧이 데미지를 줄이는 것을 얼마나 무시하는지 (0 에서 1).</param>
         /// <param name="armored">맞은 부위에 방어구나 헬멧이 있었으면 true. 총알이 이 사람을 뚫고 나가는 데 관통력을 하나 더 쓴다.</param>
         /// <returns>난수를 뺀 기본 데미지 (방어구가 있었으면 줄인 값). 혈흔이 튀는 양을 정하는 데 쓴다.</returns>
-        public int HitBullet(HumanHitPart part, int attacks, float armorPointDecay, float helmetPointDecay, out bool armored)
+        public int HitBullet(HumanHitPart part, int attacks, float armorPointDecay, float helmetPointDecay, float armorIgnore, float helmetIgnore, out bool armored)
         {
             HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
             float multiplier = 1f;
@@ -333,7 +335,9 @@ namespace GodotXOPS
             if (armored)
             {
                 float decrease = m_humanData != null ? (head ? m_humanData.helmetDamageDecrease : m_humanData.armorDamageDecrease) : 0f;
-                float keep = 1f - Mathf.Clamp(decrease, 0f, 1f);
+                // 무기가 무시하는 만큼은 줄이지 못한다. 방어구가 있었다는 사실(관통력을 하나 더 쓰는 것)과 포인트가 깎이는 것은 그대로다.
+                float ignore = Mathf.Clamp(head ? helmetIgnore : armorIgnore, 0f, 1f);
+                float keep = 1f - Mathf.Clamp(decrease, 0f, 1f) * (1f - ignore);
                 // 무적인 사람은 HP 처럼 포인트도 깎이지 않는다.
                 if (Alive && !m_invincible && damage > 0)
                 {

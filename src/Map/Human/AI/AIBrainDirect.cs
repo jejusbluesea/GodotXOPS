@@ -130,13 +130,13 @@ namespace GodotXOPS
         private void DirectShoot()
         {
             Weapon weapon = m_self.CurrentWeapon;
-            if (weapon.IsNone || TotalBullets(weapon) == 0)
+            if (weapon.IsNone || weapon.OutOfAmmo)
             {
                 m_directShots = 0;
                 return;
             }
 
-            if (weapon.Magazine == 0)
+            if (weapon.MagazineEmpty)
             {
                 m_self.ReloadWeapon();
                 return;

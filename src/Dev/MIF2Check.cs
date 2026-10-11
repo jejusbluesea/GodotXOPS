@@ -60,6 +60,7 @@ namespace GodotXOPS.Dev
             int missions = CheckOfficialMissions();
             CheckAddonData();
             CheckAddonBodySize();
+            CheckAddonMeleeWeapon();
             CheckFormat();
             CheckLegacyAddonObject();
 
@@ -641,6 +642,123 @@ namespace GodotXOPS.Dev
             MapLoader.UnloadBlockData();
             Expect(baseHuman.controllerSizeData.AddonCount == 0 && baseHuman.humanHitboxSizeData.AddonCount == 0, "맵을 내린 뒤에도 에드온의 몸 크기와 히트박스가 남아 있음");
             AIController.Enabled = true;
+        }
+
+        /// <summary>
+        /// 데이터만으로 만든 근접 무기를 든 AI 가 실제 틱에서 적에게 걸어가 치는지 확인한다.
+        /// 무기: 수명 0 인 에드온 탄(닿는 거리 1.9 m), 탄을 쓰지 않음, AI 가 쓰는 거리 1.6 m. 12 m 떨어진 적을 보고 다가가 닿는 거리에서 멈추고 데미지를 준다.
+        /// </summary>
+        private void CheckAddonMeleeWeapon()
+        {
+            const float startDistance = 12f, aiRange = 1.6f, bulletSpeed = 30f;
+            const int victimId = 0, attackerId = 1, ticks = 500;
+
+            DataManager data = DataManager.Instance;
+            HumanParameterData baseHuman = data.HumanParameterData;
+            WeaponParameterData baseWeapon = data.WeaponParameterData;
+            int sourceWeapon = baseWeapon.weaponData.FindIndex(entry => entry.magazineSize > 0 && baseWeapon.bulletData.Has(entry.bulletIndex) && !baseWeapon.bulletData[entry.bulletIndex].useGravity);
+            if (sourceWeapon < 0)
+            {
+                Expect(false, "근접 무기 점검의 전제(총알을 쏘는 무기)가 맞지 않음");
+                return;
+            }
+
+            var weapon = new WeaponParameterData();
+            BulletData blade = Clone(baseWeapon.bulletData[baseWeapon.weaponData[sourceWeapon].bulletIndex]);
+            blade.lifetime = 0f;
+            weapon.bulletData.Add(blade);
+            WeaponData knife = Clone(baseWeapon.weaponData[sourceWeapon]);
+            knife.bulletIndex = k_addon;
+            knife.bulletSpeed = bulletSpeed;
+            knife.damage = 30f;
+            knife.penetration = 0;
+            knife.pelletCount = 1;
+            knife.magazineSize = 0;
+            knife.consumeAmmo = false;
+            knife.aiMaxRange = aiRange;
+            knife.ignoreAimError = true;
+            knife.previousWeaponIndex = -1;
+            knife.nextWeaponIndex = -1;
+            weapon.weaponData.Add(knife);
+            WriteJson($"{k_workFolder}/melee_weapon.json", weapon);
+
+            var human = new HumanParameterData();
+            HumanData attackerData = Clone(baseHuman.humanData[0]);
+            attackerData.weaponIndex0 = baseWeapon.weaponGeneralData.noneWeaponIndex;
+            attackerData.weaponIndex1 = k_addon;
+            human.humanData.Add(attackerData);
+            HumanData victimData = Clone(baseHuman.humanData[0]);
+            victimData.hp = 100000f;
+            victimData.weaponIndex0 = baseWeapon.weaponGeneralData.noneWeaponIndex;
+            victimData.weaponIndex1 = baseWeapon.weaponGeneralData.noneWeaponIndex;
+            human.humanData.Add(victimData);
+            WriteJson($"{k_workFolder}/melee_human.json", human);
+
+            var blocks = new BD2File { textureListPath = $"{k_workFolder}/melee_textures.json" };
+            blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
+            var textures = new BlockTextureListData();
+            textures.blockTextureData.Add(new BlockTextureData());
+            WriteJson(blocks.textureListPath, textures);
+            blocks.Write(GamePath.Resolve($"{k_workFolder}/melee.bd2"), out _);
+
+            // 맞는 사람(플레이어라 AI 가 돌지 않는다)은 원점에, 근접 무기를 든 사람은 그 뒤 12 m 에서 그쪽(-Z)을 보고 선다.
+            var points = new PD2File();
+            points.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = k_addon + 1, param2 = 0, id = 100 });
+            points.points.Add(new PD2Point { type = MapLoader.PointHumanInfo, param1 = k_addon, param2 = 1, id = 101 });
+            points.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 100, param2 = -1, id = victimId, position = new Vector3(0f, 0.01f, 0f) });
+            points.points.Add(new PD2Point { type = MapLoader.PointHuman, param1 = 101, param2 = -1, id = attackerId, position = new Vector3(0f, 0.01f, startDistance) });
+            points.Write(GamePath.Resolve($"{k_workFolder}/melee.pd2"), out _);
+
+            var mission = new ExtendedMissionData
+            {
+                name = "MELEE CHECK",
+                fullname = "Melee weapon check",
+                blockPath = $"{k_workFolder}/melee.bd2",
+                pointPath = $"{k_workFolder}/melee.pd2",
+                addonHumanDataPath = $"{k_workFolder}/melee_human.json",
+                addonWeaponDataPath = $"{k_workFolder}/melee_weapon.json",
+            };
+            string missionPath = GamePath.Resolve($"{k_workFolder}/melee.mif2");
+            MIF2File.Write(missionPath, mission, out _);
+
+            MapLoader loader = MapLoader.Instance;
+            AIController.Enabled = true;
+            AIController.DrivePlayer = false;
+            if (!(MapLoader.LoadMissionFile(missionPath) && MapLoader.LoadBlockData(loader.MissionBD1Path) && MapLoader.LoadPointData(loader.MissionPD1Path)))
+            {
+                Expect(false, "근접 무기 점검용 미션 로드 실패");
+                return;
+            }
+
+            Human victim = MapLoader.SearchHuman(victimId);
+            Human attacker = MapLoader.SearchHuman(attackerId);
+            if (victim == null || attacker == null)
+            {
+                Expect(false, "근접 무기 점검: 사람이 스폰되지 않음");
+                return;
+            }
+            Weapon held = attacker.CurrentWeapon;
+            Expect(held.WeaponIndex == k_addon && Mathf.IsEqualApprox(held.AiMaxRange, aiRange) && !held.UsesAmmo && held.Magazine == 0, "근접 무기(에드온 10000)를 들고 시작하지 않음");
+
+            float hpBefore = victim.HP;
+            float firstHitDistance = -1f;
+            float closest = startDistance;
+            for (int tick = 0; tick < ticks; tick++)
+            {
+                SimClock.Step();
+                float distance = attacker.Controller.Position.DistanceTo(victim.Controller.Position);
+                closest = Mathf.Min(closest, distance);
+                if (firstHitDistance < 0f && victim.HP < hpBefore) firstHitDistance = distance;
+            }
+
+            float reach = Bullet.MaxReach(blade, bulletSpeed);
+            Expect(firstHitDistance > 0f && firstHitDistance <= reach + 0.5f, $"근접 무기를 든 AI 가 {ticks}틱 동안 적을 치지 못했거나 닿지 않는 거리에서 맞힘 (처음 맞힌 거리 {firstHitDistance:0.00} m, 닿는 거리 {reach:0.00} m)");
+            Expect(closest < aiRange + 0.5f && closest > 0.2f, $"근접 무기를 든 AI 가 적에게 다가가지 않았거나 겹칠 때까지 들어감 (가장 가까웠던 거리 {closest:0.00} m, 쓰는 거리 {aiRange} m)");
+            Expect(!attacker.CurrentWeapon.IsNone && attacker.CurrentWeapon.WeaponIndex == k_addon && !attacker.IsReloading, "근접 무기를 든 AI 가 무기를 버리거나 재장전함");
+            GD.Print($"근접 무기: 처음 맞힌 거리 {firstHitDistance:0.00} m, 가장 가까웠던 거리 {closest:0.00} m, 준 데미지 {hpBefore - victim.HP:0}");
+
+            MapLoader.UnloadPointData();
+            MapLoader.UnloadBlockData();
         }
 
         /// <summary>

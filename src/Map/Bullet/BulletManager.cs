@@ -101,10 +101,12 @@ namespace GodotXOPS
         /// <param name="onTargetWeight">명중 통계 가중치 (단발 1, 산탄은 2 / 탄환 수).</param>
         /// <param name="armorPointDecay">맞은 사람의 방어구 포인트를 데미지의 몇 배만큼 깎는지 (무기 데이터의 값).</param>
         /// <param name="helmetPointDecay">맞은 사람의 헬멧 포인트를 데미지의 몇 배만큼 깎는지 (무기 데이터의 값).</param>
+        /// <param name="armorIgnore">맞은 사람의 방어구가 데미지를 줄이는 것을 얼마나 무시하는지 (무기 데이터의 값).</param>
+        /// <param name="helmetIgnore">맞은 사람의 헬멧이 데미지를 줄이는 것을 얼마나 무시하는지 (무기 데이터의 값).</param>
         /// <returns>발사된 탄환. 풀이 가득 찼으면 null.</returns>
         public Bullet Spawn(BulletData data, Human owner, int team, int attacks, int penetration,
             Vector3 position, float yawDeg, float pitchDeg, float speedPerTick, Vector3 visualOrigin, float onTargetWeight = 1f,
-            float armorPointDecay = 1f, float helmetPointDecay = 1f)
+            float armorPointDecay = 1f, float helmetPointDecay = 1f, float armorIgnore = 0f, float helmetIgnore = 0f)
         {
             if (data == null) return null;
 
@@ -113,7 +115,7 @@ namespace GodotXOPS
                 Bullet bullet = m_pool[i];
                 if (bullet.IsActive) continue;
 
-                bullet.Spawn(data, owner, team, attacks, penetration, position, yawDeg, pitchDeg, speedPerTick, visualOrigin, onTargetWeight, armorPointDecay, helmetPointDecay);
+                bullet.Spawn(data, owner, team, attacks, penetration, position, yawDeg, pitchDeg, speedPerTick, visualOrigin, onTargetWeight, armorPointDecay, helmetPointDecay, armorIgnore, helmetIgnore);
                 ApplyVisual(i, data, bullet);
                 SpawnCount++;
                 return bullet;
