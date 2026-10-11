@@ -18,6 +18,7 @@ The goal is to reproduce the feel of the original. Movement, collision, and bull
 - The original AI, mission events, and mission complete / failure checks
 - Key bindings, resolution, brightness and gamma, crosshair shape, and volume in the menu's OPTION screen
 - Human, weapon, small object, and effect values editable through JSON files in `godotdata/`
+- Things the original does not have can be made with data alone: armor and helmets, health regeneration, melee weapons, weapons loaded one round at a time, a grenade launcher attached to a gun, and the range and order in which the AI uses weapons. The default data does not use them, so the original missions play as before
 - Multiple addon folders registered as separate pages through `addon.json`
 - Extended file formats (BD2, PD2, MIF2): no limits on the number of textures, point numbers, or event lines, and a mission can bring its own humans, weapons, small objects, effects, materials, and sounds. The original formats (BD1, PD1, MIF) are still supported
 - Script events: in addition to the ten original events, more are included (variables and branches, spawning, on-screen text, moving small objects and blocks, playing sounds, cutscene staging such as the camera, fades, letterbox and pausing the game, and so on), and you can add your own event packs. Scripts only run inside a sandbox
@@ -113,7 +114,7 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, and 1.2.0 added screen scripts. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
+The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events and data extensions such as armor and melee weapons. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
 
 ## License and notices
 
