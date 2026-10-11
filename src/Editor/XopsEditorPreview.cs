@@ -911,6 +911,7 @@ namespace GodotXOPS.Editor
 
         /// <summary>
         /// 기본 데이터의 목록 하나를 찾는다: 보고 있는 파일, 그다음 열려 있는 다른 기본 데이터 파일(저장하지 않은 편집 포함), 그다음 게임이 읽어 둔 데이터.
+        /// 보고 있는 파일도 기본 데이터 폴더의 것일 때만 쓴다: 에드온 데이터 파일의 목록은 10000 부터의 번호이고, 그 파일 안의 10000 미만은 게임의 기본 데이터를 가리킨다.
         /// </summary>
         /// <param name="containerType">목록이 든 데이터 클래스.</param>
         /// <param name="listPath">목록 필드의 이름. 안쪽의 목록이면 점으로 잇는다 (예: "humanAIParameterData.aiData").</param>
@@ -922,7 +923,7 @@ namespace GodotXOPS.Editor
             if (top == null) return null;
 
             object container = null;
-            if (m_asset != null && m_asset.FileKind.Type == containerType && m_asset.Fields.Contains(top))
+            if (m_asset != null && m_asset.FileKind.Type == containerType && m_asset.Fields.Contains(top) && m_asset.Path.StartsWith(k_dataFolder + "/", StringComparison.OrdinalIgnoreCase))
             {
                 container = m_asset.Container;
             }

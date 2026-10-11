@@ -1496,6 +1496,20 @@ namespace GodotXOPS.Editor
             Expect(OpenAsset("godotdata/weapon/general.json"), "무기 공통 설정 파일을 열지 못함");
             AssetNode caseWeapon = m_assetNodes.Find(node => node.Parent != null && node.Parent.Label == "caseWeaponIndex" && node.Index == 0);
             Expect(caseWeapon == null || (IsReference(caseWeapon) && caseWeapon.Item.GetText(k_assetNameColumn).StartsWith("→ ", StringComparison.Ordinal)), "번호들의 목록의 항목이 번호 칸으로 잡히지 않음");
+
+            // 에드온 데이터 파일 안의 10000 미만의 번호는 그 파일의 목록이 아니라 게임의 기본 데이터를 가리킨다.
+            string effectAddon = $"{k_selfTestFolder}/addon_effect_reference.json";
+            File.WriteAllText(GamePath.Resolve(effectAddon), "{ \"effectTextureData\": [ { \"texturePath\": \"selftest/addon_texture.png\" } ], "
+                + "\"effectData\": [ { \"name\": \"AddonEffect\", \"emitters\": [ { \"textureIndex\": 0 } ] } ] }");
+            Expect(OpenAsset(effectAddon), "에드온 이펙트 파일을 열지 못함");
+            string baseTexture = data.EffectParameterData.effectTextureData[0].texturePath;
+            AssetNode addonTexture = m_assetNodes.Find(node => node.Label == "textureIndex" && IsReference(node));
+            Expect(LookupData<EffectTextureData>(typeof(EffectParameterData), nameof(EffectParameterData.effectTextureData), 0)?.texturePath == baseTexture,
+                "에드온 이펙트 파일을 보는 동안 기본 번호의 텍스처를 그 파일의 목록에서 찾음");
+            Expect(addonTexture != null && addonTexture.Item.GetText(k_assetNameColumn) == $"→ {baseTexture}", "에드온 이펙트 파일의 기본 텍스처 번호 옆에 기본 데이터의 경로가 나오지 않음");
+            m_assetFiles.Remove(effectAddon);
+            m_assetExtraPaths.Remove(effectAddon);
+            Expect(OpenAsset("godotdata/weapon/general.json"), "무기 공통 설정 파일을 다시 열지 못함");
         }
 
         /// <summary>
