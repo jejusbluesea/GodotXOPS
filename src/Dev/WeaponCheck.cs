@@ -38,6 +38,7 @@ namespace GodotXOPS.Dev
             CheckHitParts();
             CheckHitReactionAndRotation();
             CheckGraze();
+            CheckPassingHeard();
             CheckPenetration();
             CheckArmor();
             CheckRegeneration();
@@ -241,6 +242,37 @@ namespace GodotXOPS.Dev
             FireStraight(30, 0);
             TickBullets(3);
             Expect(target.HP < hp, "판정 점과 나란한 표적에 탄환이 맞지 않음");
+        }
+
+        /// <summary>
+        /// 스쳐 지나가는 소리: 머리 옆 1 m 를 지나는 총알은 AI 가 듣고, 같은 길을 지나는 수류탄(중력을 받는 탄)은 듣지 못한다.
+        /// 원본은 총알 객체에만 통과음을 등록한다 (objectmanager.cpp:2838). 수류탄은 날아갈 때도 튕길 때도(GRE_BOUND 는 GetWorldSound 가 건너뛴다) AI 를 깨우지 않는다.
+        /// </summary>
+        private void CheckPassingHeard()
+        {
+            if (!Reset()) { Expect(false, "스쳐 지나가는 소리: 준비 실패"); return; }
+
+            Human target = m_targets[0];
+            target.Controller.Teleport(new Vector3(1f, Eye.Y - target.CameraHeight, -5f));
+            bool tickWas = SimClock.TickEnabled;
+            SimClock.TickEnabled = true;
+
+            target.ConsumeThreatHeard();
+            FireStraight(30, 0);
+            TickBullets(4);
+            Expect(target.ConsumeThreatHeard(), "머리 옆을 스친 총알을 듣지 못함");
+
+            BulletManager.Instance.Clear();
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            BulletData grenade = parameter.bulletData[parameter.weaponData[parameter.weaponGeneralData.grenadeWeaponIndex].bulletIndex];
+            Bullet thrown = BulletManager.Instance.Spawn(grenade, m_shooter, m_shooter.Team, 0, 0, Eye, 0f, 0f, 1f, Eye);
+            int ticks = 0;
+            for (; ticks < 12 && thrown.IsActive; ticks++) BulletManager.Instance.SimTick();
+            Expect(grenade.useGravity && thrown.IsActive && thrown.Position.Z < -6f, $"수류탄이 표적 옆을 지나가지 않음 (z {thrown.Position.Z:0.0})");
+            Expect(!target.ConsumeThreatHeard(), "머리 옆을 지나간 수류탄을 AI 가 들음 (원본은 총알만 듣는다)");
+
+            BulletManager.Instance.Clear();
+            SimClock.TickEnabled = tickWas;
         }
 
         /// <summary>

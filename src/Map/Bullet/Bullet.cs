@@ -293,7 +293,8 @@ namespace GodotXOPS
             if (m_active)
             {
                 TickPassingSound();
-                NotifyBulletPass();
+                // 원본은 총알 객체에만 통과음을 등록한다 (objectmanager.cpp:2838). 수류탄은 날아갈 때도 튕길 때도 AI 가 듣지 못한다 (GRE_BOUND 는 GetWorldSound 가 건너뛴다).
+                if (!m_data.useGravity) NotifyBulletPass();
             }
         }
 
@@ -568,7 +569,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 총알이 머리 옆을 스쳐 지나간 AI 에게 위협 신호를 남긴다. 팀을 가리지 않는다 (원본 GetWorldSound 의 BULLET, 거리 20).
+        /// 총알이 머리 옆을 스쳐 지나간 AI 에게 위협 신호를 남긴다. 팀을 가리지 않는다 (원본 GetWorldSound 의 BULLET, 거리 20). 중력을 받는 탄(수류탄)에는 부르지 않는다.
         /// </summary>
         private void NotifyBulletPass()
         {

@@ -228,7 +228,7 @@ AI 가 쓰는 거리(`aiMaxRange`, `aiMinRange`)는 근접 무기가 아니어�
 | `explosionSound`, `explosionEffectIndex` | 폭발 소리와 이펙트 |
 | `humanHitEffectIndex`, `objectHitEffectIndex` | 사람, 오브젝트에 맞았을 때 내는 이펙트 번호 |
 | `humanHitSounds`, `bulletPassingSounds` | 피격음, 스쳐 지나가는 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다 |
-| `bounceSounds` | 중력을 받는 탄(수류탄)이 벽이나 바닥에 튕길 때의 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다. 직선 탄에서는 쓰이지 않습니다 |
+| `bounceSounds` | 중력을 받는 탄(수류탄)이 벽이나 바닥에 튕길 때의 소리. 여러 개를 넣으면 그중 하나를 무작위로 냅니다. 직선 탄에서는 쓰이지 않습니다. AI 는 이 소리도, 날아가는 수류탄도 듣지 못합니다 (폭발만 듣습니다) |
 | `bulletHoleSize` | 재질이 남기는 탄흔(`bulletHoleEffect`)의 크기 배율. 1 이 프리셋 그대로입니다 |
 | `lifetime` | 탄환이 사라질 때까지의 시간 (초) |
 
