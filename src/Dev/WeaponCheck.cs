@@ -43,6 +43,8 @@ namespace GodotXOPS.Dev
             CheckRegeneration();
             CheckNoAmmo();
             CheckReach();
+            CheckWeaponState();
+            CheckLaunchElevation();
             CheckFireRate();
             CheckReloadAndSwitch();
             CheckReloadStyles();
@@ -543,6 +545,154 @@ namespace GodotXOPS.Dev
             }
             data.lifetime = savedLifetime;
             GD.Print($"닿는 거리: 탄속 30 에 수명 0 이면 {Bullet.MaxReach(new BulletData(), 30f):0.00} m, 탄속 10 이면 {Bullet.MaxReach(new BulletData(), 10f):0.00} m, 탄속 4 면 {Bullet.MaxReach(new BulletData(), 4f):0.00} m");
+        }
+
+        /// <summary>
+        /// 무기 한 자루의 상태: 탄 묶음(ammoGroup)이 다른 종류로 전환하면 탄을 넘기지 않고 묶음마다 따로 두는지, 같으면 전처럼 넘기는지,
+        /// 그리고 그 상태(접어 둔 탄, AI 가 쓰는 거리)가 버렸다 주워도 남는지.
+        /// 값은 무기 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// </summary>
+        private void CheckWeaponState()
+        {
+            if (!Reset()) { Expect(false, "무기의 상태: 준비 실패"); return; }
+
+            DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
+            int rifle = FindWeapon("MP5");
+            WeaponData rifleData = list[rifle];
+            int launcher = list.FindIndex(entry => entry != rifleData && entry.magazineSize > 0 && entry.magazineSize != rifleData.magazineSize && entry.pelletCount > 0);
+            if (launcher < 0) { Expect(false, "무기의 상태: 장탄수가 다른 두 번째 무기를 찾지 못함"); return; }
+            WeaponData launcherData = list[launcher];
+
+            int savedNext = rifleData.nextWeaponIndex, savedPrevious = launcherData.previousWeaponIndex, savedGroup = launcherData.ammoGroup;
+            float savedRifleSwitch = rifleData.switchTime, savedLauncherSwitch = launcherData.switchTime;
+            rifleData.nextWeaponIndex = launcher;
+            launcherData.previousWeaponIndex = rifle;
+            rifleData.switchTime = 0f;
+            launcherData.switchTime = 0f;
+
+            int multiplier = m_shooter.HumanTypeData != null ? m_shooter.HumanTypeData.autoBulletMultiplier : Weapon.DefaultAutoBulletMultiplier;
+            int freshMagazine = launcherData.magazineSize;
+            int freshReserve = launcherData.magazineSize * Mathf.Max(0, multiplier - 1);
+            int slot = m_shooter.SelectWeapon;
+
+            // 같은 묶음(0)이면 전처럼 탄을 그대로 넘긴다.
+            m_shooter.SetWeapon(slot, rifle, 12, 34);
+            m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchNext);
+            Weapon held = m_shooter.CurrentWeapon;
+            Expect(held.WeaponIndex == launcher && held.Magazine == 12 && held.Reserve == 34 && !held.TryGetStoredAmmo(0, out _, out _),
+                $"같은 묶음의 종류 전환: 무기 {held.WeaponIndex}, 탄 {held.Magazine}/{held.Reserve} (기대 {launcher}, 12/34 그대로)");
+
+            // 다른 묶음이면 넘기지 않는다. 처음 쓰는 묶음은 새 무기처럼 차 있고, 접어 둔 탄은 남는다.
+            launcherData.ammoGroup = 1;
+            m_shooter.SetWeapon(slot, rifle, 12, 34);
+            m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchNext);
+            held = m_shooter.CurrentWeapon;
+            bool stored = held.TryGetStoredAmmo(0, out int storedMagazine, out int storedReserve);
+            Expect(held.WeaponIndex == launcher && held.Magazine == freshMagazine && held.Reserve == freshReserve && stored && storedMagazine == 12 && storedReserve == 34,
+                $"다른 묶음으로 전환: 탄 {held.Magazine}/{held.Reserve}, 접어 둔 탄 {storedMagazine}/{storedReserve} (기대 {freshMagazine}/{freshReserve}, 12/34)");
+
+            // 한 발을 쓰고 돌아갔다 다시 오면 쓴 만큼 줄어 있다 (오갈 때마다 다시 차지 않는다).
+            held.ConsumeShot(out _, out _);
+            m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchPrevious);
+            held = m_shooter.CurrentWeapon;
+            Expect(held.WeaponIndex == rifle && held.Magazine == 12 && held.Reserve == 34, $"원래 묶음으로 돌아옴: 탄 {held.Magazine}/{held.Reserve} (기대 12/34)");
+            m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchNext);
+            held = m_shooter.CurrentWeapon;
+            Expect(held.Magazine == freshMagazine - 1 && held.Reserve == freshReserve, $"다시 다른 묶음으로: 탄 {held.Magazine}/{held.Reserve} (기대 {freshMagazine - 1}/{freshReserve})");
+
+            // 버렸다 주워도 접어 둔 탄과 AI 가 쓰는 거리가 남는다.
+            m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchPrevious);
+            m_shooter.CurrentWeapon.SetAiRange(1.5f, 7.5f);
+            int before = WeaponManager.Instance.CountActive();
+            bool droppedNow = m_shooter.DropCurrentWeapon();
+            Weapon dropped = null;
+            for (int i = 0; i < WeaponManager.PoolSize; i++)
+            {
+                if (WeaponManager.Instance.TryGetDropped(i, out Weapon candidate, out _, out _) && candidate.WeaponIndex == rifle && candidate.AiMaxRange == 7.5f) dropped = candidate;
+            }
+            Expect(droppedNow && WeaponManager.Instance.CountActive() == before + 1 && dropped != null, "상태를 가진 무기를 버렸는데 떨어진 무기에 그 상태가 없음");
+            if (dropped != null)
+            {
+                bool carried = dropped.TryGetStoredAmmo(1, out int carriedMagazine, out int carriedReserve);
+                Expect(dropped.Magazine == 12 && dropped.Reserve == 34 && dropped.AiMinRange == 1.5f && carried && carriedMagazine == freshMagazine - 1 && carriedReserve == freshReserve,
+                    $"떨어진 무기: 탄 {dropped.Magazine}/{dropped.Reserve}, 접어 둔 탄 {carriedMagazine}/{carriedReserve}, AI 거리 {dropped.AiMinRange}~{dropped.AiMaxRange}");
+
+                m_shooter.PickupWeapon(dropped);
+                held = m_shooter.CurrentWeapon;
+                Expect(held.WeaponIndex == rifle && held.Magazine == 12 && held.Reserve == 34 && held.AiMaxRange == 7.5f, $"주운 무기: 탄 {held.Magazine}/{held.Reserve}, AI 거리 {held.AiMaxRange} (기대 12/34, 7.5)");
+                // 주운 직후의 전환 대기가 끝난 뒤에 전환한다.
+                for (int tick = 0; tick < 60; tick++) m_shooter.TickWeapon();
+                m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchNext);
+                held = m_shooter.CurrentWeapon;
+                Expect(held.WeaponIndex == launcher && held.Magazine == freshMagazine - 1 && held.Reserve == freshReserve,
+                    $"주운 무기의 다른 묶음: 탄 {held.Magazine}/{held.Reserve} (기대 {freshMagazine - 1}/{freshReserve}: 버렸다 주워도 다시 차지 않는다)");
+            }
+
+            // 무기를 새로 받으면(종류 전환이 아니라) 접어 둔 탄이 없다.
+            m_shooter.SetWeapon(slot, rifle, 5, 5);
+            Expect(!m_shooter.CurrentWeapon.TryGetStoredAmmo(1, out _, out _) && m_shooter.CurrentWeapon.AiMaxRange == rifleData.aiMaxRange, "새로 받은 무기에 전 무기의 상태가 남아 있음");
+
+            rifleData.nextWeaponIndex = savedNext;
+            launcherData.previousWeaponIndex = savedPrevious;
+            launcherData.ammoGroup = savedGroup;
+            rifleData.switchTime = savedRifleSwitch;
+            launcherData.switchTime = savedLauncherSwitch;
+            WeaponManager.Instance.Clear();
+        }
+
+        /// <summary>
+        /// 궤적 조준(Bullet.SolveLaunchElevation): 계산한 각도로 실제 수류탄을 쏘면 목표를 지나는지. 거리와 높이 차를 바꿔 가며 본다.
+        /// 닿지 않는 거리는 닿지 않는다고 답해야 한다. 이 점검은 블록이 없는 공중에서 돌므로 탄은 수명이 다할 때까지 난다.
+        /// </summary>
+        private void CheckLaunchElevation()
+        {
+            if (!Reset()) { Expect(false, "궤적 조준: 준비 실패"); return; }
+
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            WeaponData grenade = parameter.weaponData[parameter.weaponGeneralData.grenadeWeaponIndex];
+            BulletData data = parameter.bulletData[grenade.bulletIndex];
+            float speed = grenade.bulletSpeed;
+            float speedPerTick = speed * SimClock.FrameTime;
+            int flightTicks = Mathf.RoundToInt(data.lifetime * SimClock.FrameRate) + 3;
+            // 수명이 다해 터질 때 주변 사람이 휘말리지 않게 멀리 치워 둔다.
+            for (int i = 0; i < m_targets.Count; i++) m_targets[i].Controller.Teleport(s_arena + new Vector3(500f + i * 10f, 0f, 0f));
+
+            float worst = 0f;
+            int solved = 0;
+            foreach ((float distance, float height) in new[] { (5f, 0f), (10f, 0f), (15f, 0f), (10f, 3f), (10f, -3f), (6f, 4f) })
+            {
+                if (!Bullet.SolveLaunchElevation(data, speed, distance, height, out float elevation))
+                {
+                    Expect(false, $"궤적 조준: 거리 {distance} m, 높이 {height} m 를 닿지 않는다고 답함");
+                    continue;
+                }
+                solved++;
+
+                // 정면(-Z)으로 그 각도만큼 위로 쏘고, 수평 거리를 지나는 순간의 높이를 잰다.
+                Vector3 origin = Eye;
+                Bullet bullet = BulletManager.Instance.Spawn(data, m_shooter, m_shooter.Team, 0, 0, origin, 0f, -elevation, speedPerTick, origin);
+                float crossing = float.NaN;
+                Vector3 previous = origin;
+                for (int tick = 0; tick < flightTicks && bullet != null && bullet.IsActive; tick++)
+                {
+                    BulletManager.Instance.SimTick();
+                    Vector3 now = bullet.Position;
+                    float before = origin.Z - previous.Z;
+                    float after = origin.Z - now.Z;
+                    if (float.IsNaN(crossing) && before < distance && after >= distance)
+                    {
+                        crossing = Mathf.Lerp(previous.Y, now.Y, (distance - before) / (after - before)) - origin.Y;
+                    }
+                    previous = now;
+                }
+                BulletManager.Instance.Clear();
+                float miss = float.IsNaN(crossing) ? float.MaxValue : Mathf.Abs(crossing - height);
+                worst = Mathf.Max(worst, miss);
+                Expect(miss < 0.2f, $"궤적 조준: 거리 {distance} m, 높이 {height} m 에 {elevation:0.0}° 로 쐈는데 그 거리에서의 높이가 {crossing:0.00} m (어긋남 {miss:0.00} m)");
+            }
+            Expect(!Bullet.SolveLaunchElevation(data, speed, 500f, 0f, out float farthest) && farthest > 10f && farthest < 60f,
+                $"궤적 조준: 닿지 않는 거리(500 m)를 닿는다고 답했거나 가장 멀리 가는 각도가 이상함 ({farthest:0.0}°)");
+            GD.Print($"궤적 조준: {solved}가지 목표에서 가장 큰 어긋남 {worst:0.000} m, 가장 멀리 가는 각도 {farthest:0.0}°");
         }
 
         /// <summary>

@@ -1060,9 +1060,9 @@ func bump(p, state):
 
         /// <summary>
         /// PD2 하나에 방어구·헬멧과 재정비 이벤트(30~35)를 눈으로 보는 시험용 구성을 더해 덮어쓴다 (mif2_check 의 --convert-official 로 만든 미션에 쓴다).
-        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 10000(플레이어, 방어구와 헬멧), 10001(방어구 입은 표적), 10002(맨몸 표적), 10003(근접 무기를 든 적), 무기 10002 와 10003(바닥에 놓는 것. 10003 이 근접 무기),
-        /// 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 미션 전용 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~14번(안내 문구).
-        /// 놓는 것: 정면에 표적 두 줄(방어구 입은 표적 뒤에 맨몸 표적 / 맨몸 표적 둘), 오른쪽에 Interact 자리 다섯(체력, 방어구, 헬멧, 쏘는 적 부르기, 근접 무기를 든 적 부르기).
+        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 10000(플레이어, 방어구와 헬멧), 10001(방어구 입은 표적), 10002(맨몸 표적), 10003(근접 무기를 든 적), 10004(유탄 발사기가 달린 소총을 든 적), 무기 10002 와 10003(바닥에 놓는 것. 10003 이 근접 무기),
+        /// 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 미션 전용 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~15번(안내 문구).
+        /// 놓는 것: 정면에 표적 두 줄(방어구 입은 표적 뒤에 맨몸 표적 / 맨몸 표적 둘), 오른쪽에 Interact 자리 여섯(체력, 방어구, 헬멧, 쏘는 적 부르기, 근접 무기를 든 적 부르기, 유탄 발사기를 쓰는 적 부르기).
         /// </summary>
         /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
         /// <returns>썼으면 true.</returns>
@@ -1072,7 +1072,7 @@ func bump(p, state):
             const int showVitals = 10000;
             // 더하는 포인트의 첫 식별번호, 표적의 식별번호, 에드온 번호.
             const int firstId = 30000, targetId = 9001, addonFirst = 10000;
-            const int playerInfo = 30900, armoredInfo = 30901, plainInfo = 30902, shooterInfo = 30903, knifeInfo = 30904;
+            const int playerInfo = 30900, armoredInfo = 30901, plainInfo = 30902, shooterInfo = 30903, knifeInfo = 30904, grenadierInfo = 30905;
             // 쏘는 적으로 쓰는 기본 사람 데이터의 번호와 표적의 팀.
             const int shooterData = 2, enemyTeam = 1;
             const float interactRadius = 1.5f;
@@ -1107,6 +1107,7 @@ func bump(p, state):
             Info(plainInfo, addonFirst + 2, enemyTeam);
             Info(shooterInfo, shooterData, enemyTeam);
             Info(knifeInfo, addonFirst + 3, enemyTeam);
+            Info(grenadierInfo, addonFirst + 4, enemyTeam);
             player.param1 = playerInfo;
 
             // 표적: 플레이어를 마주 보고 선다. 경로는 없다.
@@ -1161,6 +1162,7 @@ func bump(p, state):
             Station(8f, 12, addHelmet, 0, PD2File.FloatCell(60f), PD2File.FloatCell(120f));
             Station(12f, 13, spawnHuman, shooterInfo, targetId + 100, -1);
             Station(16f, 14, spawnHuman, knifeInfo, targetId + 200, -1);
+            Station(20f, 15, spawnHuman, grenadierInfo, targetId + 300, -1);
 
             if (!file.Write(full, out error))
             {

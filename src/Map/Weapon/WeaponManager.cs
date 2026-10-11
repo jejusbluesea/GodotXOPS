@@ -29,6 +29,8 @@ namespace GodotXOPS
         }
 
         private readonly Slot[] m_pool = new Slot[PoolSize];
+        // 종류와 탄 수만으로 놓는 무기(맵의 무기 포인트, 이벤트)를 만들 때 잠깐 쓰는 무기.
+        private static readonly Weapon s_template = new Weapon();
 
         // 원본 무기 처리 — 사람(10) 뒤, 총알(40) 앞.
         public int SimOrder => 30;
@@ -92,12 +94,27 @@ namespace GodotXOPS
         /// <returns>놓았으면 true. 풀이 가득 찼으면 false.</returns>
         public bool Spawn(int weaponIndex, int magazine, int reserve, Vector3 position, float yawDeg, Vector3 horizontalVelocity)
         {
+            s_template.Configure(weaponIndex, magazine, reserve, false);
+            return Spawn(s_template, position, yawDeg, horizontalVelocity);
+        }
+
+        /// <summary>
+        /// 사람이 들고 있던 무기를 떨어진 무기로 놓는다. 그 무기 한 자루의 상태(탄, 접어 둔 다른 묶음의 탄, AI 가 쓰는 거리)를 그대로 옮긴다.
+        /// 빈 자리는 앞에서부터 찾는다 (원본 AddWeaponIndex).
+        /// </summary>
+        /// <param name="source">놓을 무기. 상태를 복사하므로 부른 쪽의 무기는 그대로다.</param>
+        /// <param name="position">놓을 위치.</param>
+        /// <param name="yawDeg">모델 방향 yaw (도).</param>
+        /// <param name="horizontalVelocity">초기 수평 속도 (m/s).</param>
+        /// <returns>놓았으면 true. 풀이 가득 찼으면 false.</returns>
+        public bool Spawn(Weapon source, Vector3 position, float yawDeg, Vector3 horizontalVelocity)
+        {
             for (int i = 0; i < PoolSize; i++)
             {
                 Slot slot = m_pool[i];
                 if (slot.active) continue;
 
-                slot.weapon.Configure(weaponIndex, magazine, reserve, false);
+                slot.weapon.CopyFrom(source);
                 slot.active = true;
                 slot.falling = true;
                 slot.position = position;
@@ -253,7 +270,7 @@ namespace GodotXOPS
                     float dz = slot.position.Z - humanPosition.Z;
                     if (dx * dx + dz * dz >= radiusSq) continue;
 
-                    human.PickupWeapon(slot.weapon.WeaponIndex, slot.weapon.Magazine, slot.weapon.Reserve);
+                    human.PickupWeapon(slot.weapon);
                     slot.active = false;
                     slot.node.Visible = false;
                     break;

@@ -29,6 +29,10 @@ namespace GodotXOPS
 
         // 수류탄: 틱마다 속도에 곱하는 감쇠 (원본 object.cpp:3010-3026).
         private const float k_grenadeDrag = 0.98f;
+        // 궤적 조준(SolveLaunchElevation): 훑는 각도의 범위와 간격 (도), 좁혀 가는 횟수.
+        private const float k_arcScanLimit = 80f;
+        private const float k_arcScanStep = 2.5f;
+        private const int k_arcRefineSteps = 10;
         // 수류탄 반사 감속 = −각도 × 0.2546 + 0.7 (원본 object.cpp:3000). 정면 충돌(π/2)이면 0.3, 스치면 0.7.
         private const float k_reflectAngleCoef = 0.2546f;
         private const float k_reflectBaseCoef = 0.7f;
@@ -154,6 +158,103 @@ namespace GodotXOPS
 
             int lifeTicks = Mathf.Max(0, Mathf.RoundToInt(data.lifetime * SimClock.FrameRate));
             return (lifeTicks + 1) * speedPerTick + steps * k_substep;
+        }
+
+        /// <summary>
+        /// 중력을 받는 탄을 수평 거리와 높이 차가 주어진 점에 떨어뜨리려면 몇 도 위로 쏴야 하는지 구한다 (AI 의 궤적 조준).
+        /// TickGrenade 와 같은 계산(이동 → 감쇠 → 중력, 수명)으로 궤적을 돌려 본다. 감쇠가 있어 공식 하나로 풀리지 않으므로 각도를 훑은 뒤 좁혀 간다.
+        /// 블록과 튕김은 보지 않는다. 낮은 궤적과 높은 궤적 가운데 낮은 쪽을 고른다.
+        /// </summary>
+        /// <param name="data">탄환 데이터.</param>
+        /// <param name="bulletSpeed">탄속 (m/s, 무기 데이터의 값).</param>
+        /// <param name="horizontal">목표까지의 수평 거리 (m).</param>
+        /// <param name="height">목표의 높이 − 발사 위치의 높이 (m).</param>
+        /// <param name="elevationDeg">쏠 각도 (도, 위가 +). 닿지 않으면 가장 멀리 가는 각도.</param>
+        /// <returns>닿을 수 있으면 true.</returns>
+        public static bool SolveLaunchElevation(BulletData data, float bulletSpeed, float horizontal, float height, out float elevationDeg)
+        {
+            elevationDeg = 0f;
+            if (data == null || !(bulletSpeed > 0f) || !(horizontal > 0f)) return false;
+
+            float speedPerTick = bulletSpeed * SimClock.FrameTime;
+            bool previousOver = false;
+            float farthest = float.MinValue;
+            float farthestElevation = 0f;
+            for (float elevation = -k_arcScanLimit; elevation <= k_arcScanLimit; elevation += k_arcScanStep)
+            {
+                bool reached = SimulateArc(data, speedPerTick, elevation, horizontal, height, out float at, out float reach);
+                bool over = reached && at >= height;
+                if (over && (elevation <= -k_arcScanLimit || !previousOver))
+                {
+                    // 바로 앞의 각도에서는 못 미쳤고 이 각도에서는 넘겼다. 그 사이를 좁힌다.
+                    float low = Mathf.Max(-k_arcScanLimit, elevation - k_arcScanStep);
+                    float high = elevation;
+                    for (int i = 0; i < k_arcRefineSteps; i++)
+                    {
+                        float middle = (low + high) * 0.5f;
+                        if (SimulateArc(data, speedPerTick, middle, horizontal, height, out float middleAt, out _) && middleAt >= height) high = middle;
+                        else low = middle;
+                    }
+                    elevationDeg = high;
+                    return true;
+                }
+                previousOver = over;
+                if (reach > farthest)
+                {
+                    farthest = reach;
+                    farthestElevation = elevation;
+                }
+            }
+            elevationDeg = farthestElevation;
+            return false;
+        }
+
+        /// <summary>
+        /// 중력을 받는 탄의 궤적을 세로 평면에서 돌려 본다. TickGrenade 와 같은 순서다: 이동한 뒤 감쇠와 중력을 적용하고, 수명의 틱 수 + 1 번 움직인다.
+        /// </summary>
+        /// <param name="data">탄환 데이터.</param>
+        /// <param name="speedPerTick">틱당 이동 거리 (m).</param>
+        /// <param name="elevationDeg">쏘는 각도 (도, 위가 +).</param>
+        /// <param name="horizontal">높이를 잴 수평 거리 (m).</param>
+        /// <param name="height">목표의 높이 (발사 위치 기준, m). 닿지 못했을 때 어디까지 갔는지를 이 높이에서 잰다.</param>
+        /// <param name="heightAt">그 거리를 지날 때의 높이 (발사 위치 기준, m).</param>
+        /// <param name="reach">그 거리에 닿지 못했을 때, 목표의 높이로 내려오는 자리까지의 수평 거리 (m). 그 높이에 올라가지 못했으면 0.</param>
+        /// <returns>수명 안에 그 거리에 닿았으면 true.</returns>
+        private static bool SimulateArc(BulletData data, float speedPerTick, float elevationDeg, float horizontal, float height, out float heightAt, out float reach)
+        {
+            float radians = Mathf.DegToRad(elevationDeg);
+            float velocityX = Mathf.Cos(radians) * speedPerTick;
+            float velocityY = Mathf.Sin(radians) * speedPerTick;
+            float gravityPerTick = data.gravityScale * SimClock.FrameTime * SimClock.FrameTime;
+            int moves = Mathf.Max(0, Mathf.RoundToInt(data.lifetime * SimClock.FrameRate)) + 1;
+
+            float x = 0f;
+            float y = 0f;
+            for (int tick = 0; tick < moves; tick++)
+            {
+                float nextX = x + velocityX;
+                float nextY = y + velocityY;
+                if (nextX >= horizontal && nextX > x)
+                {
+                    heightAt = y + (nextY - y) * ((horizontal - x) / (nextX - x));
+                    reach = horizontal;
+                    return true;
+                }
+                // 목표의 높이 아래로 내려왔다. 이 궤적은 여기까지 간 것이다.
+                if (y >= height && nextY < height)
+                {
+                    heightAt = height;
+                    reach = x + (nextX - x) * ((y - height) / (y - nextY));
+                    return false;
+                }
+                x = nextX;
+                y = nextY;
+                velocityX *= k_grenadeDrag;
+                velocityY = (velocityY - gravityPerTick) * k_grenadeDrag;
+            }
+            heightAt = y;
+            reach = y >= height ? x : 0f;
+            return false;
         }
 
         /// <summary>

@@ -70,6 +70,9 @@ namespace GodotXOPS.Dev
             CheckLeadAim();
             CheckWeaponControl();
             CheckWeaponRange();
+            CheckWeaponGroups();
+            CheckWeaponPriority();
+            CheckBallisticAim();
             CheckGrenade();
             CheckZombie();
             CheckArmedZombie();
@@ -567,6 +570,251 @@ namespace GodotXOPS.Dev
             Expect(emptyShots > 0 && !holder.CurrentWeapon.IsNone && !holder.IsReloading && WeaponManager.Instance.CountActive() == dropped,
                 $"탄을 쓰지 않는 무기를 든 AI: {emptyShots}발, 무기를 {(holder.CurrentWeapon.IsNone ? "버림" : "들고 있음")} (기대 1발 이상, 들고 있음)");
             data.consumeAmmo = saved;
+        }
+
+        /// <summary>
+        /// 탄 묶음이 다른 종류를 가진 무기(총에 달린 유탄 발사기 등): 지금 종류의 탄이 떨어져도 다른 종류에 탄이 있으면 버리지 않고 그쪽으로 전환한다.
+        /// 전부 떨어졌을 때만 버린다. 값은 무기 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// 평상시의 AI 는 탄창이 비면 그 틱에 반드시 반응하므로 틱 한 번으로 본다.
+        /// </summary>
+        private void CheckWeaponGroups()
+        {
+            BeginPoints();
+            AddHuman(m_armedHuman, 1, 1, Arena(0f, 0f), 0f, 255);
+            if (!LoadPoints())
+            {
+                Expect(false, "탄 묶음 점검용 포인트 로드 실패");
+                return;
+            }
+
+            Human holder = MapLoader.SearchHuman(1);
+            DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
+            int rifle = holder.CurrentWeapon.WeaponIndex;
+            WeaponData rifleData = list[rifle];
+            int launcher = list.FindIndex(entry => entry != rifleData && entry.magazineSize > 0 && entry.pelletCount > 0);
+            if (launcher < 0) { Expect(false, "탄 묶음 점검: 두 번째 무기를 찾지 못함"); return; }
+            WeaponData launcherData = list[launcher];
+
+            int savedNext = rifleData.nextWeaponIndex, savedPrevious = launcherData.previousWeaponIndex, savedGroup = launcherData.ammoGroup;
+            int savedRiflePrevious = rifleData.previousWeaponIndex, savedLauncherNext = launcherData.nextWeaponIndex;
+            float savedRifleSwitch = rifleData.switchTime, savedLauncherSwitch = launcherData.switchTime;
+            rifleData.nextWeaponIndex = launcher;
+            rifleData.previousWeaponIndex = -1;
+            launcherData.previousWeaponIndex = rifle;
+            launcherData.nextWeaponIndex = -1;
+            launcherData.ammoGroup = 1;
+            rifleData.switchTime = 0f;
+            launcherData.switchTime = 0f;
+
+            int slot = holder.SelectWeapon;
+            int otherSlot = (slot + 1) % Human.WeaponSlotCount;
+            holder.SetWeapon(otherSlot, DataManager.Instance.WeaponParameterData.weaponGeneralData.noneWeaponIndex, 0, 0);
+            int dropped = WeaponManager.Instance.CountActive();
+
+            // 소총의 탄이 하나도 없다. 유탄 발사기는 아직 꺼낸 적이 없어 새로 채워진다.
+            holder.SetWeapon(slot, rifle, 0, 0);
+            holder.Brain.Tick(false);
+            Weapon held = holder.CurrentWeapon;
+            Expect(held.WeaponIndex == launcher && held.Magazine == launcherData.magazineSize && WeaponManager.Instance.CountActive() == dropped,
+                $"탄이 떨어진 소총: 든 무기 {held.WeaponIndex}, 탄 {held.Magazine}/{held.Reserve}, 떨어진 무기 {WeaponManager.Instance.CountActive() - dropped}개 (기대: 유탄 발사기 {launcher} 로 전환, 버리지 않음)");
+
+            // 유탄도 다 썼다. 접어 둔 소총의 탄도 0 이라 이제 버린다.
+            held.SetAmmo(0, 0);
+            holder.Brain.Tick(false);
+            Expect(holder.CurrentWeapon.IsNone && WeaponManager.Instance.CountActive() == dropped + 1, "모든 묶음의 탄이 떨어졌는데 무기를 버리지 않음");
+
+            // 반대 방향: 유탄이 떨어졌고 소총에 탄이 남아 있으면 소총으로 돌아온다.
+            holder.SetWeapon(slot, rifle, 5, 7);
+            holder.ApplyWeaponAction(HumanWeaponAction.SwitchNext);
+            holder.CurrentWeapon.SetAmmo(0, 0);
+            holder.Brain.Tick(false);
+            held = holder.CurrentWeapon;
+            Expect(held.WeaponIndex == rifle && held.Magazine == 5 && held.Reserve == 7, $"탄이 떨어진 유탄 발사기: 든 무기 {held.WeaponIndex}, 탄 {held.Magazine}/{held.Reserve} (기대: 소총 {rifle} 로 돌아옴, 5/7)");
+
+            // 묶음이 같으면(원본의 단발 ↔ 연발) 전처럼 버린다.
+            launcherData.ammoGroup = 0;
+            holder.SetWeapon(slot, rifle, 0, 0);
+            holder.Brain.Tick(false);
+            Expect(holder.CurrentWeapon.IsNone, "묶음이 같은 종류뿐인데 탄이 떨어진 무기를 버리지 않음");
+
+            rifleData.nextWeaponIndex = savedNext;
+            rifleData.previousWeaponIndex = savedRiflePrevious;
+            launcherData.previousWeaponIndex = savedPrevious;
+            launcherData.nextWeaponIndex = savedLauncherNext;
+            launcherData.ammoGroup = savedGroup;
+            rifleData.switchTime = savedRifleSwitch;
+            launcherData.switchTime = savedLauncherSwitch;
+            WeaponManager.Instance.Clear();
+        }
+
+        /// <summary>
+        /// 종류를 고르는 순서(aiPriority)와 쓰는 거리: 전투 중에 탄이 있고 거리가 맞는 종류 가운데 순서가 큰 것을 든다.
+        /// 거리 밖이면 다른 종류로 돌아가고, 순서가 음수인 종류는 다른 슬롯에 쓸 무기가 없을 때에야 든다.
+        /// 값은 무기 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// </summary>
+        private void CheckWeaponPriority()
+        {
+            BeginPoints();
+            AddHuman(m_armedHuman, 1, 1, Arena(0f, 0f), 0f, 255);
+            AddHuman(m_armedHuman, 0, 2, Arena(0f, -15f), 180f, 255);
+            if (!LoadPoints())
+            {
+                Expect(false, "종류 고르기 점검용 포인트 로드 실패");
+                return;
+            }
+
+            Human holder = MapLoader.SearchHuman(1);
+            Human enemy = MapLoader.SearchHuman(2);
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            DataList<WeaponData> list = parameter.weaponData;
+            int none = parameter.weaponGeneralData.noneWeaponIndex;
+            int rifle = holder.CurrentWeapon.WeaponIndex;
+            WeaponData rifleData = list[rifle];
+            int launcher = list.FindIndex(entry => entry != rifleData && entry.magazineSize > 0 && entry.pelletCount > 0 && entry.fireRate > 0f);
+            if (launcher < 0) { Expect(false, "종류 고르기 점검: 두 번째 무기를 찾지 못함"); return; }
+            WeaponData launcherData = list[launcher];
+
+            int savedNext = rifleData.nextWeaponIndex, savedRiflePrevious = rifleData.previousWeaponIndex;
+            int savedPrevious = launcherData.previousWeaponIndex, savedLauncherNext = launcherData.nextWeaponIndex;
+            int savedGroup = launcherData.ammoGroup, savedPriority = launcherData.aiPriority;
+            float savedMin = launcherData.aiMinRange, savedMax = launcherData.aiMaxRange;
+            float savedRifleSwitch = rifleData.switchTime, savedLauncherSwitch = launcherData.switchTime;
+            rifleData.nextWeaponIndex = launcher;
+            rifleData.previousWeaponIndex = -1;
+            launcherData.previousWeaponIndex = rifle;
+            launcherData.nextWeaponIndex = -1;
+            launcherData.ammoGroup = 1;
+            rifleData.switchTime = 0f;
+            launcherData.switchTime = 0f;
+            launcherData.aiPriority = 1;
+            launcherData.aiMinRange = 6f;
+            launcherData.aiMaxRange = 40f;
+
+            int slot = holder.SelectWeapon;
+            int otherSlot = (slot + 1) % Human.WeaponSlotCount;
+            holder.SetWeapon(otherSlot, none, 0, 0);
+            holder.SetWeapon(slot, rifle, 30, 60);
+
+            void EnterAction()
+            {
+                if (holder.Brain.Mode != AIBattleMode.Action) TickUntil(holder, 1200, () => holder.Brain.Mode == AIBattleMode.Action);
+            }
+
+            // 15 m: 순서가 높은 유탄 발사기로 바꾼다.
+            EnterAction();
+            TickUntil(holder, 30, () => holder.CurrentWeapon.WeaponIndex == launcher);
+            Expect(holder.Brain.Mode == AIBattleMode.Action && holder.CurrentWeapon.WeaponIndex == launcher, $"쓸 수 있는 거리(15 m)인데 순서가 높은 종류로 바꾸지 않음 (든 무기 {holder.CurrentWeapon.WeaponIndex}, 기대 {launcher})");
+
+            // 3 m: 유탄 발사기의 최소 거리 안이라 소총으로 돌아온다.
+            enemy.Controller.Teleport(Arena(0f, -3f));
+            EnterAction();
+            TickUntil(holder, 30, () => holder.CurrentWeapon.WeaponIndex == rifle);
+            Expect(holder.CurrentWeapon.WeaponIndex == rifle, $"최소 거리 안(3 m)인데 다른 종류로 돌아오지 않음 (든 무기 {holder.CurrentWeapon.WeaponIndex}, 기대 {rifle})");
+
+            // 다시 15 m 인데 유탄이 없다: 소총을 그대로 든다.
+            enemy.Controller.Teleport(Arena(0f, -15f));
+            EnterAction();
+            TickUntil(holder, 30, () => holder.CurrentWeapon.WeaponIndex == launcher);
+            holder.CurrentWeapon.SetAmmo(0, 0);
+            TickUntil(holder, 60, () => holder.CurrentWeapon.WeaponIndex == rifle);
+            int stayed = 0;
+            for (int tick = 0; tick < 60; tick++)
+            {
+                TickAI(holder);
+                if (holder.CurrentWeapon.WeaponIndex == rifle) stayed++;
+            }
+            Expect(stayed == 60 && !holder.CurrentWeapon.IsNone, $"순서가 높은 종류의 탄이 떨어졌는데 다른 종류에 머물지 않음 (60틱 가운데 {stayed}틱)");
+
+            // 순서가 음수: 탄이 있어도 먼저 들지 않는다.
+            launcherData.aiPriority = -1;
+            holder.SetWeapon(slot, rifle, 30, 60);
+            EnterAction();
+            stayed = 0;
+            for (int tick = 0; tick < 60; tick++)
+            {
+                TickAI(holder);
+                if (holder.CurrentWeapon.WeaponIndex == rifle || holder.CurrentWeapon.IsNone) stayed++;
+            }
+            Expect(stayed == 60, $"순서가 음수인 종류를 먼저 듦 (60틱 가운데 소총을 든 틱 {stayed})");
+
+            // 소총의 탄이 떨어졌고 다른 슬롯에 쓸 무기가 있다: 유탄(음수)이 아니라 그 슬롯으로 넘어가고, 이 무기는 버리지 않는다.
+            int dropped = WeaponManager.Instance.CountActive();
+            holder.SetWeapon(otherSlot, rifle, 30, 60);
+            holder.SetWeapon(slot, rifle, 0, 0);
+            EnterAction();
+            TickUntil(holder, 400, () => holder.SelectWeapon == otherSlot);
+            Expect(holder.SelectWeapon == otherSlot && holder.GetWeapon(slot).WeaponIndex == rifle && WeaponManager.Instance.CountActive() == dropped,
+                $"음수인 종류의 탄만 남은 무기: 고른 슬롯 {holder.SelectWeapon}, 그 무기 {holder.GetWeapon(slot).WeaponIndex}, 떨어진 무기 {WeaponManager.Instance.CountActive() - dropped}개 (기대: 슬롯 {otherSlot} 로 넘어가고 버리지 않음)");
+
+            // 다른 슬롯의 무기도 없어지면 돌아와서 음수인 종류를 쓴다.
+            holder.SetWeapon(otherSlot, none, 0, 0);
+            EnterAction();
+            TickUntil(holder, 600, () => holder.SelectWeapon == slot && holder.CurrentWeapon.WeaponIndex == launcher);
+            Expect(holder.SelectWeapon == slot && holder.CurrentWeapon.WeaponIndex == launcher, $"다른 슬롯에 쓸 무기가 없는데 음수인 종류를 쓰지 않음 (슬롯 {holder.SelectWeapon}, 든 무기 {holder.CurrentWeapon.WeaponIndex})");
+
+            rifleData.nextWeaponIndex = savedNext;
+            rifleData.previousWeaponIndex = savedRiflePrevious;
+            launcherData.previousWeaponIndex = savedPrevious;
+            launcherData.nextWeaponIndex = savedLauncherNext;
+            launcherData.ammoGroup = savedGroup;
+            launcherData.aiPriority = savedPriority;
+            launcherData.aiMinRange = savedMin;
+            launcherData.aiMaxRange = savedMax;
+            rifleData.switchTime = savedRifleSwitch;
+            launcherData.switchTime = savedLauncherSwitch;
+            BulletManager.Instance.Clear();
+            WeaponManager.Instance.Clear();
+        }
+
+        /// <summary>
+        /// 궤적 조준(aiBallisticAim): 켠 무기는 수류탄이 적에게 떨어지는 각도로 겨누고 던진다. 끈 무기(기본 수류탄)는 원본의 어림 규칙 그대로라 각도가 다르다.
+        /// 던지는 순간의 pitch 를 계산한 각도와 견준다. 값은 무기 데이터의 것이라 점검하는 동안만 바꿨다가 되돌린다.
+        /// </summary>
+        private void CheckBallisticAim()
+        {
+            const float distance = 12f;
+
+            WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
+            int grenadeIndex = parameter.weaponGeneralData.grenadeWeaponIndex;
+            WeaponData grenade = parameter.weaponData[grenadeIndex];
+            BulletData bullet = parameter.bulletData[grenade.bulletIndex];
+            bool saved = grenade.aiBallisticAim;
+
+            // 수류탄을 든 채 전투에 들어가 처음 던지는 순간의 pitch 를 돌려준다. 던지지 않았으면 NaN.
+            float ThrowPitch(bool ballistic)
+            {
+                grenade.aiBallisticAim = ballistic;
+                BeginPoints();
+                AddHuman(m_armedHuman, 1, 1, Arena(0f, 0f), 0f, 255);
+                AddHuman(m_armedHuman, 0, 2, Arena(0f, -distance), 180f, 255);
+                if (!LoadPoints()) return float.NaN;
+
+                Human thrower = MapLoader.SearchHuman(1);
+                thrower.SetWeapon(thrower.SelectWeapon, grenadeIndex);
+                int before = BulletManager.SpawnCount;
+                for (int tick = 0; tick < 1500; tick++)
+                {
+                    float pitch = thrower.Controller.Pitch;
+                    TickAI(thrower);
+                    if (BulletManager.SpawnCount > before)
+                    {
+                        BulletManager.Instance.Clear();
+                        return pitch;
+                    }
+                }
+                return float.NaN;
+            }
+
+            bool reachable = Bullet.SolveLaunchElevation(bullet, grenade.bulletSpeed, distance, 0f, out float elevation);
+            float ballisticPitch = ThrowPitch(true);
+            float originalPitch = ThrowPitch(false);
+            grenade.aiBallisticAim = saved;
+
+            // AI 는 조준이 허용각 안에 들면 던지므로 계산한 각도와 몇 도는 어긋난다.
+            Expect(reachable && !float.IsNaN(ballisticPitch) && Mathf.Abs(-ballisticPitch - elevation) < 8f,
+                $"궤적 조준을 켠 수류탄: 던진 각도 {-ballisticPitch:0.0}° (계산한 각도 {elevation:0.0}°, 기대: 8° 안)");
+            Expect(!float.IsNaN(originalPitch), "궤적 조준을 끈 수류탄을 던지지 않음");
+            GD.Print($"궤적 조준: {distance} m 의 적에게 계산한 각도 {elevation:0.0}°, 켰을 때 던진 각도 {-ballisticPitch:0.0}°, 껐을 때(원본 규칙) {-originalPitch:0.0}°");
         }
 
         /// <summary>

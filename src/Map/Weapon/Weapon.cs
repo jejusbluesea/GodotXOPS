@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Godot;
 
 namespace GodotXOPS
@@ -24,6 +25,17 @@ namespace GodotXOPS
         private int m_reserve;
         // 지난 재장전 뒤에 쏜 발 수. 재장전할 때 탄피를 내는 무기(ShellEjectMode.OnReload)가 몇 개를 낼지 정하는 데 쓴다.
         private int m_spentShells;
+        // 지금 쓰지 않는 묶음(ammoGroup)의 탄. 종류 전환으로 다른 묶음의 무기가 됐을 때 접어 둔 것이다. 그런 전환을 한 적이 없으면 null.
+        private Dictionary<int, StoredAmmo> m_storedAmmo;
+
+        /// <summary>
+        /// 접어 둔 한 묶음의 탄.
+        /// </summary>
+        private struct StoredAmmo
+        {
+            public int magazine;
+            public int reserve;
+        }
 
         public int WeaponIndex => m_weaponIndex;
         public WeaponData Data => m_data;
@@ -40,6 +52,8 @@ namespace GodotXOPS
         // AI 가 이 무기를 쓰는 거리 (m, 0 이면 제한 없음). 처음 값은 무기 데이터의 것이고 이 한 자루의 값이다.
         public float AiMaxRange { get; private set; }
         public float AiMinRange { get; private set; }
+        // AI 가 지금 종류를 고르는 순서 (WeaponData.aiPriority). 처음 값은 무기 데이터의 것이고 이 한 자루의 값이다.
+        public int AiPriority { get; private set; }
         // 맨손 여부. 원본에서 weapon[selectweapon] == NULL 인 상태에 해당한다.
         public bool IsNone => m_weaponIndex == DataManager.Instance.WeaponParameterData.weaponGeneralData.noneWeaponIndex;
 
@@ -51,6 +65,122 @@ namespace GodotXOPS
         /// <param name="reserve">예비 탄. 음수면 장탄수 × (기본 배수 − 1).</param>
         /// <param name="clampMagazine">true 면 장전된 탄을 장탄수 이하로 자른다. 치트 무기 변경처럼 탄약을 그대로 넘길 때는 false.</param>
         public void Configure(int weaponIndex, int magazine = -1, int reserve = -1, bool clampMagazine = true)
+        {
+            ApplyType(weaponIndex);
+            // 새 무기다. 접어 둔 다른 묶음의 탄은 없다.
+            m_storedAmmo = null;
+
+            int magazineSize = m_data.magazineSize;
+            if (magazine < 0) magazine = magazineSize;
+            if (reserve < 0) reserve = magazineSize * (DefaultAutoBulletMultiplier - 1);
+            SetLoadedAmmo(clampMagazine ? Mathf.Clamp(magazine, 0, magazineSize) : magazine, reserve);
+        }
+
+        /// <summary>
+        /// 같은 무기의 종류만 바꾼다 (Z / X 의 종류 전환). 이 한 자루가 갖고 있던 상태는 남는다.
+        /// 바꿀 종류의 탄 묶음(ammoGroup)이 지금과 같으면 탄을 그대로 넘긴다 (원본 human::ChangeWeaponID: 단발 ↔ 연발).
+        /// 다르면 지금 탄을 접어 두고 그 묶음의 탄을 꺼낸다. 그 묶음을 처음 쓰는 것이면 그 종류의 새 무기처럼 채운다.
+        /// </summary>
+        /// <param name="weaponIndex">바꿀 무기 인덱스. 범위 밖이면 맨손.</param>
+        /// <param name="freshReserve">그 묶음을 처음 쓸 때 줄 예비 탄 (장탄수 × (사람 종류의 배수 − 1)).</param>
+        public void SwitchType(int weaponIndex, int freshReserve)
+        {
+            int oldGroup = m_data.ammoGroup;
+            int magazine = m_magazine;
+            int reserve = m_reserve;
+
+            ApplyType(weaponIndex);
+
+            int newGroup = m_data.ammoGroup;
+            if (newGroup != oldGroup)
+            {
+                m_storedAmmo ??= new Dictionary<int, StoredAmmo>();
+                m_storedAmmo[oldGroup] = new StoredAmmo { magazine = magazine, reserve = reserve };
+                if (m_storedAmmo.Remove(newGroup, out StoredAmmo stored))
+                {
+                    magazine = stored.magazine;
+                    reserve = stored.reserve;
+                }
+                else
+                {
+                    magazine = m_data.magazineSize;
+                    reserve = Mathf.Max(0, freshReserve);
+                }
+            }
+            SetLoadedAmmo(magazine, reserve);
+        }
+
+        /// <summary>
+        /// 다른 무기의 상태를 통째로 옮겨 온다 (종류, 탄, 접어 둔 다른 묶음의 탄, AI 가 쓰는 거리). 버린 무기를 맵에 놓을 때와 주울 때 쓴다:
+        /// 무기 한 자루가 갖는 상태는 버렸다 주워도 그대로여야 한다.
+        /// </summary>
+        /// <param name="source">옮겨 올 무기.</param>
+        public void CopyFrom(Weapon source)
+        {
+            m_weaponIndex = source.m_weaponIndex;
+            m_data = source.m_data;
+            m_modelData = source.m_modelData;
+            m_magazine = source.m_magazine;
+            m_reserve = source.m_reserve;
+            m_spentShells = source.m_spentShells;
+            m_storedAmmo = source.m_storedAmmo != null ? new Dictionary<int, StoredAmmo>(source.m_storedAmmo) : null;
+            AiMinRange = source.AiMinRange;
+            AiMaxRange = source.AiMaxRange;
+            AiPriority = source.AiPriority;
+        }
+
+        /// <summary>
+        /// 접어 둔 다른 묶음의 탄을 읽는다. 지금 쓰는 묶음은 Magazine / Reserve 다.
+        /// </summary>
+        /// <param name="group">묶음 번호 (WeaponData.ammoGroup).</param>
+        /// <param name="magazine">장전된 탄.</param>
+        /// <param name="reserve">예비 탄.</param>
+        /// <returns>그 묶음의 탄을 접어 둔 것이 있으면 true.</returns>
+        public bool TryGetStoredAmmo(int group, out int magazine, out int reserve)
+        {
+            magazine = 0;
+            reserve = 0;
+            if (m_storedAmmo == null || !m_storedAmmo.TryGetValue(group, out StoredAmmo stored)) return false;
+
+            magazine = stored.magazine;
+            reserve = stored.reserve;
+            return true;
+        }
+
+        /// <summary>
+        /// 이 무기를 그 종류로 전환하면 쓸 탄이 있는지 본다 (Z / X 로 이어진 다른 종류를 AI 가 고를 때 쓴다).
+        /// 탄을 쓰지 않는 종류는 늘 있다. 지금과 같은 묶음이면 지금 탄, 접어 둔 묶음이면 그 탄, 아직 꺼낸 적 없는 묶음이면 새로 채워질 탄을 본다.
+        /// </summary>
+        /// <param name="weaponIndex">전환할 무기 인덱스.</param>
+        /// <returns>쓸 탄이 있으면 true. 없는 번호면 false.</returns>
+        public bool TypeHasAmmo(int weaponIndex)
+        {
+            DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
+            if (!list.Has(weaponIndex)) return false;
+
+            WeaponData data = list[weaponIndex];
+            if (data.pelletCount <= 0) return false;
+            if (!data.consumeAmmo) return true;
+            if (data.ammoGroup == m_data.ammoGroup) return m_magazine + m_reserve > 0;
+            if (TryGetStoredAmmo(data.ammoGroup, out int magazine, out int reserve)) return magazine + reserve > 0;
+            return data.magazineSize > 0;
+        }
+
+        /// <summary>
+        /// 지금 쓰는 묶음의 탄을 직접 정한다. 무기의 다른 상태는 그대로다.
+        /// </summary>
+        /// <param name="magazine">장전된 탄 (0 이상).</param>
+        /// <param name="reserve">예비 탄 (0 이상).</param>
+        public void SetAmmo(int magazine, int reserve)
+        {
+            SetLoadedAmmo(Mathf.Max(0, magazine), Mathf.Max(0, reserve));
+        }
+
+        /// <summary>
+        /// 무기 종류와 그 종류의 데이터를 정한다. 탄은 건드리지 않는다. AI 가 쓰는 거리는 그 종류의 데이터 값으로 돌아간다.
+        /// </summary>
+        /// <param name="weaponIndex">무기 인덱스. 범위 밖이면 맨손.</param>
+        private void ApplyType(int weaponIndex)
         {
             WeaponParameterData parameter = DataManager.Instance.WeaponParameterData;
             if (!parameter.weaponData.Has(weaponIndex))
@@ -64,13 +194,29 @@ namespace GodotXOPS
             int modelIndex = m_data.modelIndex;
             m_modelData = parameter.weaponModelData.Has(modelIndex) ? parameter.weaponModelData[modelIndex] : null;
             SetAiRange(m_data.aiMinRange, m_data.aiMaxRange);
+            AiPriority = m_data.aiPriority;
+        }
 
-            int magazineSize = m_data.magazineSize;
-            if (magazine < 0) magazine = magazineSize;
-            if (reserve < 0) reserve = magazineSize * (DefaultAutoBulletMultiplier - 1);
-            m_magazine = clampMagazine ? Mathf.Clamp(magazine, 0, magazineSize) : magazine;
+        /// <summary>
+        /// AI 가 지금 종류를 고르는 순서를 정한다. 종류를 (다시) 설정하거나 전환하면 무기 데이터의 값으로 돌아간다.
+        /// </summary>
+        /// <param name="priority">순서. 클수록 먼저 고른다. 음수면 다른 슬롯의 무기보다 뒤다.</param>
+        public void SetAiPriority(int priority)
+        {
+            AiPriority = priority;
+        }
+
+        /// <summary>
+        /// 지금 쓰는 묶음의 탄을 정한다.
+        /// </summary>
+        /// <param name="magazine">장전된 탄.</param>
+        /// <param name="reserve">예비 탄.</param>
+        private void SetLoadedAmmo(int magazine, int reserve)
+        {
+            m_magazine = magazine;
             m_reserve = reserve;
             // 탄창에서 비어 있는 만큼을 쏜 것으로 친다 (주운 무기, 종류를 바꾼 무기).
+            int magazineSize = m_data.magazineSize;
             m_spentShells = Mathf.Clamp(magazineSize - m_magazine, 0, magazineSize);
         }
 

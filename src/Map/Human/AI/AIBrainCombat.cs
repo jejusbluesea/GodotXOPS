@@ -49,7 +49,7 @@ namespace GodotXOPS
 
         /// <summary>
         /// 적을 겨누고 쏜다. 원본 AIcontrol::Action (ai.cpp:559-838).
-        /// 총은 적의 이동을 앞질러 겨누고, 수류탄은 거리에 따라 위를 겨눈다. 조준 오차가 허용각 안에 들면 AI 레벨의 확률로 발사한다.
+        /// 총은 적의 이동을 앞질러 겨누고, 수류탄은 거리에 따라 위를 겨눈다. 궤적 조준을 켠 무기(aiBallisticAim)는 중력을 받는 탄이 적에게 떨어지는 각도로 겨눈다. 조준 오차가 허용각 안에 들면 AI 레벨의 확률로 발사한다.
         /// 맨손이면 쏘지 않고, 적이 무장했으면 팔을 든다 (항복). 좀비는 쏘지 않고 다가가 근접 공격한다.
         /// 든 무기에 AI 가 쓰는 거리가 적혀 있으면(원본에 없다. 0 이면 이 분기를 타지 않는다) 그 밖에서는 쏘지 않는다:
         /// 멀면 적을 보고 달려가고, 가까우면 물러난다. 그동안에는 전투 중의 무작위 회피 이동을 하지 않는다.
@@ -72,7 +72,15 @@ namespace GodotXOPS
             if (!zombie)
             {
                 float horizontal = new Vector2(enemyPosition.X - position.X, enemyPosition.Z - position.Z).Length();
-                if (weapon.WeaponIndex == DataManager.Instance.WeaponParameterData.weaponGeneralData.grenadeWeaponIndex)
+                WeaponParameterData weaponParameter = DataManager.Instance.WeaponParameterData;
+                BulletData arcBullet = weapon.Data.aiBallisticAim && weaponParameter.bulletData.Has(weapon.Data.bulletIndex) ? weaponParameter.bulletData[weapon.Data.bulletIndex] : null;
+                if (arcBullet != null && arcBullet.useGravity && horizontal > 0f)
+                {
+                    // 궤적을 계산해서 겨눈다 (원본에 없다. 무기 데이터에서 켠 무기만): 적의 눈에 떨어지는 각도만큼 위의 점을 겨눈다. 닿지 않으면 가장 멀리 가는 각도다.
+                    Bullet.SolveLaunchElevation(arcBullet, weapon.Data.bulletSpeed, horizontal, target.Y - eye.Y, out float elevation);
+                    target.Y = eye.Y + horizontal * Mathf.Tan(Mathf.DegToRad(elevation));
+                }
+                else if (weapon.WeaponIndex == weaponParameter.weaponGeneralData.grenadeWeaponIndex)
                 {
                     target.Y += (horizontal - ai.aiShortAttackDist) * (m_longAttack ? k_grenadeRaiseLong : k_grenadeRaiseShort);
                 }

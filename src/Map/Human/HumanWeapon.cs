@@ -323,6 +323,7 @@ namespace GodotXOPS
 
         /// <summary>
         /// 같은 슬롯 안에서 무기 종류를 바꾼다 (단발 ↔ 연발 등). 탄약은 그대로 넘긴다. 원본 human::ChangeWeaponID (object.cpp:516-580).
+        /// 두 종류의 탄 묶음(ammoGroup)이 다르면 탄을 넘기지 않고 묶음마다 따로 둔다 (Weapon.SwitchType. 원본에 없다).
         /// </summary>
         /// <param name="targetIndex">바꿀 무기 인덱스. 음수면 무시.</param>
         private void SwitchWeaponID(int targetIndex)
@@ -339,7 +340,10 @@ namespace GodotXOPS
             int switchTicks = Mathf.RoundToInt(weapon.Data.switchTime * SimClock.FrameRate);
             if (switchTicks > 0 && m_reloadTicks > 0) return;
 
-            SetWeapon(m_selectWeapon, targetIndex, weapon.Magazine, weapon.Reserve, false);
+            // 무기를 새로 설정하지 않고 종류만 바꾼다: 이 한 자루의 상태(접어 둔 다른 묶음의 탄)가 남아야 한다.
+            weapon.SwitchType(targetIndex, InitialReserve(targetIndex));
+            RebuildWeaponVisual(m_selectWeapon);
+            ApplyActiveWeaponVisual();
 
             // 전환에 시간이 걸리거나 새 무기에 스코프가 없으면 스코프를 푼다. 즉시 전환이고 스코프가 있으면 새 무기의 스코프로 이어진다.
             if (m_scoping && (switchTicks > 0 || CurrentScopeData == null)) DisableScope();
@@ -369,15 +373,15 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 떨어진 무기를 현재 슬롯(맨손)에 든다. 탄약은 그대로 넘겨받고, 슬롯 전환과 같은 시간 동안 팔을 올린다.
-        /// 원본 human::PickupWeapon (object.cpp:422-449).
+        /// 떨어진 무기를 현재 슬롯(맨손)에 든다. 탄약과 그 무기 한 자루의 상태(접어 둔 다른 묶음의 탄, AI 가 쓰는 거리)를 그대로 넘겨받고,
+        /// 슬롯 전환과 같은 시간 동안 팔을 올린다. 원본 human::PickupWeapon (object.cpp:422-449).
         /// </summary>
-        /// <param name="weaponIndex">주운 무기 번호.</param>
-        /// <param name="magazine">장전된 탄.</param>
-        /// <param name="reserve">예비 탄.</param>
-        public void PickupWeapon(int weaponIndex, int magazine, int reserve)
+        /// <param name="source">주운 무기.</param>
+        public void PickupWeapon(Weapon source)
         {
-            SetWeapon(m_selectWeapon, weaponIndex, magazine, reserve, false);
+            m_weapons[m_selectWeapon].CopyFrom(source);
+            RebuildWeaponVisual(m_selectWeapon);
+            ApplyActiveWeaponVisual();
 
             HumanGeneralData general = DataManager.Instance.HumanParameterData.humanGeneralData;
             m_humanVisual.BeginArmSlowReaction(general.armAngleReloading);
@@ -396,7 +400,7 @@ namespace GodotXOPS
 
             Vector3 direction = Coord.YawForward(yawDeg);
             Vector3 position = m_controller.Position + direction * k_dropForwardOffset + Vector3.Up * k_dropHeight;
-            WeaponManager.Instance.Spawn(weapon.WeaponIndex, weapon.Magazine, weapon.Reserve, position, yawDeg + 180f, direction * speed);
+            WeaponManager.Instance.Spawn(weapon, position, yawDeg + 180f, direction * speed);
         }
 
         /// <summary>
@@ -461,6 +465,20 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 이 사람이 그 무기를 새로 받을 때의 예비 탄. 원본 AddVisualWeaponIndex: 전체 탄 = 장탄수 × TOTAL_WEAPON_AUTOBULLET, 그중 장탄수만큼이 장전돼 있다.
+        /// 배수는 사람 종류의 autoBulletMultiplier 다.
+        /// </summary>
+        /// <param name="weaponIndex">무기 인덱스.</param>
+        /// <returns>예비 탄 수.</returns>
+        private int InitialReserve(int weaponIndex)
+        {
+            DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
+            int magazineSize = list.Has(weaponIndex) ? list[weaponIndex].magazineSize : 0;
+            int multiplier = m_humanTypeData != null ? m_humanTypeData.autoBulletMultiplier : Weapon.DefaultAutoBulletMultiplier;
+            return magazineSize * Mathf.Max(0, multiplier - 1);
+        }
+
+        /// <summary>
         /// 슬롯의 무기를 지정한 종류와 탄약으로 바꾸고 모델을 다시 만든다. 무기 줍기, 종류 전환, 치트, 점검 도구가 쓴다.
         /// </summary>
         /// <param name="slot">슬롯 번호 (0 또는 1).</param>
@@ -472,14 +490,7 @@ namespace GodotXOPS
         {
             if (slot < 0 || slot >= WeaponSlotCount) return;
 
-            if (reserve < 0)
-            {
-                // 원본 AddVisualWeaponIndex: 전체 탄 = 장탄수 × TOTAL_WEAPON_AUTOBULLET, 그중 장탄수만큼이 장전돼 있다.
-                DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
-                int magazineSize = list.Has(weaponIndex) ? list[weaponIndex].magazineSize : 0;
-                int multiplier = m_humanTypeData != null ? m_humanTypeData.autoBulletMultiplier : Weapon.DefaultAutoBulletMultiplier;
-                reserve = magazineSize * Mathf.Max(0, multiplier - 1);
-            }
+            if (reserve < 0) reserve = InitialReserve(weaponIndex);
             m_weapons[slot].Configure(weaponIndex, magazine, reserve, clampMagazine);
 
             RebuildWeaponVisual(slot);

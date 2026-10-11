@@ -19,10 +19,18 @@ namespace GodotXOPS
         public float helmetIgnore;
         // 쏠 때 탄을 쓰는지. false 면 탄창이 줄지 않고 재장전도 하지 않으며, 탄이 없어도 쏜다 (근접 무기). 원본의 무기는 전부 true 다.
         public bool consumeAmmo = true;
+        // 탄의 묶음 번호. 종류 전환(Z / X)으로 넘어가는 두 무기의 번호가 같으면 탄을 그대로 넘기고(원본: 단발 ↔ 연발),
+        // 다르면 넘기지 않고 그 무기 한 자루가 묶음마다 탄을 따로 갖는다 (소총 ↔ 총에 달린 유탄 발사기). 원본의 무기는 전부 0 이다.
+        public int ammoGroup;
         // AI 가 이 무기를 쓰는 거리 (m). 적이 aiMaxRange 보다 멀면 쏘지 않고 다가가고, aiMinRange 보다 가까우면 쏘지 않고 물러난다. 0 이면 그 제한이 없다 (원본과 같다).
         // 무기 하나하나가 이 값을 처음 값으로 갖고, 스크립트가 그 무기의 값을 바꿀 수 있다.
         public float aiMaxRange;
         public float aiMinRange;
+        // AI 가 종류 전환(Z / X)으로 이어진 종류들 가운데 무엇을 들지 정하는 순서. 탄이 있고 지금 거리에서 쓸 수 있는 것 중 값이 큰 것을 든다.
+        // "다른 슬롯의 무기로 바꾸기"가 0 이다: 음수인 종류는 다른 슬롯에 쓸 무기가 없을 때에야 쓴다. 원본의 무기는 전부 0 이다.
+        public int aiPriority;
+        // 중력을 받는 탄(수류탄 등)을 AI 가 궤적을 계산해서 겨누는지. false 면 원본처럼 겨눈다 (기본 수류탄은 거리에 비례해 조금 위, 그 밖에는 직선).
+        public bool aiBallisticAim;
         public int bulletIndex;
         public float fireRate;
         public float bulletSpeed;
