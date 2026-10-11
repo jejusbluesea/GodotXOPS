@@ -7,6 +7,11 @@ namespace GodotXOPS
     // GameBridge 의 조회 담당 partial: 미션 목록, 브리핑, 통계, 버전·크레딧, 텍스처.
     public partial class GameBridge
     {
+        // 스프라이트 글꼴의 그림 (16 × 16 칸, 글자 코드가 칸 번호).
+        private const string k_fontPath = "data/char.dds";
+        // 읽지 못한 미션 글꼴의 경로. 같은 경고를 글자마다 되풀이하지 않으려고 기억한다.
+        private string m_fontOverrideFailed = string.Empty;
+
         /// <summary>
         /// 공식 미션 수.
         /// </summary>
@@ -99,6 +104,25 @@ namespace GodotXOPS
         {
             string path = slot == 0 ? MapLoader.Instance.MissionImage0 : MapLoader.Instance.MissionImage1;
             return string.IsNullOrEmpty(path) ? null : ImageLoader.LoadTexture(path);
+        }
+
+        /// <summary>
+        /// 스프라이트 글자가 지금 써야 하는 글꼴 그림. 로드된 미션이 글꼴 그림을 적어 두었으면(MIF2 의 fontImageOverridePath) 그것이고, 아니면 data/char.dds 다.
+        /// 미션의 그림을 읽지 못하면 경고를 한 번 남기고 평소의 글꼴을 쓴다. 화면이 글자를 만들 때마다 부르므로 미션 정보가 바뀌면 다음 화면부터 따라간다.
+        /// </summary>
+        /// <returns>글꼴 텍스처. 평소의 글꼴도 읽지 못하면 null.</returns>
+        public Texture2D FontTexture()
+        {
+            string path = MapLoader.Instance.MissionFontImagePath;
+            if (!string.IsNullOrEmpty(path) && path != m_fontOverrideFailed)
+            {
+                Texture2D texture = LoadTexture(path);
+                if (texture != null) return texture;
+
+                m_fontOverrideFailed = path;
+                Debugger.LogWarning($"Mission font image could not be read: {path}. Using {k_fontPath}.", nameof(GameBridge));
+            }
+            return LoadTexture(k_fontPath);
         }
 
         /// <summary>

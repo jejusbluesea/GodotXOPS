@@ -18,8 +18,6 @@ const BOTTOM_RIGHT := Vector2(1, 1)
 # 펼침 방식. 펼쳐지는 축의 크기는 "부모 크기 + 값" 이다 (0 이면 꽉 채움, 음수면 안쪽으로 줄임).
 enum Stretch { TOP, MIDDLE, BOTTOM, LEFT, CENTER, RIGHT, FULL }
 
-const FONT_PATH := "data/char.dds"
-
 static var _os_font: Font
 
 
@@ -37,8 +35,8 @@ static func layer(parent: Node, order: int, scaled: bool) -> XopsLayer:
 ## 스프라이트 글자를 만든다. pivot 은 부모 안의 기준점, align 은 그 점에 대한 글자 정렬이다.
 static func text(parent: Control, pivot: Vector2, align: Vector2, value: String,
 		x: float, y: float, w: float, h: float, color: Color) -> XopsText:
-	if XopsText.font_texture == null:
-		XopsText.font_texture = Game.LoadTexture(FONT_PATH)
+	# 미션이 글꼴 그림을 바꿔 끼울 수 있으므로 글자를 만들 때마다 지금의 글꼴을 묻는다 (같은 그림이면 같은 텍스처가 온다).
+	XopsText.font_texture = Game.FontTexture()
 
 	var node := XopsText.new()
 	node.text = value

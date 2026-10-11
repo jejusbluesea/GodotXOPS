@@ -108,7 +108,7 @@ namespace GodotXOPS.Dev
 
         /// <summary>
         /// 미션이 들고 오는 화면 스크립트와 이미지 목록: MIF2 에 적은 스크립트가 설치된 등록보다 먼저 올라오고, 올리지 못하면 설치된 것으로 넘어가지 않으며,
-        /// 미션이 바꾸지 않는 화면은 평소대로이고, 이미지는 미션의 목록(10000 부터)의 번호로 읽힌다.
+        /// 미션이 바꾸지 않는 화면은 평소대로이고, 이미지는 미션의 목록(10000 부터)의 번호로 읽힌다. 미션의 글꼴 그림(fontImageOverridePath)도 여기서 본다.
         /// </summary>
         /// <param name="game">창구.</param>
         /// <param name="folder">점검용 파일을 쓰는 폴더 (exe 폴더 기준).</param>
@@ -149,9 +149,21 @@ namespace GodotXOPS.Dev
             Expect(game.UiScriptLoad("maingame") == null, "AllowUiScript 를 껐는데 미션의 화면 스크립트가 올라옴");
             config.SetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, saved);
 
+            // 미션의 글꼴 그림: 적어 둔 미션에서는 그 그림, 읽지 못하면 평소의 글꼴, 미션을 내리면 평소의 글꼴.
+            Texture2D normalFont = game.FontTexture();
+            Expect(normalFont != null && normalFont == game.LoadTexture("data/char.dds"), "미션이 없을 때의 글꼴이 char.dds 가 아님");
+            mission.fontImageOverridePath = "data/title.dds";
+            Expect(IO.MIF2File.Write(missionPath, mission, out _) && MapLoader.LoadMissionFile(missionPath)
+                && game.FontTexture() == game.LoadTexture("data/title.dds") && game.FontTexture() != normalFont, "미션이 적은 글꼴 그림이 쓰이지 않음");
+            mission.fontImageOverridePath = "data/none.png";
+            Expect(IO.MIF2File.Write(missionPath, mission, out _) && MapLoader.LoadMissionFile(missionPath) && game.FontTexture() == normalFont, "읽지 못하는 글꼴 그림에서 평소의 글꼴로 돌아가지 않음");
+            mission.fontImageOverridePath = "data/title.dds";
+            Expect(IO.MIF2File.Write(missionPath, mission, out _) && MapLoader.LoadMissionFile(missionPath) && game.FontTexture() != normalFont, "글꼴 그림을 다시 적었는데 쓰이지 않음");
+
             foreach (string screen in new[] { "briefing", "maingame", "result" }) game.UiScriptFree(screen);
             game.SetUiScriptOverride(string.Empty);
             game.UnloadMission();
+            Expect(game.FontTexture() == normalFont, "미션을 내렸는데 미션의 글꼴 그림이 남아 있음");
             Expect(game.UiScriptLoad("maingame") == null && game.ListImage(10000) == null, "미션을 내렸는데 그 미션의 화면 스크립트나 이미지가 남아 있음");
         }
 

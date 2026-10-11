@@ -36,6 +36,7 @@ namespace GodotXOPS
         private string m_briefingScriptPath = string.Empty;
         private string m_hudScriptPath = string.Empty;
         private string m_resultScriptPath = string.Empty;
+        private string m_fontImageOverridePath = string.Empty;
 
         // 경로는 모두 전체 경로다. 해당 항목이 없으면 빈 문자열.
         public string MissionName => m_missionName;
@@ -49,6 +50,8 @@ namespace GodotXOPS
         public int SkyIndex => m_skyIndex;
         public bool AdjustCollision => m_adjustCollision;
         public bool DarkScreen => m_darkScreen;
+        // 지금 미션이 스프라이트 글꼴 대신 쓰라고 적어 둔 그림의 경로 (exe 폴더 기준). 없으면 빈 문자열.
+        public string MissionFontImagePath => m_fontImageOverridePath;
         // 확장 미션 파일(MIF2)에서 읽은 미션인지.
         public bool ExtendedMission => m_extendedMission;
 
@@ -203,6 +206,7 @@ namespace GodotXOPS
             loader.m_briefingScriptPath = data.briefingScriptPath ?? string.Empty;
             loader.m_hudScriptPath = data.hudScriptPath ?? string.Empty;
             loader.m_resultScriptPath = data.resultScriptPath ?? string.Empty;
+            loader.m_fontImageOverridePath = data.fontImageOverridePath ?? string.Empty;
             LoadMissionImages();
             return true;
         }
@@ -293,6 +297,7 @@ namespace GodotXOPS
             loader.m_briefingScriptPath = string.Empty;
             loader.m_hudScriptPath = string.Empty;
             loader.m_resultScriptPath = string.Empty;
+            loader.m_fontImageOverridePath = string.Empty;
             if (DataManager.Loaded) DataManager.Instance.ImageParameterData.imageData.ClearAddon();
         }
 

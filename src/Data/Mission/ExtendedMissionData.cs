@@ -39,5 +39,7 @@ namespace GodotXOPS
         public string briefingScriptPath = string.Empty;
         public string hudScriptPath = string.Empty;
         public string resultScriptPath = string.Empty;
+        // 이 미션에서만 스프라이트 글꼴(data/char.dds) 대신 쓰는 그림. 배치는 char.dds 와 같아야 한다 (16 × 16 칸, 글자 코드가 칸 번호). 비워 두면 평소의 글꼴이다.
+        public string fontImageOverridePath = string.Empty;
     }
 }

@@ -94,6 +94,7 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Briefing script", "*.sgd", m => m.briefingScriptPath, (m, v) => m.briefingScriptPath = v);
             AddMissionPath(grid, "HUD script", "*.sgd", m => m.hudScriptPath, (m, v) => m.hudScriptPath = v);
             AddMissionPath(grid, "Result script", "*.sgd", m => m.resultScriptPath, (m, v) => m.resultScriptPath = v);
+            AddMissionPath(grid, "Font image override", "*.bmp, *.png, *.jpg, *.dds", m => m.fontImageOverridePath, (m, v) => m.fontImageOverridePath = v);
             column.AddChild(new Label
             {
                 Text = "Numbers 10000 and up in the map point at the mission's addon data. The addon event pack adds this mission's own events to the Add menu.",

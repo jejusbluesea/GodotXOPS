@@ -162,7 +162,7 @@ godot --headless --path . res://scenes/dev/loader_check.tscn
 | `play_test.tscn` | `-- --selftest` | 모든 미션에서 틱을 돌려 사람이 맵 아래로 빠지지 않는지 |
 | `weapon_check.tscn` | — | 무기, 총알, 히트박스, 떨어진 무기, 오브젝트, 통계 |
 | `ai_check.tscn` | — | AI(시야, 청각, 경계, 조준, 경로)와 미션 이벤트·판정 |
-| `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름, 화면 스크립트의 등록과 로드, 미션이 들고 오는 화면 스크립트와 이미지 목록 |
+| `ui_check.tscn` | — | 화면 창구 `Game`의 값과 화면 전환 흐름, 화면 스크립트의 등록과 로드, 미션이 들고 오는 화면 스크립트와 이미지 목록, 미션의 글꼴 그림 |
 | `bd2_check.tscn` | — | 모든 미션의 BD1 을 BD2 로 바꿔 쓰고 읽어 블록·메시·판정 결과가 같은지, 블록 플래그(판정별 통과), 그리지 않는 면, 재질(착탄 이펙트와 소리, 발소리와 박자), 깨진 파일, 레이 범위 거르기가 전부 훑은 결과와 같은지 |
 | `mif2_check.tscn` | — | 모든 공식 미션을 확장 형식(BD2, PD2, MIF2)으로 바꿔 미션 정보와 같은 난수 씨앗으로 돌린 100틱의 결과가 원본과 같은지, 에드온 데이터와 10000 번호 규칙, 에드온의 몸 크기와 히트박스(1 m 틈의 장벽 밑을 지나가는지, 절반 크기의 히트박스가 어느 높이에서 맞는지), MIF2 의 형식 오류, 미션 목록 스캔, MIF 추가 오브젝트의 변환 |
 | `pd2_check.tscn` | — | 모든 미션의 PD1 을 PD2 로 바꿔 쓰고 읽어 포인트와 스폰된 사람·무기·오브젝트가 같은지, 255 를 넘는 번호, 추가 파라미터, 방향, 이벤트 줄 수, 깨진 파일 |
@@ -358,6 +358,7 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 - SafeGDScript 의 컴파일러가 일반 GDScript 와 다르게 도는 곳이 있습니다 (모딩 문서의 "스크립트를 쓸 때 조심할 것"). 변수에 든 글자끼리의 비교가 틀리게 나올 때가 있어서, 예제는 상태(고른 탭, 키를 기다리는 액션)를 글자가 아니라 목록에서의 자리(수)로 듭니다.
 - 실패(호출 앞뒤의 예외 횟수, 요소 수와 호출 수의 한도)하면 `XopsScriptScreen.frame` 이 false 를 돌려주고, 화면이 스크립트를 내린 뒤 기본 화면을 만듭니다.
 - 미션(MIF2)이 `briefingScriptPath` / `hudScriptPath` / `resultScriptPath` 에 적은 스크립트는 `Game.UiScriptLoad` 가 설치된 등록보다 먼저 올립니다 (`MapLoader.MissionScreenScript`). 등록 파일이 없으므로 이미지 번호는 전부 이미지 목록(`ImageParameterData`, 10000 이상은 미션의 것)을 가리킵니다. 미션의 이미지 목록은 다른 에드온 데이터와 달리 미션 정보를 읽을 때 붙고 `UnloadMissionData` 가 뗍니다 (브리핑과 결과 화면에서도 써야 합니다).
+- 스프라이트 글자의 그림은 `XopsUI.text` 가 글자를 만들 때마다 `Game.FontTexture()` 로 받습니다 (미션이 MIF2 의 `fontImageOverridePath` 를 적었으면 그 그림, 아니면 `data/char.dds`). `XopsText.font_texture` 는 모든 글자가 함께 쓰는 값 하나이므로, 한 화면 안에서 두 글꼴을 섞어 그릴 수 없습니다.
 - 화면 스크립트를 고친 뒤에는 `ui_check`(등록과 로드)를 돌리고, 화면은 `--ui-script` 와 `--ui-shot` 으로 기본 화면과 견줘 봅니다.
 
 ## 원본과 다르게 한 동작
