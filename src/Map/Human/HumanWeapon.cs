@@ -466,16 +466,15 @@ namespace GodotXOPS
 
         /// <summary>
         /// 이 사람이 그 무기를 새로 받을 때의 예비 탄. 원본 AddVisualWeaponIndex: 전체 탄 = 장탄수 × TOTAL_WEAPON_AUTOBULLET, 그중 장탄수만큼이 장전돼 있다.
-        /// 배수는 사람 종류의 autoBulletMultiplier 다.
+        /// 배수는 사람 종류의 autoBulletMultiplier 다. 무기 데이터에 initialReserve 가 적혀 있으면 배수와 관계없이 그 값이다.
         /// </summary>
         /// <param name="weaponIndex">무기 인덱스.</param>
         /// <returns>예비 탄 수.</returns>
         private int InitialReserve(int weaponIndex)
         {
             DataList<WeaponData> list = DataManager.Instance.WeaponParameterData.weaponData;
-            int magazineSize = list.Has(weaponIndex) ? list[weaponIndex].magazineSize : 0;
             int multiplier = m_humanTypeData != null ? m_humanTypeData.autoBulletMultiplier : Weapon.DefaultAutoBulletMultiplier;
-            return magazineSize * Mathf.Max(0, multiplier - 1);
+            return Weapon.FreshReserve(list.Has(weaponIndex) ? list[weaponIndex] : null, multiplier);
         }
 
         /// <summary>

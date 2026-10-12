@@ -18,18 +18,18 @@ namespace GodotXOPS.IO
         public Vector3[] vertices = new Vector3[VertexCount];
         // 면 f 의 v 번째 정점의 UV 는 uvs[f * 4 + v] 다.
         public Vector2[] uvs = new Vector2[FaceCount * FaceVertexCount];
-        // 텍스처 목록의 번호. 음수면 그 면을 그리지 않는다.
+        // 텍스처 목록의 번호. 음수면 그 면을 그리지 않는다. 면의 재질(착탄, 발소리)은 텍스처 목록의 그 항목이 정한다.
         public int[] textureIndices = new int[FaceCount];
-        // 재질 목록의 번호. -1 이면 미션의 기본 재질이다.
-        public int[] materialIndices = new int[FaceCount];
         // 판정을 끄는 비트 (BD2File.PassHuman / PassBullet / PassSight). 0 이면 전부 충돌한다. 그 밖의 비트는 예약이고 0 으로 쓴다.
         public int flags;
     }
 
     /// <summary>
     /// 확장 블록 데이터(BD2) 파일의 읽기와 쓰기. 게임 싱글톤과 무관해서 에디터 같은 다른 도구에서도 쓸 수 있다.
-    /// 구조 (정수는 리틀 엔디안): 매직 8바이트 → 텍스처 목록 경로 길이(uint32) → 경로(UTF-8) → 블록 개수(uint32) → 블록 × 340바이트.
-    /// 블록: 정점 8개(x, y, z float32) → UV 24개(u, v float32) → 면 텍스처 번호 6개(int32) → 면 재질 번호 6개(int32) → 플래그(int32).
+    /// 구조 (정수는 리틀 엔디안): 매직 8바이트 → 텍스처 목록 경로 길이(uint32) → 경로(UTF-8) → 블록 개수(uint32) → 블록 × 316바이트.
+    /// 블록: 정점 8개(x, y, z float32) → UV 24개(u, v float32) → 면 텍스처 번호 6개(int32) → 플래그(int32).
+    /// 1.2.2 까지의 파일(매직 GDXOPSBD)은 블록이 340바이트이고 텍스처 번호 뒤에 면 재질 번호 6개(int32)가 있었다. 읽을 수는 있고, 그 번호는 버린다
+    /// (재질은 1.2.3 부터 텍스처 목록의 항목이 정한다). 쓰는 것은 늘 지금의 형식이다.
     /// </summary>
     public class BD2File
     {
@@ -40,15 +40,21 @@ namespace GodotXOPS.IO
         public const int PassBullet = 1 << 1;
         public const int PassSight = 1 << 2;
 
-        private const int k_blockSize = 340;
+        private const int k_blockSize = 316;
+        // 1.2.2 까지의 블록 크기와, 그 안에 있던 면 재질 번호의 바이트 수.
+        private const int k_legacyBlockSize = 340;
+        private const int k_legacyMaterialBytes = BD2Block.FaceCount * sizeof(int);
         // 깨진 파일이 경로 길이로 큰 값을 줘도 메모리를 잡지 않게 하는 한계 (바이트).
         private const int k_maxPathLength = 4096;
 
-        private static readonly byte[] s_magic = Encoding.ASCII.GetBytes("GDXOPSBD");
+        private static readonly byte[] s_magic = Encoding.ASCII.GetBytes("GDXOPSB2");
+        private static readonly byte[] s_legacyMagic = Encoding.ASCII.GetBytes("GDXOPSBD");
 
         // 텍스처 목록 JSON 의 경로 (exe 폴더 기준).
         public string textureListPath = string.Empty;
         public List<BD2Block> blocks = new List<BD2Block>();
+        // 읽은 파일이 1.2.2 까지의 형식이었고, 지금은 쓰지 않는 면 재질 번호에 기본값(-1)이 아닌 것이 있었는지. 쓸 때는 보지 않는다.
+        public bool droppedFaceMaterials;
 
         /// <summary>
         /// BD2 파일을 읽는다.
@@ -67,7 +73,8 @@ namespace GodotXOPS.IO
                 using var reader = new BinaryReader(File.OpenRead(filepath));
 
                 byte[] magic = reader.ReadBytes(s_magic.Length);
-                if (!magic.AsSpan().SequenceEqual(s_magic))
+                bool legacy = magic.AsSpan().SequenceEqual(s_legacyMagic);
+                if (!legacy && !magic.AsSpan().SequenceEqual(s_magic))
                 {
                     error = "not a BD2 file (magic mismatch)";
                     return false;
@@ -89,7 +96,7 @@ namespace GodotXOPS.IO
 
                 uint blockCount = reader.ReadUInt32();
                 long remaining = reader.BaseStream.Length - reader.BaseStream.Position;
-                if ((long)blockCount * k_blockSize > remaining)
+                if ((long)blockCount * (legacy ? k_legacyBlockSize : k_blockSize) > remaining)
                 {
                     error = $"file is too short for {blockCount} blocks";
                     return false;
@@ -113,7 +120,10 @@ namespace GodotXOPS.IO
                         block.uvs[i] = new Vector2(u, v);
                     }
                     for (int i = 0; i < block.textureIndices.Length; i++) block.textureIndices[i] = reader.ReadInt32();
-                    for (int i = 0; i < block.materialIndices.Length; i++) block.materialIndices[i] = reader.ReadInt32();
+                    for (int i = 0; legacy && i < k_legacyMaterialBytes / sizeof(int); i++)
+                    {
+                        if (reader.ReadInt32() != -1) result.droppedFaceMaterials = true;
+                    }
                     block.flags = reader.ReadInt32();
                     result.blocks.Add(block);
                 }
@@ -168,7 +178,6 @@ namespace GodotXOPS.IO
                         writer.Write(uv.Y);
                     }
                     foreach (int index in block.textureIndices) writer.Write(index);
-                    foreach (int index in block.materialIndices) writer.Write(index);
                     writer.Write(block.flags);
                 }
 

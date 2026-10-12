@@ -620,8 +620,16 @@ namespace GodotXOPS.Editor
             Expect(block.textureIndices[topFace] == -1 && m_faceTexture.Selected == 0 && MapLoader.Blocks[added].mesh.GetSurfaceCount() == 1, "면을 그리지 않게 하지 못함");
             Undo();
             Expect(block.textureIndices[topFace] == 1, "면의 텍스처 바꾸기를 되돌리지 못함");
-            SetFaceMaterial(0);
-            Expect(block.materialIndices[topFace] == 0 && block.materialIndices[1] == -1, "면의 재질을 바꾸지 못함");
+            // 재질은 텍스처가 정한다: 면을 고르면 텍스처 목록이 그 면의 텍스처를 가리키고, 그 재질을 바꾸면 그 텍스처를 쓰는 면에 듣는다.
+            Expect(m_textureSelected == 1 && !m_textureMaterial.Disabled && m_textureMaterial.Selected == 0 && m_faceMaterialLabel.Text == "(mission default)",
+                "면을 선택했는데 텍스처 목록이 그 면의 텍스처와 재질을 가리키지 않음");
+            Expect(SetTextureMaterial(1, 0) && textures[1].materialIndex == 0 && textures[0].materialIndex == -1
+                && MapLoader.Blocks[added].faceMaterials[topFace] == 0 && MapLoader.Blocks[added].faceMaterials[1] == -1
+                && m_faceMaterialLabel.Text.StartsWith("[0]", StringComparison.Ordinal) && m_textureList.GetItemText(1).Contains("([0]"), "텍스처의 재질을 바꾸지 못하거나 그 텍스처를 쓰는 면에 전달되지 않음");
+            Undo();
+            Expect(textures[1].materialIndex == -1 && MapLoader.Blocks[added].faceMaterials[topFace] == -1 && m_textureSelected == 1, "텍스처의 재질 바꾸기를 되돌리지 못함");
+            Redo();
+            Expect(!SetTextureMaterial(-1, 0) && m_messageIsError, "고른 텍스처가 없는데 재질을 바꿈");
             SetFaceUV(2, new Vector2(3f, 4f));
             Expect(block.uvs[topFace * 4 + 2].DistanceTo(new Vector2(3f, 4f)) < tolerance && Mathf.Abs((float)m_uvBoxes[4].Value - 3f) < 0.01f, "면의 UV 한 모서리를 바꾸지 못함");
             TransformFaceUV(UVOperation.Fit);
@@ -676,7 +684,8 @@ namespace GodotXOPS.Editor
             Expect(SaveBlocksTo(saved) && m_document.Blocks.textureListPath == savedTextures && File.Exists(GamePath.Resolve(savedTextures)),
                 "다른 이름으로 저장했는데 텍스처 목록이 블록 파일 옆에 쓰이지 않음");
             Expect(OpenBlock(saved) && m_document.Textures.blockTextureData.Count == textureCount + 1 && m_document.Blocks.blocks.Count == added + 1
-                && m_document.Textures.blockTextureData[textureCount].diffusePath == secondTexture, "저장한 블록과 텍스처 목록을 다시 연 내용이 다름");
+                && m_document.Textures.blockTextureData[textureCount].diffusePath == secondTexture && m_document.Textures.blockTextureData[1].materialIndex == 0,
+                "저장한 블록과 텍스처 목록(재질 포함)을 다시 연 내용이 다름");
 
             // 블록 파일에 적힌 텍스처 목록의 경로가 다른 파일을 가리키면 쓰지 않는다 (받은 파일이 설정이나 기본 데이터를 덮어쓰지 못하게).
             string configFull = GamePath.Resolve("godotdata/config.json");

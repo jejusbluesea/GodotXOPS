@@ -25,6 +25,7 @@ namespace GodotXOPS.Editor
         private Action<string> m_missionPathSetter;
         // 화면에 반영해 둔 값. 바뀌면 하늘과 이벤트 목록을 다시 읽는다.
         private int m_shownSky = -1;
+        private string m_shownSkyData;
         private string m_shownEventPack;
 
         /// <summary>
@@ -90,6 +91,7 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Addon block material data", "*.json", m => m.addonBlockMaterialDataPath, (m, v) => m.addonBlockMaterialDataPath = v);
             AddMissionPath(grid, "Addon sound data", "*.json", m => m.addonSoundDataPath, (m, v) => m.addonSoundDataPath = v);
             AddMissionPath(grid, "Addon image data", "*.json", m => m.addonImageDataPath, (m, v) => m.addonImageDataPath = v);
+            AddMissionPath(grid, "Addon sky data", "*.json", m => m.addonSkyDataPath, (m, v) => m.addonSkyDataPath = v);
             AddMissionPath(grid, "Addon event pack", "*.json", m => m.addonEventDataPath, (m, v) => m.addonEventDataPath = v);
             AddMissionPath(grid, "Briefing script", "*.sgd", m => m.briefingScriptPath, (m, v) => m.briefingScriptPath = v);
             AddMissionPath(grid, "HUD script", "*.sgd", m => m.hudScriptPath, (m, v) => m.hudScriptPath = v);
@@ -229,6 +231,16 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
+        /// 문서의 하늘을 3D 화면에 띄운다. 미션이 들고 오는 하늘(10000 번대)도 보이게 그 파일을 먼저 읽고, 안개는 끈다 (에디터는 맵 전체를 멀리서 본다).
+        /// </summary>
+        private void LoadEditorSky()
+        {
+            MapLoader.LoadAddonSky(m_document.Mission.addonSkyDataPath);
+            MapLoader.LoadSkyData(m_document.SkyIndex);
+            MapLoader.ClearFog();
+        }
+
+        /// <summary>
         /// 바뀐 미션의 설정을 화면에 반영한다: 칸의 값, 하늘, 이 미션의 이벤트 묶음.
         /// </summary>
         private void ApplyMission()
@@ -249,11 +261,11 @@ namespace GodotXOPS.Editor
             }
 
             RefreshAssetList();
-            if (m_shownSky != mission.skyIndex)
+            if (m_shownSky != mission.skyIndex || m_shownSkyData != mission.addonSkyDataPath)
             {
                 m_shownSky = mission.skyIndex;
-                MapLoader.LoadSkyData(mission.skyIndex);
-                MapLoader.ClearFog();
+                m_shownSkyData = mission.addonSkyDataPath;
+                LoadEditorSky();
             }
             if (m_shownEventPack != mission.addonEventDataPath)
             {

@@ -648,9 +648,9 @@ namespace GodotXOPS
         private string Sky(string[] args)
         {
             int count = DataManager.Instance.SkyData.skyTexturePath.Count;
-            if (args.Length == 0 || !int.TryParse(args[0], out int skyIndex) || skyIndex < 0 || skyIndex >= count)
+            if (args.Length == 0 || !int.TryParse(args[0], out int skyIndex) || !MapLoader.TryGetSky(skyIndex, out _, out _))
             {
-                return $"A sky index is required (0 to {count - 1}, sky_data.json has {count} entries)";
+                return $"A sky index is required (0 to {count - 1}, sky_data.json has {count} entries. 10000 and up: the mission's sky data)";
             }
 
             m_skyIndex = skyIndex;

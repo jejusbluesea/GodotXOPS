@@ -260,7 +260,8 @@ namespace GodotXOPS
                         WarnMissingAddon(parameter.weaponData, weaponIndex, "weapon");
                         continue;
                     }
-                    totalBullets = parameter.weaponData[weaponIndex].magazineSize * Weapon.DefaultAutoBulletMultiplier;
+                    WeaponData random = parameter.weaponData[weaponIndex];
+                    totalBullets = random.magazineSize + Weapon.FreshReserve(random, Weapon.DefaultAutoBulletMultiplier);
                 }
 
                 if (!parameter.weaponData.Has(weaponIndex))

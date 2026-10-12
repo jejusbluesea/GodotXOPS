@@ -62,7 +62,7 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="weaponIndex">WeaponParameterData.weaponData 인덱스.</param>
         /// <param name="magazine">장전된 탄. 음수면 장탄수만큼 가득.</param>
-        /// <param name="reserve">예비 탄. 음수면 장탄수 × (기본 배수 − 1).</param>
+        /// <param name="reserve">예비 탄. 음수면 무기 데이터의 initialReserve, 그것도 없으면 장탄수 × (기본 배수 − 1).</param>
         /// <param name="clampMagazine">true 면 장전된 탄을 장탄수 이하로 자른다. 치트 무기 변경처럼 탄약을 그대로 넘길 때는 false.</param>
         public void Configure(int weaponIndex, int magazine = -1, int reserve = -1, bool clampMagazine = true)
         {
@@ -72,8 +72,21 @@ namespace GodotXOPS
 
             int magazineSize = m_data.magazineSize;
             if (magazine < 0) magazine = magazineSize;
-            if (reserve < 0) reserve = magazineSize * (DefaultAutoBulletMultiplier - 1);
+            if (reserve < 0) reserve = FreshReserve(m_data, DefaultAutoBulletMultiplier);
             SetLoadedAmmo(clampMagazine ? Mathf.Clamp(magazine, 0, magazineSize) : magazine, reserve);
+        }
+
+        /// <summary>
+        /// 무기를 새로 채울 때의 예비 탄. 무기 데이터에 initialReserve 가 적혀 있으면 그 값이고, 아니면 원본의 규칙이다
+        /// (원본 AddVisualWeaponIndex: 전체 탄 = 장탄수 × 배수, 그중 장탄수만큼이 장전돼 있다).
+        /// </summary>
+        /// <param name="data">무기 데이터. null 이면 0.</param>
+        /// <param name="multiplier">초기 탄약 배수 (사람 종류의 autoBulletMultiplier).</param>
+        /// <returns>예비 탄 수.</returns>
+        public static int FreshReserve(WeaponData data, int multiplier)
+        {
+            if (data == null) return 0;
+            return data.initialReserve >= 0 ? data.initialReserve : data.magazineSize * Mathf.Max(0, multiplier - 1);
         }
 
         /// <summary>
@@ -82,7 +95,7 @@ namespace GodotXOPS
         /// 다르면 지금 탄을 접어 두고 그 묶음의 탄을 꺼낸다. 그 묶음을 처음 쓰는 것이면 그 종류의 새 무기처럼 채운다.
         /// </summary>
         /// <param name="weaponIndex">바꿀 무기 인덱스. 범위 밖이면 맨손.</param>
-        /// <param name="freshReserve">그 묶음을 처음 쓸 때 줄 예비 탄 (장탄수 × (사람 종류의 배수 − 1)).</param>
+        /// <param name="freshReserve">그 묶음을 처음 쓸 때 줄 예비 탄 (Human.InitialReserve).</param>
         public void SwitchType(int weaponIndex, int freshReserve)
         {
             int oldGroup = m_data.ammoGroup;

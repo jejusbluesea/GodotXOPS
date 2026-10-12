@@ -554,7 +554,6 @@ namespace GodotXOPS.Editor
             }
             for (int f = 0; f < BD2Block.FaceCount; f++)
             {
-                block.materialIndices[f] = -1;
                 for (int v = 0; v < BD2Block.FaceVertexCount; v++)
                 {
                     block.uvs[f * BD2Block.FaceVertexCount + v] = s_faceUVs[v];

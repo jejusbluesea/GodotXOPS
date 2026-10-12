@@ -69,6 +69,7 @@ namespace GodotXOPS.Editor
             [(typeof(EffectGeneralData), nameof(EffectGeneralData.wallBloodEffectIndex))] = new AssetReference(s_effect, k_effects),
             [(typeof(BlockMaterialData), nameof(BlockMaterialData.hitEffect))] = new AssetReference(s_effect, k_effects),
             [(typeof(BlockMaterialData), nameof(BlockMaterialData.bulletHoleEffect))] = new AssetReference(s_effect, k_effects),
+            [(typeof(BlockTextureData), nameof(BlockTextureData.materialIndex))] = new AssetReference(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData)),
         };
 
         /// <summary>

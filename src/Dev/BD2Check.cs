@@ -182,7 +182,7 @@ namespace GodotXOPS.Dev
                 Expect(reread && copy.textureListPath == listRelative && copy.blocks.Count == file.blocks.Count
                     && File.ReadAllBytes(bd2Path).AsSpan().SequenceEqual(File.ReadAllBytes(copyPath)),
                     $"{label}: BD2 를 읽어 다시 쓴 파일이 다름");
-                Expect(new FileInfo(bd2Path).Length == 8 + 4 + System.Text.Encoding.UTF8.GetByteCount(listRelative) + 4 + 340L * file.blocks.Count,
+                Expect(new FileInfo(bd2Path).Length == 8 + 4 + System.Text.Encoding.UTF8.GetByteCount(listRelative) + 4 + 316L * file.blocks.Count,
                     $"{label}: BD2 파일 크기가 레이아웃과 다름");
 
                 if (!MapLoader.LoadBlockData(bd2Path))
@@ -481,7 +481,7 @@ namespace GodotXOPS.Dev
         /// <param name="center">중심.</param>
         /// <param name="halfSize">각 축의 절반 크기.</param>
         /// <param name="flags">블록 플래그.</param>
-        /// <returns>만든 블록. 텍스처와 재질 번호는 전부 0 이다.</returns>
+        /// <returns>만든 블록. 텍스처 번호는 전부 0 이다.</returns>
         internal static BD2Block MakeBox(Vector3 center, Vector3 halfSize, int flags)
         {
             // 면 법선이 바깥을 향하는 정점 순서다 (점검이 위와 옆에서 쏜 레이로 확인한다).
@@ -521,15 +521,15 @@ namespace GodotXOPS.Dev
             {
                 file.blocks.Add(MakeBox(new Vector3(i * 10f, 0f, 0f), Vector3.One, flags[i]));
             }
-            // 첫 블록: 면 하나는 그리지 않고, 면 하나는 목록에 없는 번호이고, 재질 번호를 면마다 다르게 준다.
+            // 첫 블록: 면 하나는 그리지 않고, 면 하나는 목록에 없는 번호이고, 면 하나는 재질이 적힌 텍스처를 쓴다.
+            const int textureMaterial = 10005;
             file.blocks[0].textureIndices[0] = -1;
             file.blocks[0].textureIndices[1] = 99;
             file.blocks[0].textureIndices[2] = 1;
-            for (int f = 0; f < BD2Block.FaceCount; f++) file.blocks[0].materialIndices[f] = f == 0 ? -1 : 10000 + f;
 
             var textures = new BlockTextureListData();
             textures.blockTextureData.Add(new BlockTextureData());
-            textures.blockTextureData.Add(new BlockTextureData());
+            textures.blockTextureData.Add(new BlockTextureData { materialIndex = textureMaterial });
             File.WriteAllText(GamePath.Resolve(listRelative), JsonData.ToJson(textures));
 
             if (!file.Write(bd2Path, out _) || !MapLoader.LoadBlockData(bd2Path))
@@ -573,7 +573,8 @@ namespace GodotXOPS.Dev
             Expect(blocks[1].mesh != null && blocks[1].mesh.GetSurfaceCount() == 1, "통과 블록이 그려지지 않음");
 
             int[] materials = blocks[0].faceMaterials;
-            Expect(materials != null && materials[0] == -1 && materials[5] == 10005, "면 재질 번호가 블록에 전달되지 않음");
+            Expect(materials != null && materials[0] == -1 && materials[1] == -1 && materials[2] == textureMaterial && materials[3] == -1,
+                "텍스처의 재질 번호가 그 텍스처를 쓰는 면에 전달되지 않음 (그리지 않는 면과 목록 밖의 번호는 기본 재질)");
 
             // 텍스처 목록 파일이 없어도 블록과 판정은 로드된다. 면은 그릴 텍스처가 없어 전부 빠진다.
             file.textureListPath = $"{k_workFolder}/missing.json";
@@ -628,15 +629,20 @@ namespace GodotXOPS.Dev
             file.blocks.Add(MakeBox(new Vector3(0f, 10f, 0f), Vector3.One, BD2File.PassBullet));
             file.blocks.Add(MakeBox(new Vector3(80f, 0f, 0f), Vector3.One, 0));
             file.blocks.Add(MakeBox(new Vector3(200f, 0f, 0f), Vector3.One, 0));
-            int[] blockMaterials = { 1, 2, -1, 1 };
-            for (int b = 0; b < blockMaterials.Length; b++)
+            // 재질은 텍스처가 정한다. 텍스처 넷: 기본 재질(-1) / 재질 1 / 재질 2 / 목록에 없는 재질.
+            int[] textureMaterials = { -1, 1, 2, 10005 };
+            int[] blockTextures = { 1, 2, 0, 1 };
+            for (int b = 0; b < blockTextures.Length; b++)
             {
-                for (int f = 0; f < BD2Block.FaceCount; f++) file.blocks[b].materialIndices[f] = blockMaterials[b];
+                for (int f = 0; f < BD2Block.FaceCount; f++) file.blocks[b].textureIndices[f] = blockTextures[b];
             }
-            file.blocks[2].materialIndices[1] = 10005;
+            file.blocks[2].textureIndices[1] = 3;
 
             var textures = new BlockTextureListData();
-            textures.blockTextureData.Add(new BlockTextureData());
+            foreach (int material in textureMaterials)
+            {
+                textures.blockTextureData.Add(new BlockTextureData { materialIndex = material });
+            }
             File.WriteAllText(GamePath.Resolve(listRelative), JsonData.ToJson(textures));
 
             bool savedAI = AIController.Enabled;
@@ -776,7 +782,25 @@ namespace GodotXOPS.Dev
             Expect(!BD2File.Read(badPath, out _, out _), "머리말이 잘린 파일을 읽음");
 
             Expect(!MapLoader.LoadBlockData(badPath) && MapLoader.Blocks.Count == 0, "깨진 BD2 를 로드함");
-            Expect(BD2File.Read(goodPath, out BD2File good, out _) && good.blocks.Count == 1 && good.textureListPath == "a.json", "정상 파일을 읽지 못함");
+            Expect(BD2File.Read(goodPath, out BD2File good, out _) && good.blocks.Count == 1 && good.textureListPath == "a.json" && !good.droppedFaceMaterials, "정상 파일을 읽지 못함");
+
+            // 1.2.2 까지의 형식(매직 GDXOPSBD, 블록 340바이트): 텍스처 번호 뒤의 면 재질 번호 6개를 건너뛰고 같은 블록으로 읽는다.
+            const int legacyMaterialBytes = BD2Block.FaceCount * sizeof(int);
+            const int flagBytes = sizeof(int);
+            const int legacyFlags = BD2File.PassBullet;
+            var legacy = new List<byte>(bytes.AsSpan(0, bytes.Length - flagBytes).ToArray());
+            byte[] legacyMagic = System.Text.Encoding.ASCII.GetBytes("GDXOPSBD");
+            for (int i = 0; i < legacyMagic.Length; i++) legacy[i] = legacyMagic[i];
+            for (int f = 0; f < BD2Block.FaceCount; f++) legacy.AddRange(BitConverter.GetBytes(f == 0 ? 3 : -1));
+            legacy.AddRange(BitConverter.GetBytes(legacyFlags));
+            Expect(legacy.Count == bytes.Length + legacyMaterialBytes, "옛 형식의 점검용 파일 크기가 다름");
+            File.WriteAllBytes(badPath, legacy.ToArray());
+            bool legacyRead = BD2File.Read(badPath, out BD2File old, out _);
+            Expect(legacyRead && old.blocks.Count == 1 && old.droppedFaceMaterials && old.blocks[0].flags == legacyFlags
+                && old.blocks[0].vertices[7].IsEqualApprox(good.blocks[0].vertices[7]) && old.blocks[0].textureIndices[5] == good.blocks[0].textureIndices[5],
+                "1.2.2 까지의 BD2 를 읽지 못하거나 내용이 다름");
+            Expect(legacyRead && old.Write(badPath, out _) && new FileInfo(badPath).Length == bytes.Length && BD2File.Read(badPath, out BD2File rewritten, out _)
+                && !rewritten.droppedFaceMaterials && rewritten.blocks[0].flags == legacyFlags, "옛 형식의 BD2 를 지금의 형식으로 다시 쓰지 못함");
         }
     }
 }

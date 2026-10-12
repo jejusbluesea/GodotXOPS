@@ -664,6 +664,27 @@ namespace GodotXOPS.Dev
             m_shooter.SetWeapon(slot, rifle, 5, 5);
             Expect(!m_shooter.CurrentWeapon.TryGetStoredAmmo(1, out _, out _) && m_shooter.CurrentWeapon.AiMaxRange == rifleData.aiMaxRange, "새로 받은 무기에 전 무기의 상태가 남아 있음");
 
+            // 무기 데이터에 처음 예비 탄(initialReserve)을 적으면 사람 종류의 배수 대신 그 값으로 채운다: 다른 묶음을 처음 꺼낼 때와 탄 수 없이 무기를 받을 때.
+            // 기본값(-1)이면 위에서 본 대로 배수의 규칙이다.
+            const int writtenReserve = 2;
+            int savedInitial = launcherData.initialReserve;
+            Expect(savedInitial < 0 && rifleData.initialReserve < 0, "기본 무기 데이터의 initialReserve 가 -1 이 아님");
+            launcherData.initialReserve = writtenReserve;
+            m_shooter.SetWeapon(slot, rifle, 12, 34);
+            m_shooter.ApplyWeaponAction(HumanWeaponAction.SwitchNext);
+            held = m_shooter.CurrentWeapon;
+            Expect(held.WeaponIndex == launcher && held.Magazine == freshMagazine && held.Reserve == writtenReserve,
+                $"initialReserve 를 적은 묶음을 처음 꺼냄: 탄 {held.Magazine}/{held.Reserve} (기대 {freshMagazine}/{writtenReserve})");
+            m_shooter.SetWeapon(slot, launcher);
+            held = m_shooter.CurrentWeapon;
+            Expect(held.Magazine == freshMagazine && held.Reserve == writtenReserve, $"initialReserve 를 적은 무기를 탄 수 없이 받음: 탄 {held.Magazine}/{held.Reserve} (기대 {freshMagazine}/{writtenReserve})");
+            launcherData.initialReserve = 0;
+            m_shooter.SetWeapon(slot, launcher);
+            Expect(m_shooter.CurrentWeapon.Reserve == 0, "initialReserve 0 이 예비 탄 없음이 아님");
+            m_shooter.SetWeapon(slot, launcher, 1, 7);
+            Expect(m_shooter.CurrentWeapon.Reserve == 7, "탄 수를 적어 준 무기에 initialReserve 가 덮어씀");
+            launcherData.initialReserve = savedInitial;
+
             rifleData.nextWeaponIndex = savedNext;
             launcherData.previousWeaponIndex = savedPrevious;
             launcherData.ammoGroup = savedGroup;

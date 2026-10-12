@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using Godot;
 using GodotXOPS.IO;
 
@@ -13,12 +12,53 @@ namespace GodotXOPS
         // 어두운 화면 미션에서 스카이와 모델(사람·무기·소물·탄환)에 곱하는 밝기 (원본 D3DGraphics::RenderModel 의 darkflag).
         private const float k_darkModelBrightness = 0.8f;
 
+        // 지금 미션이 들고 온 하늘 (MIF2 의 addonSkyDataPath). 하늘 번호 10000 이상이 이 목록의 (번호 - 10000) 번째다. 없으면 null.
+        private SkyData m_addonSky;
+
+        /// <summary>
+        /// 미션이 들고 오는 하늘 파일을 읽어 둔다. sky_data.json 과 같은 키를 쓰는 JSON 이고, 쓰는 것은 skyTexturePath 와 skyColor 두 목록뿐이다
+        /// (하늘 모델, 안개 거리, 카메라 거리는 게임 전체의 값이라 미션이 바꾸지 못한다). 미션 정보를 읽을 때 부르고 미션 정보를 내릴 때 뗀다:
+        /// 하늘은 맵과 따로 로드하므로 다른 에드온 데이터(LoadAddonData)와 함께 붙이지 않는다.
+        /// </summary>
+        /// <param name="relativePath">exe 폴더 기준 경로. 비어 있으면 미션의 하늘을 뗀다.</param>
+        public static void LoadAddonSky(string relativePath)
+        {
+            Instance.m_addonSky = LoadAddonFile<SkyData>(relativePath);
+        }
+
+        /// <summary>
+        /// 하늘 번호가 가리키는 텍스처와 안개 색을 찾는다. 10000 미만은 sky_data.json, 10000 이상은 미션의 하늘이다.
+        /// </summary>
+        /// <param name="skyIndex">하늘 번호.</param>
+        /// <param name="texturePath">텍스처 경로 (exe 폴더 기준). 그 번호에 텍스처가 없으면 빈 문자열.</param>
+        /// <param name="fogColor">안개 색. 그 번호에 색이 없으면 검정 (원본의 default).</param>
+        /// <returns>그 번호의 텍스처가 목록에 있으면 true.</returns>
+        public static bool TryGetSky(int skyIndex, out string texturePath, out Color fogColor)
+        {
+            texturePath = string.Empty;
+            fogColor = Colors.Black;
+
+            SkyData source = DataManager.Instance.SkyData;
+            int index = skyIndex;
+            if (skyIndex >= DataList<int>.AddonBase)
+            {
+                source = Instance.m_addonSky;
+                index = skyIndex - DataList<int>.AddonBase;
+            }
+            if (source == null || index < 0) return false;
+
+            if (index < source.skyColor.Count) fogColor = source.skyColor[index].ToColor();
+            if (index >= source.skyTexturePath.Count) return false;
+            texturePath = source.skyTexturePath[index] ?? string.Empty;
+            return true;
+        }
+
         /// <summary>
         /// 스카이 메시와 텍스처를 로드해 스카이 노드를 생성한다. 이전 스카이는 먼저 제거한다.
         /// 스카이는 셰이더가 카메라 위치에 붙여 그리므로 노드 위치와 무관하게 항상 배경으로 보인다.
         /// 어두운 화면 미션이면 스카이와 모델의 밝기도 여기서 낮춘다 (미션 정보를 먼저 로드해야 한다).
         /// </summary>
-        /// <param name="textureIndex">SkyData 텍스처 경로 목록의 인덱스. 0 이거나 범위 밖이면 텍스처 없이 검정.</param>
+        /// <param name="textureIndex">하늘 번호. 10000 이상은 미션의 하늘이다. 텍스처가 없는 번호(0, 범위 밖)면 텍스처 없이 검정.</param>
         public static void LoadSkyData(int textureIndex)
         {
             UnloadSkyData();
@@ -39,13 +79,17 @@ namespace GodotXOPS
             }
 
             ImageTexture texture = null;
-            if (textureIndex > 0 && textureIndex < skyData.skyTexturePath.Count)
+            if (TryGetSky(textureIndex, out string texturePath, out _) && texturePath.Length > 0)
             {
-                string fullTexturePath = GamePath.Resolve(skyData.skyTexturePath[textureIndex]);
+                string fullTexturePath = GamePath.Resolve(texturePath);
                 if (fullTexturePath != null)
                 {
                     texture = ImageLoader.LoadTexture(fullTexturePath);
                 }
+            }
+            else if (textureIndex >= DataList<int>.AddonBase)
+            {
+                Debugger.LogWarning($"Sky {textureIndex} is not in the mission's sky data (addonSkyDataPath).", nameof(MapLoader));
             }
 
             var sky = new MeshInstance3D
@@ -82,7 +126,7 @@ namespace GodotXOPS
         /// 원본 SetFog(true, skynumber) 대응. 선형 안개를 SkyData 의 fogStart ~ fogEnd 범위, 하늘 번호별 색으로 적용한다.
         /// SkyData.fog 가 false 면 안개를 끈다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)만 받는다.
         /// </summary>
-        /// <param name="skyIndex">하늘 번호. skyColor 범위를 벗어나면 검정(원본 default).</param>
+        /// <param name="skyIndex">하늘 번호. 10000 이상은 미션의 하늘이다. 색이 없는 번호면 검정(원본 default).</param>
         public static void ApplySkyFog(int skyIndex)
         {
             SkyData skyData = DataManager.Instance.SkyData;
@@ -92,8 +136,7 @@ namespace GodotXOPS
                 return;
             }
 
-            List<Color32> colors = skyData.skyColor;
-            Color color = (skyIndex >= 0 && skyIndex < colors.Count) ? colors[skyIndex].ToColor() : Colors.Black;
+            TryGetSky(skyIndex, out _, out Color color);
 
             // 셰이더가 sRGB 값 그대로 섞으므로 색을 선형으로 바꾸지 않고 넘긴다. w = 1 은 안개 사용.
             RenderingServer.GlobalShaderParameterSet(s_fogColorGlobal, new Vector4(color.R, color.G, color.B, 1f));

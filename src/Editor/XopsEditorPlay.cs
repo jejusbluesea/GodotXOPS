@@ -88,7 +88,7 @@ namespace GodotXOPS.Editor
         /// </summary>
         private void RestoreView()
         {
-            MapLoader.LoadSkyData(m_document.SkyIndex);
+            LoadEditorSky();
             RebuildBlocks();
         }
 

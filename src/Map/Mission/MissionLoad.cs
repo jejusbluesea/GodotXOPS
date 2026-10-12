@@ -203,6 +203,7 @@ namespace GodotXOPS
             loader.m_addonSoundDataPath = data.addonSoundDataPath ?? string.Empty;
             loader.m_addonEventDataPath = data.addonEventDataPath ?? string.Empty;
             loader.m_addonImageDataPath = data.addonImageDataPath ?? string.Empty;
+            LoadAddonSky(data.addonSkyDataPath);
             loader.m_briefingScriptPath = data.briefingScriptPath ?? string.Empty;
             loader.m_hudScriptPath = data.hudScriptPath ?? string.Empty;
             loader.m_resultScriptPath = data.resultScriptPath ?? string.Empty;
@@ -294,6 +295,7 @@ namespace GodotXOPS
             loader.m_addonSoundDataPath = string.Empty;
             loader.m_addonEventDataPath = string.Empty;
             loader.m_addonImageDataPath = string.Empty;
+            loader.m_addonSky = null;
             loader.m_briefingScriptPath = string.Empty;
             loader.m_hudScriptPath = string.Empty;
             loader.m_resultScriptPath = string.Empty;

@@ -741,9 +741,8 @@ namespace GodotXOPS.Editor
             m_history.Clear();
             m_blockDirty = false;
             RedrawBlocks();
-            MapLoader.LoadSkyData(m_document.SkyIndex);
             // 게임의 안개는 수십 미터 밖을 가린다. 에디터는 맵 전체를 멀리서 봐야 하므로 끈다.
-            MapLoader.ClearFog();
+            LoadEditorSky();
             m_view.SetAngles(k_viewFrontYaw, k_startPitch);
             FocusAll();
         }

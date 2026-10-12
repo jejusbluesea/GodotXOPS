@@ -1205,7 +1205,6 @@ func bump(p, state):
             for (int i = 0; i < BD2Block.VertexCount; i++) block.vertices[i] = center + corners[i] * half;
             for (int f = 0; f < BD2Block.FaceCount; f++)
             {
-                block.materialIndices[f] = -1;
                 block.textureIndices[f] = -1;
             }
             return block;

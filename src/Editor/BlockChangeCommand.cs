@@ -75,7 +75,6 @@ namespace GodotXOPS.Editor
             System.Array.Copy(from.vertices, to.vertices, from.vertices.Length);
             System.Array.Copy(from.uvs, to.uvs, from.uvs.Length);
             System.Array.Copy(from.textureIndices, to.textureIndices, from.textureIndices.Length);
-            System.Array.Copy(from.materialIndices, to.materialIndices, from.materialIndices.Length);
             to.flags = from.flags;
         }
     }

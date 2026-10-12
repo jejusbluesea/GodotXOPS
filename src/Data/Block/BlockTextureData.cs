@@ -8,5 +8,7 @@ namespace GodotXOPS
     {
         // exe 폴더 기준 색 텍스처 경로. 비어 있으면 원본의 빈 텍스처 슬롯처럼 흰 면이 된다.
         public string diffusePath = string.Empty;
+        // 이 텍스처를 쓰는 면의 재질 번호 (block_material_data.json 의 목록, 10000 이상은 미션의 에드온 재질). -1 이면 미션의 기본 재질이다.
+        public int materialIndex = -1;
     }
 }

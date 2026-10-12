@@ -14,6 +14,7 @@ namespace GodotXOPS
         // 블록 데이터(BD2)와 포인트 데이터(PD2).
         public string blockPath = string.Empty;
         public string pointPath = string.Empty;
+        // 하늘 번호. 10000 이상은 addonSkyDataPath 의 파일의 (번호 - 10000) 번째다.
         public int skyIndex;
         // 추가 충돌 검사와 어두운 화면 (MIF 의 화면 플래그 두 비트).
         public bool adjustCollision;
@@ -33,6 +34,8 @@ namespace GodotXOPS
         public string addonBlockMaterialDataPath = string.Empty;
         public string addonSoundDataPath = string.Empty;
         public string addonImageDataPath = string.Empty;
+        // 이 미션이 들고 오는 하늘. sky_data.json 과 같은 키를 쓰는 JSON 이고 skyTexturePath 와 skyColor 두 목록만 읽는다. 비워 두면 없다.
+        public string addonSkyDataPath = string.Empty;
         // 이 미션 전용 스크립트 이벤트 묶음의 등록 파일. 종류 번호 10000 이상이 이 묶음의 이벤트다. 비워 두면 없다.
         public string addonEventDataPath = string.Empty;
         // 이 미션에서만 기본 화면 대신 그리는 화면 스크립트(.sgd). 비워 두면 평소의 화면이다. 이미지는 미션의 이미지 목록(10000 부터)을 번호로 그린다.

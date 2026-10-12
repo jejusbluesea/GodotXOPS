@@ -25,7 +25,7 @@ namespace GodotXOPS
         public Vector3[] vertices;
         public Vector2[] uvs;
         public int[] textureIndices;
-        // 면마다의 재질 번호. BD1 에는 재질이 없어 null 이다.
+        // 면마다의 재질 번호. BD2 에서는 그 면의 텍스처가 정한 것이다 (텍스처 목록의 materialIndex). BD1 에는 재질이 없어 null 이다.
         public int[] materialIndices;
         // true 면 passFlags 가 판정별 충돌 여부를 정한다 (BD2). false 면 세 판정 모두 충돌한다 (BD1). 어느 쪽이든 판형 블록은 충돌하지 않는다.
         public bool hasPassFlags;
@@ -49,7 +49,7 @@ namespace GodotXOPS
         public int layerMask;
         // 정점 모양이 유효한 입체가 아니어서(판형 블록) 플래그와 관계없이 충돌하지 않는 블록인지.
         public bool boardShape;
-        // 면마다의 재질 번호. 재질이 없는 맵(BD1)이면 null.
+        // 면마다의 재질 번호 (그 면의 텍스처가 정한 것). 재질이 없는 맵(BD1)이면 null.
         public int[] faceMaterials;
         public Vector3[] faceNormals;
         public Vector3[] faceCenters;

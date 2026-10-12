@@ -286,6 +286,7 @@ namespace GodotXOPS.Dev
             const int addonMagazine = 77;
             const float addonObjectHp = 55f;
             const string addonHitSound = "data/sound/hit3.wav";
+            const string addonSkyTexture = "data/sky/sky2.bmp";
             const int objectId = 300000;
 
             DataManager data = DataManager.Instance;
@@ -346,10 +347,16 @@ namespace GodotXOPS.Dev
             material.blockMaterialData.Add(new BlockMaterialData { name = "AddonFloor", hitEffect = k_addon, hitSounds = new List<string> { addonHitSound } });
             WriteJson($"{k_workFolder}/addon_material.json", material);
 
+            // 하늘: 텍스처 둘과 안개 색 하나. 색이 없는 번호는 검정이다.
+            var sky = new SkyData();
+            sky.skyTexturePath.Add(addonSkyTexture);
+            sky.skyTexturePath.Add(addonSkyTexture);
+            sky.skyColor.Add(new Color32 { r = 10, g = 20, b = 30, a = 255 });
+            WriteJson($"{k_workFolder}/addon_sky.json", sky);
+
             // --- 블록: 넓은 바닥. 재질은 전부 -1 이고 미션의 기본 재질이 에드온 재질이다 ---
             var blocks = new BD2File { textureListPath = $"{k_workFolder}/addon_textures.json" };
             blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
-            for (int f = 0; f < BD2Block.FaceCount; f++) blocks.blocks[0].materialIndices[f] = -1;
             var textures = new BlockTextureListData();
             textures.blockTextureData.Add(new BlockTextureData());
             WriteJson(blocks.textureListPath, textures);
@@ -382,6 +389,7 @@ namespace GodotXOPS.Dev
                 addonObjectDataPath = $"{k_workFolder}/addon_object.json",
                 addonEffectDataPath = $"{k_workFolder}/addon_effect.json",
                 addonBlockMaterialDataPath = $"{k_workFolder}/addon_material.json",
+                addonSkyDataPath = $"{k_workFolder}/addon_sky.json",
             };
             string missionPath = GamePath.Resolve($"{k_workFolder}/addon.mif2");
             MIF2File.Write(missionPath, mission, out _);
@@ -413,6 +421,17 @@ namespace GodotXOPS.Dev
                 && baseWeapon.weaponData.Neighbor(0, -1) == k_addon, "기본 목록과 에드온을 잇는 다음·이전 번호가 다름");
             Expect(baseWeapon.weaponGeneralData.noneWeaponIndex == noneWeapon && baseEffect.effectGeneralData.poolInitialSize == poolSize,
                 "에드온 파일의 전역 설정이 기본 데이터를 바꿈");
+
+            // 하늘: 번호 10000 부터가 미션의 하늘이다. 텍스처는 있고 안개 색이 없는 번호는 검정, 목록에 없는 번호는 없다. 기본 번호는 그대로다.
+            bool addonSky = MapLoader.TryGetSky(k_addon, out string skyTexture, out Color skyFog);
+            bool addonSkyNoColor = MapLoader.TryGetSky(k_addon + 1, out string skyTextureNoColor, out Color skyFogNoColor);
+            Expect(addonSky && skyTexture == addonSkyTexture && skyFog.IsEqualApprox(new Color32 { r = 10, g = 20, b = 30, a = 255 }.ToColor()), "미션의 하늘(10000)이 텍스처와 안개 색을 주지 않음");
+            Expect(addonSkyNoColor && skyTextureNoColor == addonSkyTexture && skyFogNoColor == Colors.Black, "안개 색을 적지 않은 미션의 하늘이 검정이 아님");
+            Expect(!MapLoader.TryGetSky(k_addon + 2, out _, out _) && MapLoader.TryGetSky(1, out string baseSky, out _) && baseSky == data.SkyData.skyTexturePath[1],
+                "목록에 없는 미션의 하늘 번호를 받아들이거나 기본 하늘이 달라짐");
+            MapLoader.LoadSkyData(k_addon);
+            Expect(MapLoader.Instance.FindChild("Skybox", true, false) != null, "미션의 하늘 번호로 하늘이 만들어지지 않음");
+            MapLoader.LoadSkyData(loader.SkyIndex);
 
             // 사람: 에드온 사람 종류로 스폰된다.
             Human player = MapLoader.Player;
@@ -470,6 +489,10 @@ namespace GodotXOPS.Dev
             Expect(baseHuman.humanData.AddonCount == 0 && baseWeapon.weaponData.AddonCount == 0 && baseObject.objectData.AddonCount == 0
                 && baseEffect.effectData.AddonCount == 0 && data.BlockMaterialParameterData.blockMaterialData.AddonCount == 0 && !baseWeapon.weaponData.Has(k_addon)
                 && baseWeapon.weaponData.Neighbor(baseWeapon.weaponData.Count - 1, 1) == 0, "맵을 내린 뒤에도 에드온 데이터가 남아 있음");
+            // 하늘은 맵이 아니라 미션 정보에 붙어 있다. 맵을 내려도 남고, 미션 정보를 내리면 떨어진다.
+            Expect(MapLoader.TryGetSky(k_addon, out _, out _), "맵만 내렸는데 미션의 하늘이 떨어짐");
+            MapLoader.UnloadMissionData();
+            Expect(!MapLoader.TryGetSky(k_addon, out _, out _), "미션 정보를 내린 뒤에도 미션의 하늘이 남아 있음");
 
             // 에드온 파일을 적지 않은 MIF2: 같은 포인트를 로드하면 에드온 번호는 전부 건너뛴다. 사람 종류가 없는 사람은 죽은 채로 스폰된다.
             mission.addonHumanDataPath = string.Empty;

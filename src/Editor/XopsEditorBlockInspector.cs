@@ -35,7 +35,15 @@ namespace GodotXOPS.Editor
         private Control m_faceBox;
         private Label m_faceLabel;
         private OptionButton m_faceTexture;
-        private OptionButton m_faceMaterial;
+        // 선택한 면의 재질을 알려 주는 글 (재질은 그 면의 텍스처가 정한다).
+        private Label m_faceMaterialLabel;
+        // 텍스처 목록에서 고른 텍스처의 재질.
+        private OptionButton m_textureMaterial;
+        // 텍스처 목록에서 고른 자리. 목록을 다시 채워도 남긴다. 없으면 −1.
+        private int m_textureSelected = -1;
+        // 값 칸이 마지막으로 보여 준 맨 앞 면의 키와 그 면의 텍스처. 다른 면을 고르거나 그 면의 텍스처가 바뀌면 텍스처 목록의 선택을 그 텍스처로 옮긴다.
+        private int m_inspectedFace = -1;
+        private int m_inspectedTexture = -1;
         private readonly SpinBox[] m_uvBoxes = new SpinBox[BD2Block.FaceVertexCount * 2];
         private ItemList m_textureList;
         // 재질 드롭다운의 줄 번호 → 재질 번호.
@@ -51,7 +59,7 @@ namespace GodotXOPS.Editor
         private static readonly string[] s_flagNames = { "Humans pass through", "Bullets pass through", "Sight passes through" };
 
         /// <summary>
-        /// 오른쪽 패널의 블록용 값 칸들을 만든다: 블록의 통과 플래그, 면의 텍스처·재질·UV, 텍스처 목록.
+        /// 오른쪽 패널의 블록용 값 칸들을 만든다: 블록의 통과 플래그, 면의 텍스처·UV, 텍스처 목록과 텍스처마다의 재질.
         /// </summary>
         /// <param name="column">칸을 넣을 세로 상자.</param>
         private void BuildBlockInspector(VBoxContainer column)
@@ -102,12 +110,8 @@ namespace GodotXOPS.Editor
             };
             grid.AddChild(m_faceTexture);
             grid.AddChild(new Label { Text = "Material" });
-            m_faceMaterial = new OptionButton { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, FocusMode = Control.FocusModeEnum.None, ClipText = true };
-            m_faceMaterial.ItemSelected += index =>
-            {
-                if (!m_fillingInspector) SetFaceMaterial(m_materialOptionIndices[(int)index]);
-            };
-            grid.AddChild(m_faceMaterial);
+            m_faceMaterialLabel = new Label { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, ClipText = true, MouseFilter = Control.MouseFilterEnum.Stop, TooltipText = "The material comes from the face's texture. Change it under Textures of this map" };
+            grid.AddChild(m_faceMaterialLabel);
 
             for (int corner = 0; corner < BD2Block.FaceVertexCount; corner++)
             {
@@ -140,7 +144,26 @@ namespace GodotXOPS.Editor
             box.AddChild(new HSeparator());
             box.AddChild(new Label { Text = "Textures of this map" });
             m_textureList = new ItemList { CustomMinimumSize = new Vector2(0f, k_textureListHeight), FocusMode = Control.FocusModeEnum.None };
+            m_textureList.ItemSelected += index =>
+            {
+                m_textureSelected = (int)index;
+                SyncTextureMaterial();
+            };
             box.AddChild(m_textureList);
+            // 재질(착탄 이펙트·소리, 발소리)은 텍스처마다 정한다. 그 텍스처를 쓰는 면 전부에 듣는다.
+            var materialRow = new HBoxContainer();
+            box.AddChild(materialRow);
+            materialRow.AddChild(new Label { Text = "Material" });
+            m_textureMaterial = new OptionButton
+            {
+                SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, FocusMode = Control.FocusModeEnum.None, ClipText = true,
+                TooltipText = "Material of the texture selected in the list: bullet hit effect and sound, footsteps. Every face using the texture gets it",
+            };
+            m_textureMaterial.ItemSelected += index =>
+            {
+                if (!m_fillingInspector) SetTextureMaterial(m_textureSelected, m_materialOptionIndices[(int)index]);
+            };
+            materialRow.AddChild(m_textureMaterial);
             var textureButtons = new HBoxContainer();
             box.AddChild(textureButtons);
             var add = new Button { Text = "Add...", FocusMode = Control.FocusModeEnum.None, TooltipText = "Add an image file to the texture list" };
@@ -239,28 +262,31 @@ namespace GodotXOPS.Editor
             }
             m_boardLabel.Visible = board;
 
+            List<int> faces = TargetFaces();
+            // 다른 면을 골랐거나 그 면의 텍스처가 바뀌었으면 텍스처 목록의 선택을 그 면의 텍스처로 옮긴다 (그 재질을 바로 고칠 수 있게).
+            int firstFace = faces.Count > 0 ? faces[0] : -1;
+            int firstTexture = firstFace >= 0 ? blocks[firstFace / ElementStride].textureIndices[firstFace % ElementStride] : -1;
+            if (firstFace != m_inspectedFace || firstTexture != m_inspectedTexture)
+            {
+                m_inspectedFace = firstFace;
+                m_inspectedTexture = firstTexture;
+                if (firstTexture >= 0 && firstTexture < textures.Count) m_textureSelected = firstTexture;
+            }
+            if (m_textureSelected >= textures.Count) m_textureSelected = -1;
+
             m_textureList.Clear();
             m_faceTexture.Clear();
             m_faceTexture.AddItem("(not drawn)");
             for (int i = 0; i < textures.Count; i++)
             {
                 string name = string.IsNullOrEmpty(textures[i].diffusePath) ? "(white)" : textures[i].diffusePath;
-                m_textureList.AddItem($"[{i}] {name}");
+                string material = textures[i].materialIndex == k_defaultMaterial ? string.Empty : $"  ({MaterialName(textures[i].materialIndex)})";
+                m_textureList.AddItem($"[{i}] {name}{material}");
                 m_faceTexture.AddItem($"[{i}] {Path.GetFileName(name)}");
             }
+            if (m_textureSelected >= 0) m_textureList.Select(m_textureSelected);
+            SyncTextureMaterial();
 
-            DataList<BlockMaterialData> materials = DataManager.Instance.BlockMaterialParameterData.blockMaterialData;
-            m_faceMaterial.Clear();
-            m_materialOptionIndices.Clear();
-            m_faceMaterial.AddItem("(mission default)");
-            m_materialOptionIndices.Add(k_defaultMaterial);
-            for (int i = 0; i < materials.Count; i++)
-            {
-                m_faceMaterial.AddItem($"[{i}] {materials[i].name}");
-                m_materialOptionIndices.Add(i);
-            }
-
-            List<int> faces = TargetFaces();
             m_faceBox.Visible = faces.Count > 0;
             if (faces.Count > 0)
             {
@@ -272,13 +298,8 @@ namespace GodotXOPS.Editor
                 int texture = block.textureIndices[face];
                 m_faceTexture.Select(texture >= 0 && texture < textures.Count ? texture + 1 : 0);
 
-                int material = block.materialIndices[face];
-                if (!m_materialOptionIndices.Contains(material))
-                {
-                    m_faceMaterial.AddItem($"[{material}]");
-                    m_materialOptionIndices.Add(material);
-                }
-                m_faceMaterial.Select(m_materialOptionIndices.IndexOf(material));
+                int material = texture >= 0 && texture < textures.Count ? textures[texture].materialIndex : k_defaultMaterial;
+                m_faceMaterialLabel.Text = material == k_defaultMaterial ? "(mission default)" : MaterialName(material);
 
                 for (int corner = 0; corner < BD2Block.FaceVertexCount; corner++)
                 {
@@ -348,12 +369,77 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 고칠 면들의 재질을 정한다.
+        /// 재질 번호를 사람이 알아볼 이름으로 적는다. 10000 이상은 지금 미션의 에드온 재질 파일에서 찾는다.
         /// </summary>
-        /// <param name="materialIndex">재질 번호. −1 이면 미션의 기본 재질이다.</param>
-        private void SetFaceMaterial(int materialIndex)
+        /// <param name="materialIndex">재질 번호.</param>
+        /// <returns>"[번호] 이름". 목록에 없는 번호면 번호만.</returns>
+        private string MaterialName(int materialIndex)
         {
-            EditFaces("Set material", (block, face) => block.materialIndices[face] = materialIndex);
+            BlockMaterialData material = LookupData<BlockMaterialData>(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData), materialIndex);
+            return material == null ? $"[{materialIndex}]" : $"[{materialIndex}] {material.name}";
+        }
+
+        /// <summary>
+        /// 재질 드롭다운을 채우고 텍스처 목록에서 고른 텍스처의 재질을 가리키게 한다: 미션의 기본 재질, 기본 데이터의 재질들, 지금 미션의 에드온 재질들(10000 부터).
+        /// </summary>
+        private void SyncTextureMaterial()
+        {
+            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            bool filling = m_fillingInspector;
+            m_fillingInspector = true;
+
+            m_textureMaterial.Clear();
+            m_materialOptionIndices.Clear();
+            m_textureMaterial.AddItem("(mission default)");
+            m_materialOptionIndices.Add(k_defaultMaterial);
+            System.Collections.IList materials = ListOf(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData));
+            System.Collections.IList addon = AddonListOf(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData));
+            for (int i = 0; materials != null && i < materials.Count; i++)
+            {
+                m_textureMaterial.AddItem($"[{i}] {ItemName(materials[i])}");
+                m_materialOptionIndices.Add(i);
+            }
+            for (int i = 0; addon != null && i < addon.Count; i++)
+            {
+                m_textureMaterial.AddItem($"[{DataList<BlockMaterialData>.AddonBase + i}] {ItemName(addon[i])}  (mission)");
+                m_materialOptionIndices.Add(DataList<BlockMaterialData>.AddonBase + i);
+            }
+
+            bool selected = m_textureSelected >= 0 && m_textureSelected < textures.Count;
+            m_textureMaterial.Disabled = !selected;
+            if (selected)
+            {
+                int material = textures[m_textureSelected].materialIndex;
+                if (!m_materialOptionIndices.Contains(material))
+                {
+                    m_textureMaterial.AddItem($"[{material}]  (not in the list)");
+                    m_materialOptionIndices.Add(material);
+                }
+                m_textureMaterial.Select(m_materialOptionIndices.IndexOf(material));
+            }
+            m_fillingInspector = filling;
+        }
+
+        /// <summary>
+        /// 텍스처 목록의 한 텍스처의 재질을 정한다. 그 텍스처를 쓰는 면 전부의 착탄 이펙트·소리와 발소리가 바뀐다.
+        /// </summary>
+        /// <param name="textureIndex">텍스처 목록의 번호.</param>
+        /// <param name="materialIndex">재질 번호. −1 이면 미션의 기본 재질이다.</param>
+        /// <returns>바꿨으면 true.</returns>
+        private bool SetTextureMaterial(int textureIndex, int materialIndex)
+        {
+            if (Transforming) CancelTransform();
+            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            if (textureIndex < 0 || textureIndex >= textures.Count) return Fail("Select a texture in the list first");
+            if (textures[textureIndex].materialIndex == materialIndex) return false;
+
+            BlockTextureData[] before = TextureListCommand.Snapshot(textures);
+            textures[textureIndex].materialIndex = materialIndex;
+            m_history.Push(new TextureListCommand("Set texture material", textures, before));
+            m_blockDirty = true;
+            RebuildBlocks();
+            SetMessage(materialIndex == k_defaultMaterial ? $"Texture [{textureIndex}] uses the mission's default material" : $"Texture [{textureIndex}] uses material {MaterialName(materialIndex)}");
+            return true;
         }
 
         /// <summary>
@@ -438,7 +524,7 @@ namespace GodotXOPS.Editor
                 if (fullPath == null || !File.Exists(fullPath)) return Fail($"Texture file open failed: {relativePath}");
             }
 
-            string[] before = TextureListCommand.Snapshot(textures);
+            BlockTextureData[] before = TextureListCommand.Snapshot(textures);
             if (replaceIndex < 0) textures.Add(new BlockTextureData { diffusePath = relativePath ?? string.Empty });
             else textures[replaceIndex].diffusePath = relativePath ?? string.Empty;
 

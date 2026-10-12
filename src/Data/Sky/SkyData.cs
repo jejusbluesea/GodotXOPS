@@ -14,10 +14,6 @@ namespace GodotXOPS
         // sky 번호별 fog 색 (skyTexturePath 와 동일 인덱스). 원본 SetFog skycolor switch (d3dgraphics-directx.cpp:1287-1292).
         public List<Color32> skyColor = new List<Color32>();
 
-        // 메인 카메라 클리핑 면 (원본 CLIPPINGPLANE_NEAR/FAR ×0.1). CameraClippingApplier 가 카메라에 적용.
-        public float nearClippingPlane;
-        public float farClippingPlane;
-
         // 안개 적용 여부 (false 면 fog 미적용). fogStart~fogEnd = Linear 안개 거리 구간.
         public bool fog;
         public float fogStart;

@@ -13,7 +13,7 @@ namespace GodotXOPS
         // 면 재질 번호 -1 이 가리키는 재질 번호.
         private int m_defaultBlockMaterial;
 
-        // 면 재질 번호 -1 이 가리키는 재질 번호. 확장 미션 데이터가 정한다 (기본 0).
+        // 재질 번호 -1 (재질을 적지 않은 텍스처의 면, 그리지 않는 면)이 가리키는 재질 번호. 확장 미션 데이터가 정한다 (기본 0).
         public static int DefaultBlockMaterial
         {
             get => Instance.m_defaultBlockMaterial;

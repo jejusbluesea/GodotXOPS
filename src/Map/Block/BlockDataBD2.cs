@@ -24,12 +24,17 @@ namespace GodotXOPS
                 return false;
             }
 
+            if (file.droppedFaceMaterials)
+            {
+                Debugger.LogWarning($"BD2 file of 1.2.2 or older: its per-face materials are ignored. Set the material on the texture list instead: {filepath}", nameof(MapLoader));
+            }
             ConvertBD2(file, null, out texturePaths, out rawBlocks);
             return true;
         }
 
         /// <summary>
         /// BD2 의 내용과 그것이 가리키는 텍스처 목록을 블록 원시 데이터로 바꾼다. 배열(정점, UV, 번호)은 BD2 의 것을 그대로 가리킨다.
+        /// 면의 재질 번호는 그 면의 텍스처가 정한다 (텍스처 목록의 materialIndex). 그리지 않는 면과 목록에 없는 번호의 면은 미션의 기본 재질(-1)이다.
         /// </summary>
         /// <param name="file">BD2 의 내용.</param>
         /// <param name="textures">텍스처 목록. null 이면 BD2 가 가리키는 텍스처 목록 파일을 읽는다.</param>
@@ -48,12 +53,18 @@ namespace GodotXOPS
             for (int i = 0; i < rawBlocks.Length; i++)
             {
                 BD2Block block = file.blocks[i];
+                var materialIndices = new int[BD2Block.FaceCount];
+                for (int f = 0; f < materialIndices.Length; f++)
+                {
+                    int texture = block.textureIndices[f];
+                    materialIndices[f] = texture >= 0 && texture < list.blockTextureData.Count ? list.blockTextureData[texture].materialIndex : -1;
+                }
                 rawBlocks[i] = new RawBlockData
                 {
                     vertices = block.vertices,
                     uvs = block.uvs,
                     textureIndices = block.textureIndices,
-                    materialIndices = block.materialIndices,
+                    materialIndices = materialIndices,
                     hasPassFlags = true,
                     passFlags = block.flags,
                 };
@@ -62,7 +73,7 @@ namespace GodotXOPS
 
         /// <summary>
         /// BD1 파일을 같은 화면과 같은 판정을 내는 BD2 로 바꾼다. 텍스처 슬롯 10개는 텍스처 목록의 항목 10개가 되고,
-        /// 판형 블록(충돌 없음)은 세 판정을 모두 끈 플래그가 된다. 재질은 전부 기본 재질(-1)이다.
+        /// 판형 블록(충돌 없음)은 세 판정을 모두 끈 플래그가 된다. 텍스처의 재질은 전부 기본 재질(-1)이다.
         /// </summary>
         /// <param name="bd1Path">BD1 파일 전체 경로. exe 폴더 안에 있어야 텍스처 경로를 적을 수 있다.</param>
         /// <param name="textureListPath">BD2 에 적을 텍스처 목록 파일 경로 (exe 폴더 기준).</param>
@@ -105,7 +116,6 @@ namespace GodotXOPS
                     // BD1 에서 슬롯 범위 밖의 번호는 그리지 않는 면이다. BD2 에서는 음수로 적는다.
                     int textureIndex = raw.textureIndices[f];
                     block.textureIndices[f] = textureIndex >= 0 && textureIndex < texturePaths.Length ? textureIndex : -1;
-                    block.materialIndices[f] = -1;
                 }
                 file.blocks.Add(block);
             }
