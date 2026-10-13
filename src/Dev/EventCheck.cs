@@ -1247,7 +1247,7 @@ func bump(p, state):
             Vector3 forward = Coord.AimDirection(controller.Yaw, controller.Pitch);
 
             PD2File file = BaseFile();
-            file.eventEntryIds.AddRange(new[] { 100, 200, 300, 400 });
+            file.eventEntryIds.AddRange(new[] { 100, 200, 300, 400, 500 });
             int far = PD2File.FloatCell(1000f);
             // 줄 0: 글자 놓기(스프라이트, 오른쪽 위, 빨강) → Interact(각도 무관. 안내 칸을 함께 쓰는 줄 3 과 같은 문구) → 변수 → 글자 지우기 → 변수 표시 → 대기.
             file.points.Add(Event(showText, 100, 0, 101, 1, sprite, topRight, PD2File.FloatCell(-10f), PD2File.FloatCell(-12f), PD2File.FloatCell(20f), red, PD2File.FloatCell(0f)));
@@ -1268,6 +1268,11 @@ func bump(p, state):
             front.position = eye + forward * 5f;
             file.points.Add(front);
             file.points.Add(Event(setVar, 401, 8, 402, 1));
+            // 줄 4: 다른 Interact 들이 끝난 뒤에(안내 칸을 함께 쓴다) 0.3초(10틱) 동안 꾹 눌러야 하는 Interact. 안내는 기본 문구다.
+            const int holdStart = 50, holdTicks = 10;
+            file.points.Add(Event(waitTicks, 500, holdStart, 501));
+            file.points.Add(Event(waitInteract, 501, 0, 502, far, PD2File.FloatCell(180f), -1, PD2File.FloatCell(0.3f)));
+            file.points.Add(Event(setVar, 502, 9, 503, 1));
 
             int errors = Debugger.ErrorCount;
             if (!WriteAndLoad(BuildPack(), k_script, file))
@@ -1320,6 +1325,27 @@ func bump(p, state):
             Expect(timer != null && timer["text"].AsString() == "1:04" && events.GetVariable(5) == 64, $"44틱 뒤의 카운트다운이 다름 (\"{timer?["text"]}\")");
             Expect(FindText(texts, 1) == null, "시간이 정해진 글자가 사라지지 않음");
             Expect(FindText(texts, promptSlot) == null, "넘어간 Interact 의 안내가 남아 있음");
+
+            // 꾹 누르는 Interact: 누르고 있는 틱을 세고, 떼면 처음부터 다시 센다. 누른 순간만으로는 넘어가지 않는다.
+            for (int tick = 0; tick < holdStart; tick++) SimClock.Step();
+            prompt = FindText(events.HudTexts(), promptSlot);
+            Expect(prompt != null && prompt["text"].AsString() == $"HOLD {key}", $"꾹 누르는 Interact 의 기본 안내가 다름 (\"{prompt?["text"]}\")");
+            events.QueueInteract();
+            SimClock.Step();
+            Expect(events.GetVariable(9) == 0, "꾹 눌러야 하는 Interact 가 한 번 누른 것으로 넘어감");
+            events.SetInteractHeld(true);
+            for (int tick = 0; tick < holdTicks / 2; tick++) SimClock.Step();
+            prompt = FindText(events.HudTexts(), promptSlot);
+            Expect(events.InteractHeld && events.GetVariable(9) == 0 && prompt != null && prompt["text"].AsString() == $"HOLD {key}  50%",
+                $"누르고 있는 동안의 안내가 진행을 보여 주지 않음 (\"{prompt?["text"]}\")");
+            events.SetInteractHeld(false);
+            SimClock.Step();
+            events.SetInteractHeld(true);
+            for (int tick = 0; tick < holdTicks - 1; tick++) SimClock.Step();
+            Expect(events.GetVariable(9) == 0, "키를 뗐다가 다시 눌렀는데 누른 시간이 처음부터 다시 세지지 않음");
+            SimClock.Step();
+            Expect(events.GetVariable(9) == 1 && FindText(events.HudTexts(), promptSlot) == null, "정한 시간만큼 눌렀는데 넘어가지 않거나 안내가 남음");
+            events.SetInteractHeld(false);
 
             // 칸의 범위와 미션 종료.
             events.SetHudText(EventManager.HudSlotCount, "x", null);

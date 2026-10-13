@@ -169,6 +169,11 @@
           "name": "message",
           "slot": "e2",
           "kind": "message"
+        },
+        {
+          "name": "hold",
+          "slot": "e3",
+          "kind": "float"
         }
       ],
       "exits": [

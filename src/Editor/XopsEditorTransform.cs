@@ -497,7 +497,7 @@ namespace GodotXOPS.Editor
                 return;
             }
 
-            if (command is BlockChangeCommand or BlockListCommand or TextureListCommand)
+            if (command is BlockChangeCommand or BlockListCommand or TextureListCommand or TextureDeleteCommand)
             {
                 m_blockDirty = true;
                 RebuildBlocks();

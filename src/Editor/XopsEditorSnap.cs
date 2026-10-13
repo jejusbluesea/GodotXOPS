@@ -48,6 +48,8 @@ namespace GodotXOPS.Editor
         // 변형하는 것들 가운데 대상에 맞춰지는 것의 순번 (m_transformStarts 의 번호). 변형을 시작할 때 마우스에 가장 가까운 것이다.
         private int m_transformAnchor;
         private readonly HashSet<int> m_snapExcluded = new HashSet<int>();
+        // 지금 변형으로 움직이고 있는 꼭짓점의 키. 축을 묶었을 때 자기 블록의 움직이지 않는 꼭짓점에는 붙을 수 있게 가르는 데 쓴다.
+        private readonly HashSet<int> m_snapMoving = new HashSet<int>();
 
         private int SnapSlot => m_editMode == EditMode.Block ? 1 : 0;
 
@@ -153,7 +155,9 @@ namespace GodotXOPS.Editor
 
         /// <summary>
         /// 마우스 아래에서 붙을 자리를 찾는다. 꼭짓점·모서리의 가운데·면의 가운데 가운데 화면에서 가장 가까운 것이 먼저이고,
-        /// 없으면 모서리 위의 가장 가까운 점, 그것도 없으면 마우스 아래의 면이다. 옮기고 있는 블록은 대상에서 뺀다.
+        /// 없으면 모서리 위의 가장 가까운 점, 그것도 없으면 마우스 아래의 면이다. 옮기고 있는 블록은 대상에서 뺀다:
+        /// 자기 꼭짓점에 붙으면 블록이 찌그러지기 쉽다. 다만 축을 묶은 동안에는 그 축으로만 움직이므로, 자기 블록에서도 움직이지 않는 꼭짓점과
+        /// 그것들로만 된 모서리·면의 가운데에는 붙는다 (한 면을 반대쪽 꼭짓점의 자리에 맞춰 반듯한 상자를 만들 때 쓴다). 면 위(Face)는 늘 다른 블록의 면이다.
         /// X-RAY 가 꺼져 있으면 블록에 가려진 자리에는 붙지 않는다.
         /// </summary>
         /// <param name="mouse">화면 좌표 (픽셀).</param>
@@ -170,9 +174,21 @@ namespace GodotXOPS.Editor
             IReadOnlyList<int[]> faces = MapLoader.BlockFaceVertices;
 
             m_snapExcluded.Clear();
+            m_snapMoving.Clear();
+            bool ownAllowed = false;
             if (Transforming && m_transformingBlocks)
             {
                 foreach (int index in m_transformBlockIndices) m_snapExcluded.Add(index);
+                foreach (int key in m_transformVertexKeys) m_snapMoving.Add(key);
+                ownAllowed = m_transformAxis != TransformAxis.None;
+            }
+            // 옮기고 있는 블록의 것이면, 그 꼭짓점들이 전부 움직이지 않는 것일 때만 대상이다.
+            bool Usable(int block, bool own, int first, int second = -1, int third = -1, int fourth = -1)
+            {
+                if (!own) return true;
+                int blockBase = block * ElementStride;
+                return !m_snapMoving.Contains(blockBase + first) && (second < 0 || !m_snapMoving.Contains(blockBase + second))
+                    && (third < 0 || !m_snapMoving.Contains(blockBase + third)) && (fourth < 0 || !m_snapMoving.Contains(blockBase + fourth));
             }
 
             float best = k_snapRadiusPixels;
@@ -198,20 +214,31 @@ namespace GodotXOPS.Editor
             {
                 for (int b = 0; b < blocks.Count; b++)
                 {
-                    if (m_snapExcluded.Contains(b)) continue;
+                    bool own = m_snapExcluded.Contains(b);
+                    if (own && !ownAllowed) continue;
 
                     Vector3[] vertices = blocks[b].vertices;
                     if (targets.HasFlag(SnapTarget.Vertex))
                     {
-                        foreach (Vector3 vertex in vertices) Consider(vertex, SnapTarget.Vertex, ref point, ref kind);
+                        for (int v = 0; v < vertices.Length; v++)
+                        {
+                            if (Usable(b, own, v)) Consider(vertices[v], SnapTarget.Vertex, ref point, ref kind);
+                        }
                     }
                     if (targets.HasFlag(SnapTarget.EdgeCenter))
                     {
-                        foreach (int[] edge in BlockOverlay.Edges) Consider((vertices[edge[0]] + vertices[edge[1]]) * 0.5f, SnapTarget.EdgeCenter, ref point, ref kind);
+                        foreach (int[] edge in BlockOverlay.Edges)
+                        {
+                            if (Usable(b, own, edge[0], edge[1])) Consider((vertices[edge[0]] + vertices[edge[1]]) * 0.5f, SnapTarget.EdgeCenter, ref point, ref kind);
+                        }
                     }
                     if (targets.HasFlag(SnapTarget.FaceCenter))
                     {
-                        foreach (int[] face in faces) Consider((vertices[face[0]] + vertices[face[1]] + vertices[face[2]] + vertices[face[3]]) * 0.25f, SnapTarget.FaceCenter, ref point, ref kind);
+                        foreach (int[] face in faces)
+                        {
+                            if (!Usable(b, own, face[0], face[1], face[2], face[3])) continue;
+                            Consider((vertices[face[0]] + vertices[face[1]] + vertices[face[2]] + vertices[face[3]]) * 0.25f, SnapTarget.FaceCenter, ref point, ref kind);
+                        }
                     }
                 }
                 if (kind != SnapTarget.None) return true;
@@ -223,11 +250,13 @@ namespace GodotXOPS.Editor
             {
                 for (int b = 0; b < blocks.Count; b++)
                 {
-                    if (m_snapExcluded.Contains(b)) continue;
+                    bool own = m_snapExcluded.Contains(b);
+                    if (own && !ownAllowed) continue;
 
                     Vector3[] vertices = blocks[b].vertices;
                     foreach (int[] edge in BlockOverlay.Edges)
                     {
+                        if (!Usable(b, own, edge[0], edge[1])) continue;
                         Consider(ClosestOnSegmentToRay(vertices[edge[0]], vertices[edge[1]], origin, direction), SnapTarget.Edge, ref point, ref kind);
                     }
                 }

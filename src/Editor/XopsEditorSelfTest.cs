@@ -677,6 +677,8 @@ namespace GodotXOPS.Editor
             Redo();
 
             CheckBlockUV(added);
+            CheckBlockSnap(added);
+            CheckTextureDelete(added);
 
             // 저장: 다른 이름으로 저장하면 텍스처 목록도 그 옆에 따로 쓰인다.
             string saved = $"{k_selfTestFolder}/values.bd2";
@@ -1566,6 +1568,129 @@ namespace GodotXOPS.Editor
             UpdateDetails();
             RefreshUVEditor(true);
             Expect(m_uvCanvas.FaceCount == BD2Block.FaceCount && m_uvCanvas.SelectedCount == 0, "블록 단위에서 UV 편집 화면이 여섯 면을 보여 주지 않거나 전의 선택이 남음");
+        }
+
+        /// <summary>
+        /// 블록의 스냅을 확인한다: 직교 시점에서 격자에 붙는지, 축을 묶으면 자기 블록의 움직이지 않는 꼭짓점에 붙고 묶지 않으면 붙지 않는지.
+        /// </summary>
+        /// <param name="added">시험에 쓸 블록의 번호 (한 변 1 m 의 상자).</param>
+        private void CheckBlockSnap(int added)
+        {
+            const float tolerance = 1e-4f;
+            const float grid = 0.5f;
+            // 꼭짓점 0 의 바로 아래가 4 다 (같은 X, Z). 0 을 격자에서 벗어나게 밀어 놓고 시작한다.
+            const int movedVertex = 0;
+            const int belowVertex = 4;
+            Camera3D camera = m_view.Camera;
+            BD2Block block = m_document.Blocks.blocks[added];
+            SnapTarget savedTargets = m_snapTargets[1];
+            bool savedOn = m_snapOn[1];
+            bool savedXray = m_xray;
+            float savedGrid = m_gridSize;
+            Vector3 savedVertex = block.vertices[movedVertex];
+
+            SetXray(true);
+            SetBlockElement(BlockElement.Vertex);
+            m_blockSelection.Add(added * ElementStride + movedVertex);
+            UpdateDetails();
+            ViewFront(false);
+            FocusSelection();
+            block.vertices[movedVertex] = savedVertex + new Vector3(0.13f, 0.07f, 0f);
+            Vector3 start = block.vertices[movedVertex];
+            m_snapOn[1] = true;
+            m_gridSize = grid;
+
+            // 직교 시점(정면)에서 격자만 켜고 옮기면 화면의 두 축은 격자점에 오고, 보는 방향의 축은 그대로다.
+            m_snapTargets[1] = SnapTarget.Grid;
+            Vector2 at = camera.UnprojectPosition(start);
+            BeginTransform(TransformMode.Move);
+            m_transformStartMouse = at;
+            m_transformMouse = at + new Vector2(37f, -23f);
+            UpdateTransform();
+            Vector3 cells = block.vertices[movedVertex] / grid;
+            Expect(m_view.Orthographic && Mathf.Abs(cells.X - Mathf.Round(cells.X)) < tolerance && Mathf.Abs(cells.Y - Mathf.Round(cells.Y)) < tolerance
+                && Mathf.Abs(block.vertices[movedVertex].Z - start.Z) < tolerance,
+                $"직교 시점에서 격자를 켰는데 블록의 꼭짓점이 격자점에 오지 않음 ({block.vertices[movedVertex]})");
+            CancelTransform();
+
+            // 격자와 꼭짓점을 함께 켜도, 마우스 근처에 꼭짓점이 없으면 격자에 붙는다.
+            m_snapTargets[1] = SnapTarget.Grid | SnapTarget.Vertex;
+            BeginTransform(TransformMode.Move);
+            m_transformStartMouse = at;
+            m_transformMouse = at + new Vector2(37f, -23f);
+            UpdateTransform();
+            bool nearVertex = FindSnapPoint(m_transformMouse, SnapTarget.Vertex, out _, out _);
+            cells = block.vertices[movedVertex] / grid;
+            Expect(nearVertex || (Mathf.Abs(cells.X - Mathf.Round(cells.X)) < tolerance && Mathf.Abs(cells.Y - Mathf.Round(cells.Y)) < tolerance),
+                "격자와 꼭짓점을 함께 켰을 때 꼭짓점이 없는 자리에서 격자에 붙지 않음");
+            CancelTransform();
+
+            // 자기 블록의 꼭짓점: 축을 묶지 않으면 대상이 아니고, 묶으면 움직이지 않는 꼭짓점에 붙어 그 축의 값만 맞춰진다.
+            m_snapTargets[1] = SnapTarget.Vertex;
+            Vector3 below = block.vertices[belowVertex];
+            Vector2 overBelow = camera.UnprojectPosition(below);
+            BeginTransform(TransformMode.Move);
+            m_transformStartMouse = at;
+            m_transformMouse = overBelow;
+            UpdateTransform();
+            bool freeFound = FindSnapPoint(overBelow, SnapTarget.Vertex, out Vector3 freeHit, out _);
+            Expect(!freeFound || Mathf.Abs(freeHit.X - below.X) > tolerance || Mathf.Abs(freeHit.Y - below.Y) > tolerance, "축을 묶지 않았는데 자기 블록의 꼭짓점이 스냅 대상임");
+            SetTransformAxis(TransformAxis.X);
+            bool lockedFound = FindSnapPoint(overBelow, SnapTarget.Vertex, out Vector3 lockedHit, out SnapTarget lockedKind);
+            Expect(lockedFound && lockedKind == SnapTarget.Vertex && Mathf.Abs(lockedHit.X - below.X) < tolerance && Mathf.Abs(lockedHit.Y - below.Y) < tolerance,
+                "축을 묶었는데 자기 블록의 움직이지 않는 꼭짓점이 스냅 대상이 아님");
+            Expect(Mathf.Abs(block.vertices[movedVertex].X - below.X) < tolerance && Mathf.Abs(block.vertices[movedVertex].Y - start.Y) < tolerance
+                && Mathf.Abs(block.vertices[movedVertex].Z - start.Z) < tolerance, $"X 축에 묶고 자기 꼭짓점에 붙였는데 X 만 맞춰지지 않음 ({block.vertices[movedVertex]})");
+            // 움직이고 있는 꼭짓점 자신은 축을 묶어도 대상이 아니다.
+            bool selfFound = FindSnapPoint(camera.UnprojectPosition(block.vertices[movedVertex]) + new Vector2(0f, -40f), SnapTarget.Vertex, out Vector3 selfHit, out _);
+            Expect(!selfFound || selfHit.DistanceTo(block.vertices[movedVertex]) > tolerance, "움직이고 있는 꼭짓점 자신이 스냅 대상임");
+            CancelTransform();
+
+            block.vertices[movedVertex] = savedVertex;
+            m_snapTargets[1] = savedTargets;
+            m_snapOn[1] = savedOn;
+            m_gridSize = savedGrid;
+            SetXray(savedXray);
+            RebuildBlocks();
+        }
+
+        /// <summary>
+        /// 텍스처 목록에서 지우기를 확인한다: 앞의 10개는 지우지 못하고, 그 뒤의 것을 지우면 그 텍스처를 쓰던 면은 그리지 않는 면이 되고
+        /// 뒤의 번호를 쓰던 면은 하나씩 당겨지며, 한 번에 되돌려진다. 끝나면 목록과 블록을 처음대로 돌려놓는다.
+        /// </summary>
+        /// <param name="added">시험에 쓸 블록의 번호.</param>
+        private void CheckTextureDelete(int added)
+        {
+            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            BD2Block block = m_document.Blocks.blocks[added];
+            int count = textures.Count;
+            int savedFirst = block.textureIndices[0];
+            int savedSecond = block.textureIndices[1];
+            string path = textures[0].diffusePath;
+
+            Expect(count >= k_fixedTextureSlots && SetTexture(path, -1) && SetTexture(path, -1) && textures.Count == count + 2, "지우기 점검용 텍스처 둘을 더하지 못함");
+            textures[count + 1].materialIndex = 0;
+            block.textureIndices[0] = count;
+            block.textureIndices[1] = count + 1;
+            RebuildBlocks();
+
+            int undoBefore = m_history.UndoCount;
+            Expect(!DeleteTexture(0) && m_messageIsError && textures.Count == count + 2 && m_history.UndoCount == undoBefore, "원본의 슬롯에 해당하는 앞쪽 텍스처를 지움");
+            Expect(!DeleteTexture(count + 5) && textures.Count == count + 2, "목록에 없는 자리를 지움");
+            Expect(DeleteTexture(count) && textures.Count == count + 1 && block.textureIndices[0] == k_noTexture && block.textureIndices[1] == count
+                && textures[count].materialIndex == 0 && m_history.UndoCount == undoBefore + 1 && m_textureList.ItemCount == count + 1,
+                $"텍스처를 지웠는데 목록이나 면의 번호가 맞지 않음 (면 {block.textureIndices[0]}, {block.textureIndices[1]})");
+            Undo();
+            block = m_document.Blocks.blocks[added];
+            Expect(textures.Count == count + 2 && block.textureIndices[0] == count && block.textureIndices[1] == count + 1 && textures[count + 1].materialIndex == 0,
+                "텍스처 지우기를 되돌렸는데 목록이나 면의 번호가 돌아오지 않음");
+
+            block.textureIndices[0] = savedFirst;
+            block.textureIndices[1] = savedSecond;
+            Undo();
+            Undo();
+            Expect(textures.Count == count, "지우기 점검이 텍스처 목록을 처음대로 돌려놓지 못함");
+            RebuildBlocks();
         }
 
         /// <summary>

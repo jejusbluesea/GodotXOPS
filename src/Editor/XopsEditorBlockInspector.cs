@@ -28,6 +28,8 @@ namespace GodotXOPS.Editor
         private const string k_textureListSuffix = "_textures.json";
         private const string k_textureListExtension = ".json";
         private const float k_textureListHeight = 110f;
+        // 텍스처 목록에서 지울 수 없는 앞쪽 자리의 수. 원본(BD1)의 텍스처 슬롯 10개에 해당하는 자리이고, 그 뒤에 더한 것만 지울 수 있다.
+        private const int k_fixedTextureSlots = 10;
 
         // 블록 모드의 값 칸들.
         private Control m_blockBox;
@@ -177,6 +179,9 @@ namespace GodotXOPS.Editor
                 else PickTextureFile(chosen[0]);
             };
             textureButtons.AddChild(replace);
+            var delete = new Button { Text = "Delete", FocusMode = Control.FocusModeEnum.None, TooltipText = "Delete the texture selected in the list. Only textures after the first 10 can be deleted. Faces using it are no longer drawn, and the numbers after it move up by one" };
+            delete.Pressed += () => DeleteTexture(m_textureSelected);
+            textureButtons.AddChild(delete);
         }
 
         /// <summary>
@@ -532,6 +537,49 @@ namespace GodotXOPS.Editor
             m_blockDirty = true;
             RebuildBlocks();
             SetMessage(replaceIndex < 0 ? $"Added texture [{textures.Count - 1}] {relativePath}" : $"Texture [{replaceIndex}] is now {relativePath}");
+            return true;
+        }
+
+        /// <summary>
+        /// 텍스처 목록에서 한 자리를 지운다. 원본의 슬롯에 해당하는 앞의 10개는 지우지 못한다.
+        /// 뒤의 번호가 하나씩 당겨지므로 블록의 면이 가리키는 번호도 함께 고친다: 지운 텍스처를 쓰던 면은 그리지 않는 면이 되고, 더 뒤의 번호는 하나씩 줄인다.
+        /// </summary>
+        /// <param name="index">지울 자리.</param>
+        /// <returns>지웠으면 true.</returns>
+        private bool DeleteTexture(int index)
+        {
+            if (Transforming) CancelTransform();
+            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            if (index < 0 || index >= textures.Count) return Fail("Select a texture in the list first");
+            if (index < k_fixedTextureSlots) return Fail($"Textures [0] to [{k_fixedTextureSlots - 1}] cannot be deleted (use Replace). Only textures added after them can");
+
+            List<BD2Block> blocks = m_document.Blocks.blocks;
+            BlockTextureData[] texturesBefore = TextureListCommand.Snapshot(textures);
+            BD2Block[] blocksBefore = BlockListCommand.Snapshot(blocks);
+            string path = textures[index].diffusePath;
+            textures.RemoveAt(index);
+            int cleared = 0;
+            foreach (BD2Block block in blocks)
+            {
+                for (int f = 0; f < BD2Block.FaceCount; f++)
+                {
+                    if (block.textureIndices[f] == index)
+                    {
+                        block.textureIndices[f] = k_noTexture;
+                        cleared++;
+                    }
+                    else if (block.textureIndices[f] > index)
+                    {
+                        block.textureIndices[f]--;
+                    }
+                }
+            }
+
+            m_history.Push(new TextureDeleteCommand("Delete texture", new TextureListCommand("Delete texture", textures, texturesBefore), new BlockListCommand("Delete texture", blocks, blocksBefore)));
+            m_textureSelected = -1;
+            m_blockDirty = true;
+            RebuildBlocks();
+            SetMessage($"Deleted texture [{index}] {path}{(cleared > 0 ? $": {cleared} face(s) used it and are no longer drawn" : string.Empty)}");
             return true;
         }
 

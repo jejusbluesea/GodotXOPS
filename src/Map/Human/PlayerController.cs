@@ -174,7 +174,11 @@ namespace GodotXOPS
             m_pitch = Mathf.Clamp(m_controller.Pitch, -k_pitchLimit, k_pitchLimit);
 
             // Interact 는 사람이 아니라 미션 이벤트가 받는다. 다음 틱의 이벤트가 소비한다. 조작 잠금으로 막지 않는다.
-            if (input.WasPressed(InputManager.Interact) && EventManager.Loaded) EventManager.Instance.QueueInteract();
+            if (EventManager.Loaded)
+            {
+                if (input.WasPressed(InputManager.Interact)) EventManager.Instance.QueueInteract();
+                EventManager.Instance.SetInteractHeld(input.IsPressed(InputManager.Interact));
+            }
 
             // 전부 잠겼으면 사람에게 아무 입력도 넣지 않는다. 게임 정지 중에는 틱이 입력을 소비하지 않고, 지시를 받는 중이면 AI 가 넣은 입력을 덮어쓰면 안 된다.
             if (locks == EventManager.LockAll)

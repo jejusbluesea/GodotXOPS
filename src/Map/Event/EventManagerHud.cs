@@ -49,11 +49,16 @@ namespace GodotXOPS
         private int m_hudRevision;
         private bool m_interactPending;
         private bool m_interactNow;
+        // Interact 키를 누르고 있는지: 프레임에서 들어온 값과 이번 틱의 것으로 확정한 값.
+        private bool m_interactHeldInput;
+        private bool m_interactHeldNow;
 
         // 화면 글자의 내용이 바뀔 때마다 오르는 값. HUD 는 이 값이 바뀌었을 때만 HudTexts 를 다시 읽는다.
         public int HudRevision => m_hudRevision;
         // 이번 틱에 플레이어가 Interact 키를 눌렀는지. 살아 있는 플레이어가 지난 틱 뒤에 누른 것만 친다.
         public bool InteractPressed => m_interactNow;
+        // 이번 틱에 플레이어가 Interact 키를 누르고 있는지 (꾹 눌러야 하는 이벤트가 쓴다). 살아 있는 플레이어만 친다.
+        public bool InteractHeld => m_interactHeldNow;
 
         /// <summary>
         /// 플레이어가 Interact 키를 눌렀음을 알린다 (PlayerController). 다음 틱 한 번 동안 InteractPressed 가 켜진다.
@@ -61,6 +66,15 @@ namespace GodotXOPS
         public void QueueInteract()
         {
             m_interactPending = true;
+        }
+
+        /// <summary>
+        /// 플레이어가 Interact 키를 누르고 있는지 알린다 (PlayerController 가 프레임마다). 다음 틱부터 InteractHeld 에 반영된다.
+        /// </summary>
+        /// <param name="held">누르고 있으면 true.</param>
+        public void SetInteractHeld(bool held)
+        {
+            m_interactHeldInput = held;
         }
 
         /// <summary>
@@ -172,8 +186,10 @@ namespace GodotXOPS
         private void LatchInteract()
         {
             Human player = MapLoader.Player;
-            m_interactNow = m_interactPending && player != null && player.Alive;
+            bool alive = player != null && player.Alive;
+            m_interactNow = m_interactPending && alive;
             m_interactPending = false;
+            m_interactHeldNow = m_interactHeldInput && alive;
         }
 
         /// <summary>
@@ -203,6 +219,8 @@ namespace GodotXOPS
             ResetHudImages();
             m_interactPending = false;
             m_interactNow = false;
+            m_interactHeldInput = false;
+            m_interactHeldNow = false;
         }
 
         /// <summary>

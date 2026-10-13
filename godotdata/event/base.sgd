@@ -68,32 +68,56 @@ func wait_ticks(p, state):
 		return 0
 	return -1
 
+# Waits for the player to press Interact near this point. hold is how many seconds the key must be kept down; 0 passes on the press.
+# The hold starts over when the key is released or the player steps out of reach or looks away.
 func wait_interact(p, state):
+	if not interact_in_reach(p):
+		state["held"] = 0
+		return -1
+	# Whole ticks, rounded like every other time in the game (one second is 100 / 3 ticks).
+	var need = int(p["hold"] * 100.0 / 3.0 + 0.5)
+	var held = 0
+	if need <= 0:
+		if api["interact_pressed"].call():
+			api["hud_clear"].call(31)
+			return 0
+	else:
+		if api["interact_held"].call():
+			held = state.get("held", 0) + 1
+		state["held"] = held
+		if held >= need:
+			api["hud_clear"].call(31)
+			return 0
+	var text = "PRESS " + api["key_name"].call("interact")
+	if need > 0:
+		text = "HOLD " + api["key_name"].call("interact")
+	if p["message"] >= 0:
+		text = api["message_text"].call(p["message"])
+	if held > 0:
+		text = text + "  " + str(int(held * 100 / need)) + "%"
+	# Slot 31 is the prompt slot of this pack. The text lasts 0.1 s and is renewed every tick, so it disappears by itself when the condition ends.
+	api["hud_text"].call(31, text, {"font": 1, "anchor": 4, "x": 0.0, "y": -40.0, "size": 16.0, "seconds": 0.1})
+	return -1
+
+# Whether the human of a Wait Interact is the player, alive, within the radius of the point and looking at it within the angle.
+func interact_in_reach(p):
 	var i = api["find_human"].call(p["human"])
 	if i < 0:
-		return -1
+		return false
 	if i != api["player"].call():
-		return -1
+		return false
 	var h = api["human"].call(i)
 	if not h["alive"]:
-		return -1
+		return false
 	var dx = h["x"] - p["x"]
 	var dy = h["y"] - p["y"]
 	var dz = h["z"] - p["z"]
 	if dx * dx + dy * dy + dz * dz > p["radius"] * p["radius"]:
-		return -1
+		return false
 	if p["angle"] < 180.0:
 		if api["look_angle"].call(i, p["x"], p["y"], p["z"]) > p["angle"]:
-			return -1
-	if api["interact_pressed"].call():
-		api["hud_clear"].call(31)
-		return 0
-	var text = "PRESS " + api["key_name"].call("interact")
-	if p["message"] >= 0:
-		text = api["message_text"].call(p["message"])
-	# Slot 31 is the prompt slot of this pack. The text lasts 0.1 s and is renewed every tick, so it disappears by itself when the condition ends.
-	api["hud_text"].call(31, text, {"font": 1, "anchor": 4, "x": 0.0, "y": -40.0, "size": 16.0, "seconds": 0.1})
-	return -1
+			return false
+	return true
 
 # ---- human state
 
