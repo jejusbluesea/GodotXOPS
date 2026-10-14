@@ -21,7 +21,14 @@
 - 커밋 `fdffa9d` 의 메시지에 취소한 프로젝트의 이름이 남아 있다 (공개 저장소의 기록이라 고치지 않았다).
 
 
-## 1.2.4: 맵팩의 화면과 글꼴, 메뉴 스크립트 (2026-10-14, 구현함, 커밋 전)
+## 1.2.4 릴리즈 (2026-10-14)
+
+**1.2.4 를 릴리즈했다 (2026-10-14, 이것이 최신이다)**: https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.4 , 첨부 `GodotXOPS_1.2.4.7z`. 게시는 사용자가 했다 (한 번은 게시가 되지 않아 다시 했다). 게시 뒤에 README 세 개의 "최신 릴리즈"와 "앞으로 할 것", `ROADMAP.md` 의 1.2.3·1.2.4 상태, `CLAUDE.md` 를 고쳤다. 아래는 준비할 때의 기록이다.
+
+- 커밋 `f68d77f`, 태그 `v1.2.4`(푸시함). 릴리즈 폴더 `build/1.2.4/GodotXOPS/`(익스포트 결과물, git 이 추적하는 `godotdata/` 46개, `addon.json`, `dist/` 의 두 파일, `LICENSE.txt`)와 릴리즈 노트 `build/1.2.4/release_notes.md`. 익스포트 빌드에서 메뉴와 `script_probe` 가 헤드리스로 종료 코드 0. 압축과 게시는 사용자가 한다.
+- 게시한 뒤 고칠 것은 고쳤다 (위).
+
+## 1.2.4: 맵팩의 화면과 글꼴, 메뉴 스크립트 (2026-10-14, 구현함, 커밋 `f68d77f`)
 
 - **구현한 것**: Manifest 의 키 다섯, `MapLoader.MissionScreenScript(화면, out fromPack)` 과 `MissionFontImagePath` 의 MIF2 → 맵팩 순서, `GameBridgeMenuPack.cs`(`SetMenuPage`, `MenuPackActive`, `MenuPackName`, `MenuPackImageCount`, `AddMapPack`), `ui/mainmenu.gd` 의 `_set_menu_page` / `_update_pack_script`, 메뉴 스크립트의 `show_page` 와 `v["pack_page"]` / `v["pack_title"]`, 예제 `mainmenu_pack.sgd` 와 `mainmenu.sgd` 의 수정, 개발용 인자 `--map-pack` 과 메뉴의 `--ui-state addon --page 번호`, `ui_check` 의 `CheckMapPackUiScript`, `DataManager.AddMapPackPage` / `RemoveMapPackPage`(점검의 `MIF2Check.RegisterPack` 도 이것을 쓴다), 문서. 점검 씬 전부 통과.
 - **눈으로 본 것** (`build/pack_demo/`, 공식 미션 1 을 바꾼 것 + 시험용 Manifest): 기본 메뉴와 예제 메뉴 스크립트 둘 다 맵팩 페이지에서 기본 타이틀이 감춰지고 맵팩의 로고(이미지 10000)와 버전이 그려진다 / 맵팩 글꼴이 메뉴의 글자 전부에 적용된다 (시험에는 글꼴이 아닌 그림을 넣어 깨져 보인다) / `<<` 로 addon 폴더 페이지로 가면 기본 타이틀과 `char.dds` 로 돌아온다.
