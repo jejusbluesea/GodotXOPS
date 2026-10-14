@@ -21,7 +21,7 @@ namespace GodotXOPS
         /// <summary>
         /// 지금 MapLoader 에 들어 있는 원본 형식 미션(BD1 + PD1, 공식 미션이나 MIF)을 확장 형식 한 벌(BD2, 텍스처 목록, PD2, .msg, MIF2)로 바꿔 쓴다.
         /// 같은 화면과 같은 판정이 나오는 미션이 된다. MIF 의 추가 사물(addon-object)이 있으면 에드온 오브젝트 데이터 파일로 옮기고,
-        /// 그것을 가리키던 소물 포인트의 번호를 10000 으로 바꾼다.
+        /// 그것을 가리키던 소물 포인트의 번호를 미션 데이터의 첫 번호(20000)로 바꾼다.
         /// 먼저 LoadMissionData 나 LoadMissionFile 로 미션 정보를 읽어 둔다. 맵은 로드돼 있지 않아도 된다.
         /// </summary>
         /// <param name="outputFolder">파일들을 쓸 폴더 (exe 폴더 기준). 없으면 만든다.</param>
@@ -79,14 +79,14 @@ namespace GodotXOPS
             };
 
             // 원본 MIF 의 추가 사물은 소물 목록의 예약 자리(addonObjectIndex)를 미션마다 덮어쓰는 방식이다.
-            // 확장 형식에서는 에드온 오브젝트 데이터의 첫 항목(번호 10000)으로 옮긴다.
+            // 확장 형식에서는 미션의 에드온 오브젝트 데이터의 첫 항목(번호 20000)으로 옮긴다.
             AddonObjectSections addonObject = BuildAddonObjectSections();
             if (addonObject != null)
             {
                 int legacyIndex = DataManager.Instance.ObjectParameterData.objectGeneralData.addonObjectIndex;
                 foreach (PD2Point point in points.points)
                 {
-                    if (point.type == PointSmallObject && point.param1 == legacyIndex) point.param1 = DataList<ObjectData>.AddonBase;
+                    if (point.type == PointSmallObject && point.param1 == legacyIndex) point.param1 = DataList<ObjectData>.MissionBase;
                 }
                 mission.addonObjectDataPath = objectsRelative;
             }
@@ -134,8 +134,8 @@ namespace GodotXOPS
             if (!parameter.objectModelData.Has(source.modelIndex) || !parameter.objectColliderData.Has(source.colliderIndex)) return null;
 
             ObjectData data = Clone(source);
-            data.modelIndex = DataList<ObjectModelData>.AddonBase;
-            data.colliderIndex = DataList<ObjectColliderData>.AddonBase;
+            data.modelIndex = DataList<ObjectModelData>.MissionBase;
+            data.colliderIndex = DataList<ObjectColliderData>.MissionBase;
 
             var sections = new AddonObjectSections();
             sections.objectData.Add(data);

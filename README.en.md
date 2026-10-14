@@ -19,10 +19,10 @@ The goal is to reproduce the feel of the original. Movement, collision, and bull
 - Key bindings, resolution, brightness and gamma, crosshair shape, and volume in the menu's OPTION screen
 - Human, weapon, small object, and effect values editable through JSON files in `godotdata/`
 - Things the original does not have can be made with data alone: armor and helmets, health regeneration, melee weapons, weapons loaded one round at a time, a grenade launcher attached to a gun, and the range and order in which the AI uses weapons. The default data does not use them, so the original missions play as before
-- Multiple addon folders registered as separate pages through `addon.json`
-- Extended file formats (BD2, PD2, MIF2): no limits on the number of textures, point numbers, or event lines, and a mission can bring its own humans, weapons, small objects, effects, materials, sounds, and images. The original formats (BD1, PD1, MIF) are still supported
+- Map packs: several missions and the data they share (humans, weapons, sky, events, materials and more) bundled by one manifest; registering it in `addon.json` makes it one addon page in the menu
+- Extended file formats (BD2, PD2, MIF2): no limits on the number of textures, point numbers, or event lines, and map packs and missions can bring their own humans, weapons, small objects, sounds, and images (map packs also sky, events, materials, and effects). The original formats (BD1, PD1, MIF) are still supported
 - Script events: in addition to the ten original events, more are included (variables and branches, spawning, on-screen text, moving small objects and blocks, playing sounds, putting images on the screen, cutscene staging such as the camera, fades, letterbox and pausing the game, and so on), and you can add your own event packs. Scripts only run inside a sandbox
-- Screen scripts: the opening, menu, briefing, in-game screen (HUD), result, and option screens can each be redrawn by a script. The built-in screens stay as they are and only the screens you register are replaced; samples that rewrite all six built-in screens are included. A mission can also bring its own briefing, HUD, and result screens. Scripts only run inside a sandbox
+- Screen scripts: the opening, menu, briefing, in-game screen (HUD), result, and option screens can each be redrawn by a script. The built-in screens stay as they are and only the screens you register are replaced; samples that rewrite all six built-in screens are included. Missions and map packs can also bring their own briefing, HUD, and result screens and font, and a map pack can replace the title on its page of the menu. Scripts only run inside a sandbox
 - [Editor](#editor): edit blocks, points and events, missions, and data, and play-test right away
 - Debug console (set `AllowConsole` to `"true"` in `godotdata/config.json`, then press F11)
 
@@ -84,28 +84,25 @@ Run `GodotXOPS_Editor.bat` (the same as `GodotXOPS.exe -- --scene editor`). It c
 - F5 play-tests the current content right away, and Esc returns to the editor.
 - The full list of controls is in the [editor section of the development guide](docs/development.md#에디터) (written in Korean).
 
-## Addon pages
+## Addon pages and map packs
 
-The `addon` folder is the first page of the addon list by default. To register more folders, write their paths and page names in `addon.json`, with the same number of entries in both lists. Paths are relative to the folder that contains `GodotXOPS.exe`.
+The `addon` folder is the first page of the addon list by default (in file name order). The pages after it are map packs. To register a map pack, write the path of its manifest file in `addon.json`. Paths are relative to the folder that contains `GodotXOPS.exe`.
 
 ```json
 {
-    "addonPath" : [
-        "addon_pack1",
-        "addon_pack2"
-    ],
-    "addonName" : [
-        "Pack 1",
-        "Pack 2"
+    "manifests" : [
+        "mappacks/vol0/manifest.json"
     ]
 }
 ```
+
+The manifest holds the map pack's name, the order of its missions (MIF2), and the data files the map pack shares. See [map packs in the modding guide](docs/modding.md#맵팩) for details. From 1.2.4 on, the old `addon.json` keys up to 1.2.3 (`addonPath`, `addonName`) are no longer read.
 
 ## Documentation
 
 The documents are written in Korean.
 
-- [Modding guide](docs/modding.md) — every key of the `godotdata/` JSON files (weapons, humans, AI, small objects, effects, missions), the extended file formats, a mission's addon data, script events, screen scripts, per-mission screens, images and font, and addon pages
+- [Modding guide](docs/modding.md) — every key of the `godotdata/` JSON files (weapons, humans, AI, small objects, effects, missions), the extended file formats, map pack and mission addon data, script events, screen scripts, per-mission screens, images and font, and addon pages and map packs
 - [Development guide](docs/development.md) — building from source, code structure, check tools, the editor, the debug console, and behavior that differs from the original
 
 ## Differences from the original

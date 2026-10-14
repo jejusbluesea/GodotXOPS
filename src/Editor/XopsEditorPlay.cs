@@ -48,7 +48,9 @@ namespace GodotXOPS.Editor
             if (missionPath == null) return Fail($"Play test files could not be written ({error})");
 
             GameBridge game = GameBridge.Instance;
-            bool loaded = game.LoadMissionFile(GamePath.Resolve(missionPath));
+            // 임시 파일은 어느 맵팩에도 없으므로, 문서의 미션 파일이 속한 맵팩으로 돌린다.
+            string packLookup = m_document.MissionPath.Length > 0 ? GamePath.Resolve(m_document.MissionPath) : null;
+            bool loaded = game.LoadMissionFileInPack(GamePath.Resolve(missionPath), packLookup);
             if (!loaded || MapLoader.Player == null)
             {
                 string reason = loaded ? "the map has no human to play (add a Human point and its Human info point)" : game.LastLoadError();

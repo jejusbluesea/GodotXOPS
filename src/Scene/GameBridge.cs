@@ -156,9 +156,20 @@ namespace GodotXOPS
         /// <returns>로드에 성공했으면 true.</returns>
         public bool LoadMissionFile(string mifPath)
         {
+            return LoadMissionFileInPack(mifPath, mifPath);
+        }
+
+        /// <summary>
+        /// 미션 파일 하나를 로드하되, 맵팩은 다른 경로로 찾는다 (에디터의 플레이 테스트: 임시 폴더에 쓴 미션을 원래 자리의 맵팩으로 돌린다).
+        /// </summary>
+        /// <param name="mifPath">미션 파일 전체 경로.</param>
+        /// <param name="packLookupPath">맵팩을 찾을 미션의 전체 경로. 비어 있으면 맵팩 없이 돈다.</param>
+        /// <returns>로드에 성공했으면 true.</returns>
+        public bool LoadMissionFileInPack(string mifPath, string packLookupPath)
+        {
             UnloadMission();
             int errors = Debugger.ErrorCount;
-            bool loaded = MapLoader.LoadMissionFile(mifPath) && LoadCurrentMissionMap();
+            bool loaded = MapLoader.LoadMissionFile(mifPath, packLookupPath ?? string.Empty) && LoadCurrentMissionMap();
             RecordLoadResult(loaded, errors);
             return loaded;
         }

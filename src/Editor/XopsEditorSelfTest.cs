@@ -919,21 +919,31 @@ namespace GodotXOPS.Editor
             EditMission("Edit Sky", mission => mission.skyIndex = sky == 1 ? 2 : 1);
             Expect(m_shownSky == m_document.Mission.skyIndex && m_shownSky != sky, "하늘 번호를 바꿨는데 화면의 하늘이 바뀌지 않음");
 
-            // 미션 전용 이벤트 묶음: 등록 파일을 가리키면 그 이벤트가 목록에 들어온다.
-            string pack = $"{k_selfTestFolder}/mission_events.json";
-            File.WriteAllText(GamePath.Resolve(pack), "{ \"scriptPath\": \"\", \"events\": [ { \"type\": 10000, \"name\": \"Custom\", \"function\": \"custom\", "
-                + "\"parameters\": [ { \"name\": \"amount\", \"slot\": \"e0\", \"kind\": \"float\" } ] } ] }");
-            EditMission("Edit pack", mission => mission.addonEventDataPath = pack);
-            Expect(m_catalog.Get(10000)?.name == "Custom" && PointTypeInfo.Get(10000).Name == "Custom", "미션 전용 이벤트 묶음이 이벤트 목록에 들어오지 않음");
-            Undo();
-            Expect(m_catalog.Get(10000) == null, "이벤트 묶음 편집을 되돌렸는데 그 이벤트가 목록에 남음");
-
             string saved = $"{k_selfTestFolder}/saved.mif2";
             Expect(SaveMissionTo(saved) && !m_missionDirty && m_document.MissionPath == saved && MIF2File.Read(GamePath.Resolve(saved), out ExtendedMissionData written, out _)
                 && written.name == "Edited" && written.blockPath == m_document.BlockPath && written.pointPath == m_document.PointPath && written.skyIndex == m_document.Mission.skyIndex,
                 "미션 파일을 저장하지 못했거나 내용이 다름");
             Expect(MapLoader.LoadMissionFile(GamePath.Resolve(saved)) && MapLoader.Instance.MissionName == "Edited", "에디터가 쓴 미션 파일을 게임이 읽지 못함");
             MapLoader.UnloadMissionData();
+
+            // 맵팩의 이벤트 묶음: 미션이 Manifest 에 적혀 있으면 그 맵팩의 이벤트가 목록에 들어온다.
+            string events = $"{k_selfTestFolder}/pack_events.json";
+            File.WriteAllText(GamePath.Resolve(events), "{ \"scriptPath\": \"\", \"events\": [ { \"type\": 10000, \"name\": \"Custom\", \"function\": \"custom\", "
+                + "\"parameters\": [ { \"name\": \"amount\", \"slot\": \"e0\", \"kind\": \"float\" } ] } ] }");
+            var mapPack = new MapPackManifestData
+            {
+                name = "SELF TEST",
+                missions = new List<string> { saved },
+                eventDataPath = events,
+                manifestPath = $"{k_selfTestFolder}/manifest.json",
+            };
+            Dev.MIF2Check.RegisterPack(mapPack);
+            ApplyMission();
+            Expect(ReferenceEquals(DocumentPack(), mapPack) && m_missionPackLabel.Text.Contains("SELF TEST"), "Manifest 에 적힌 미션인데 맵팩을 찾지 못함");
+            Expect(m_catalog.Get(10000)?.name == "Custom" && PointTypeInfo.Get(10000).Name == "Custom", "맵팩의 이벤트 묶음이 이벤트 목록에 들어오지 않음");
+            Dev.MIF2Check.UnregisterPack(mapPack);
+            ApplyMission();
+            Expect(DocumentPack() == null && m_catalog.Get(10000) == null, "맵팩에서 뺐는데 그 이벤트가 목록에 남음");
 
             SetEditMode(EditMode.Point);
             Expect(!m_missionPanel.Visible && m_links.Visible, "미션 모드에서 돌아왔는데 3D 화면이 돌아오지 않음");
@@ -1224,19 +1234,19 @@ namespace GodotXOPS.Editor
                 Expect(m_previewRoot.FindChild("Controller", true, false) != null && m_previewCaption.Text.StartsWith("Body size", StringComparison.Ordinal), "몸 크기 데이터를 선택했는데 그려지지 않음");
             }
 
-            // 에드온 번호(10000)의 몸 크기와 히트박스는 미션의 에드온 파일에서 찾고, 없는 번호는 게임처럼 기본 목록의 끝으로 본다.
+            // 미션 번호(20000)의 몸 크기와 히트박스는 미션의 에드온 파일에서 찾고, 없는 번호는 게임처럼 기본 목록의 끝으로 본다.
             string bodyAddon = $"{k_selfTestFolder}/addon_body.json";
             const string part = "{ \"position\": { \"x\": 0, \"y\": 0.5, \"z\": 0 }, \"rotationEuler\": { \"x\": 0, \"y\": 0, \"z\": 0 }, \"height\": 0.123, \"radius\": 0.1 }";
             File.WriteAllText(GamePath.Resolve(bodyAddon), "{ \"controllerSizeData\": [ { \"height\": 0.8, \"cameraHeight\": 0.7, \"mapRadius\": 0.28, \"humanRadius\": 0.25 } ], "
                 + $"\"humanHitboxSizeData\": [ {{ \"head\": {part}, \"body\": {part}, \"leg\": {part} }} ] }}");
             string savedHumanAddon = m_document.Mission.addonHumanDataPath;
             m_document.Mission.addonHumanDataPath = bodyAddon;
-            ControllerSizeData addonSize = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), DataList<int>.AddonBase, out int usedSize);
-            HumanHitboxSizeData addonHitbox = LookupClamped<HumanHitboxSizeData>(nameof(HumanParameterData.humanHitboxSizeData), DataList<int>.AddonBase, out int usedHitbox);
-            Expect(addonSize != null && Mathf.IsEqualApprox(addonSize.height, 0.8f) && usedSize == DataList<int>.AddonBase, "에드온 번호의 몸 크기를 미션의 에드온 파일에서 찾지 못함");
-            Expect(addonHitbox?.head != null && Mathf.IsEqualApprox(addonHitbox.head.height, 0.123f) && usedHitbox == DataList<int>.AddonBase, "에드온 번호의 히트박스를 미션의 에드온 파일에서 찾지 못함");
+            ControllerSizeData addonSize = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), DataList<int>.MissionBase, out int usedSize);
+            HumanHitboxSizeData addonHitbox = LookupClamped<HumanHitboxSizeData>(nameof(HumanParameterData.humanHitboxSizeData), DataList<int>.MissionBase, out int usedHitbox);
+            Expect(addonSize != null && Mathf.IsEqualApprox(addonSize.height, 0.8f) && usedSize == DataList<int>.MissionBase, "에드온 번호의 몸 크기를 미션의 에드온 파일에서 찾지 못함");
+            Expect(addonHitbox?.head != null && Mathf.IsEqualApprox(addonHitbox.head.height, 0.123f) && usedHitbox == DataList<int>.MissionBase, "에드온 번호의 히트박스를 미션의 에드온 파일에서 찾지 못함");
             int baseSizes = DataManager.Instance.HumanParameterData.controllerSizeData.Count;
-            ControllerSizeData clamped = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), DataList<int>.AddonBase + 5, out int usedClamped);
+            ControllerSizeData clamped = LookupClamped<ControllerSizeData>(nameof(HumanParameterData.controllerSizeData), DataList<int>.MissionBase + 5, out int usedClamped);
             Expect(clamped != null && usedClamped == baseSizes - 1, $"없는 에드온 번호의 몸 크기를 기본 목록의 끝으로 보지 않음 ({usedClamped})");
             m_document.Mission.addonHumanDataPath = savedHumanAddon;
             m_assetFiles.Remove(bodyAddon);

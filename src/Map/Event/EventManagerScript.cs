@@ -8,8 +8,9 @@ namespace GodotXOPS
     {
         // 스크립트 이벤트의 첫 종류 번호. 1 에서 19 는 원본의 포인트 종류다.
         public const int ScriptEventFirst = 20;
-        // 미션 전용 이벤트의 첫 종류 번호 (다른 에드온 데이터와 같은 규칙).
-        public const int AddonEventFirst = 10000;
+        // 맵팩 이벤트의 종류 번호 구간 (다른 맵팩 데이터와 같은 규칙). 미션은 이벤트 묶음을 들고 오지 않는다.
+        public const int PackEventFirst = 10000;
+        public const int PackEventLast = 19999;
 
         // 설치형 이벤트 묶음의 등록 파일이 있는 폴더 (exe 폴더 기준). 그 안의 .json 하나가 묶음 하나다.
         private const string k_packFolder = "godotdata/event";
@@ -50,7 +51,7 @@ namespace GodotXOPS
         /// 포인트 데이터를 로드할 때 불린다. 하나라도 준비하지 못하면 미션을 로드하지 않는다 (없는 번호, 겹친 번호, 컴파일 오류, 없는 함수, 격리 실패).
         /// </summary>
         /// <param name="usedTypes">포인트 데이터에 있는 20 이상의 종류 번호.</param>
-        /// <param name="addonPackPath">미션 전용 묶음의 등록 파일 (exe 폴더 기준). 없으면 빈 문자열.</param>
+        /// <param name="addonPackPath">미션이 속한 맵팩의 묶음의 등록 파일 (exe 폴더 기준). 없으면 빈 문자열이나 null.</param>
         /// <returns>전부 준비했으면 true.</returns>
         public bool LoadScripts(IReadOnlyCollection<int> usedTypes, string addonPackPath)
         {
@@ -212,10 +213,10 @@ namespace GodotXOPS
 
         /// <summary>
         /// 등록 파일 하나를 읽어 목록에 더한다. 형식이 틀린 항목은 경고를 남기고 건너뛴다.
-        /// 번호가 구간을 벗어난 항목도 건너뛴다: 설치형은 20 에서 9999 사이, 미션 전용은 10000 이상이어야 한다.
+        /// 번호가 구간을 벗어난 항목도 건너뛴다: 설치형은 20 에서 9999 사이, 맵팩의 묶음은 10000 에서 19999 사이여야 한다.
         /// </summary>
         /// <param name="fullPath">등록 파일 전체 경로.</param>
-        /// <param name="addon">미션 전용 묶음이면 true.</param>
+        /// <param name="addon">맵팩의 묶음이면 true.</param>
         /// <param name="registry">종류 번호 → 등록된 이벤트.</param>
         private static void ReadPack(string fullPath, bool addon, Dictionary<int, Registered> registry)
         {
@@ -235,10 +236,12 @@ namespace GodotXOPS
             {
                 if (definition == null) continue;
 
-                bool inRange = addon ? definition.type >= AddonEventFirst : definition.type >= ScriptEventFirst && definition.type < AddonEventFirst;
+                bool inRange = addon
+                    ? definition.type >= PackEventFirst && definition.type <= PackEventLast
+                    : definition.type >= ScriptEventFirst && definition.type < PackEventFirst;
                 if (!inRange)
                 {
-                    Debugger.LogWarning($"Event type {definition.type} is out of range for {(addon ? "a mission pack (10000 or more)" : "an installed pack (20 to 9999)")}: {label}", nameof(EventManager));
+                    Debugger.LogWarning($"Event type {definition.type} is out of range for {(addon ? "a map pack (10000 to 19999)" : "an installed pack (20 to 9999)")}: {label}", nameof(EventManager));
                     continue;
                 }
                 definition.parameters ??= new List<EventSlotData>();

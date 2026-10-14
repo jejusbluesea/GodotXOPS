@@ -410,7 +410,7 @@ namespace GodotXOPS
         private static HumanAIScopeData ScopeData(Weapon weapon)
         {
             int scopeIndex = weapon.Data.scopeIndex;
-            int index = !weapon.Data.scope ? 0 : (scopeIndex >= DataList<HumanAIScopeData>.AddonBase ? scopeIndex : scopeIndex + 1);
+            int index = !weapon.Data.scope ? 0 : (DataList<HumanAIScopeData>.IsAddon(scopeIndex) ? scopeIndex : scopeIndex + 1);
             return AIData.aiScopeData.GetClamped(index);
         }
 

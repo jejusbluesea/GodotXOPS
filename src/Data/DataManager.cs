@@ -80,9 +80,9 @@ namespace GodotXOPS
         /// <param name="name">목록의 JSON 키 (로그용).</param>
         private static void CheckListSize<T>(DataList<T> list, string name)
         {
-            if (list.Count <= DataList<T>.AddonBase) return;
+            if (list.Count <= DataList<T>.PackBase) return;
 
-            Debugger.LogError($"{name} has {list.Count} entries. Entries from {DataList<T>.AddonBase} on cannot be used: those numbers belong to mission add-on data.", nameof(DataManager));
+            Debugger.LogError($"{name} has {list.Count} entries. Entries from {DataList<T>.PackBase} on cannot be used: those numbers belong to map pack and mission add-on data.", nameof(DataManager));
         }
 
         /// <summary>
@@ -195,19 +195,20 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 어드온 미션을 페이지 단위로 로드한다. 페이지 0은 항상 기본 OpenXOPS 어드온 폴더("addon") 폴백(이름 없음).
-        /// 페이지 1~은 addon.json의 addonPath 목록(유저 추가 경로)으로, 파일이 없거나 목록이 없으면 폴백만 남는다.
-        /// 경로는 항상 데이터 루트 기준이며 루트 밖으로 나가는 경로는 무시한다.
-        /// 경로가 감지되면 폴더가 없거나 .mif가 없어도 빈 페이지로 추가한다. 페이지 이름은 같은 인덱스의 addonName(없으면 빈 문자열).
+        /// 어드온 미션을 페이지 단위로 로드한다. 페이지 0은 항상 기본 OpenXOPS 어드온 폴더("addon") 폴백(이름 없음, 파일 이름 순서).
+        /// 페이지 1~은 addon.json 의 manifests 가 가리키는 맵팩 Manifest 하나씩이다. 이름과 미션의 순서는 Manifest 가 정한다.
+        /// 읽지 못한 Manifest 는 페이지가 되지 않는다. 경로는 항상 exe 폴더 기준이며 루트 밖으로 나가는 경로는 무시한다.
         /// </summary>
         private void LoadAddonMissions()
         {
             MissionData.addonMissions = new List<List<AddonMissionData>>();
             MissionData.addonPageNames = new List<string>();
+            MissionData.addonPagePacks = new List<MapPackManifestData>();
 
             // 페이지 0: 항상 존재하는 폴백 = 기본 OpenXOPS 어드온 폴더. 페이지 이름 없음.
             MissionData.addonMissions.Add(ScanAddonMifs(GamePath.Resolve(GamePath.AddonFolder)));
             MissionData.addonPageNames.Add(string.Empty);
+            MissionData.addonPagePacks.Add(null);
 
             // addon.json은 선택 파일이므로 부재를 먼저 걸러 TryReadJson의 "찾을 수 없습니다" 에러 로그가 상시 뜨는 것을 막는다.
             if (!File.Exists(GamePath.Resolve(k_addonPathDataPath)))
@@ -216,25 +217,123 @@ namespace GodotXOPS
             }
 
             AddonPathData addonPathData = LoadOrDefault<AddonPathData>(k_addonPathDataPath);
-            if (addonPathData.addonPath == null)
+            if (addonPathData.manifests == null)
             {
                 return;
             }
 
-            for (int i = 0; i < addonPathData.addonPath.Count; i++)
+            foreach (string manifestPath in addonPathData.manifests)
             {
-                string packDirectory = GamePath.Resolve(addonPathData.addonPath[i]);
-                if (packDirectory == null)
+                MapPackManifestData pack = ReadMapPack(manifestPath);
+                if (pack == null) continue;
+
+                MissionData.addonMissions.Add(ListPackMissions(pack));
+                MissionData.addonPageNames.Add(pack.name ?? string.Empty);
+                MissionData.addonPagePacks.Add(pack);
+            }
+        }
+
+        /// <summary>
+        /// 맵팩 Manifest 하나를 읽는다.
+        /// </summary>
+        /// <param name="relativePath">Manifest 경로 (exe 폴더 기준).</param>
+        /// <returns>읽은 Manifest. 경로가 비었거나 파일이 없거나 JSON 이 아니면 에러를 남기고 null.</returns>
+        public static MapPackManifestData ReadMapPack(string relativePath)
+        {
+            string fullPath = string.IsNullOrEmpty(relativePath) ? null : GamePath.Resolve(relativePath);
+            if (fullPath == null || !File.Exists(fullPath))
+            {
+                Debugger.LogError($"Map pack manifest open failed: {relativePath}", nameof(DataManager));
+                return null;
+            }
+
+            var pack = new MapPackManifestData();
+            try
+            {
+                if (!JsonData.Overwrite(EncodingHelper.ReadAllText(fullPath), pack, relativePath)) return null;
+            }
+            catch (IOException e)
+            {
+                Debugger.LogError($"Map pack manifest read failed: {relativePath} ({e.Message})", nameof(DataManager));
+                return null;
+            }
+            pack.missions ??= new List<string>();
+            pack.manifestPath = relativePath;
+            return pack;
+        }
+
+        /// <summary>
+        /// 맵팩의 미션 목록을 Manifest 에 적은 순서대로 만든다. 없는 파일, MIF2 가 아닌 파일, 읽지 못한 MIF2 는 에러를 남기고 뺀다.
+        /// </summary>
+        /// <param name="pack">맵팩.</param>
+        /// <returns>미션 목록.</returns>
+        public static List<AddonMissionData> ListPackMissions(MapPackManifestData pack)
+        {
+            var page = new List<AddonMissionData>();
+            foreach (string mission in pack.missions)
+            {
+                string path = string.IsNullOrEmpty(mission) ? null : GamePath.Resolve(mission);
+                if (path == null || !File.Exists(path))
                 {
+                    Debugger.LogError($"Map pack mission not found: {mission} ({pack.manifestPath})", nameof(DataManager));
+                    continue;
+                }
+                if (!string.Equals(Path.GetExtension(path), MIF2File.Extension, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    Debugger.LogError($"Map pack missions must be MIF2: {mission} ({pack.manifestPath})", nameof(DataManager));
                     continue;
                 }
 
-                MissionData.addonMissions.Add(ScanAddonMifs(packDirectory));
-                string pageName = (addonPathData.addonName != null && i < addonPathData.addonName.Count)
-                    ? addonPathData.addonName[i]
-                    : string.Empty;
-                MissionData.addonPageNames.Add(pageName ?? string.Empty);
+                AddonMissionData entry = ReadMissionEntry(path);
+                if (entry != null) page.Add(entry);
             }
+            return page;
+        }
+
+        /// <summary>
+        /// 맵팩 하나를 어드온 페이지의 끝에 더한다. addon.json 을 고치지 않고 맵팩을 돌려 볼 때 쓴다 (개발용 인자 --map-pack, 점검 씬).
+        /// </summary>
+        /// <param name="pack">맵팩.</param>
+        public void AddMapPackPage(MapPackManifestData pack)
+        {
+            MissionData.addonMissions.Add(ListPackMissions(pack));
+            MissionData.addonPageNames.Add(pack.name ?? string.Empty);
+            MissionData.addonPagePacks.Add(pack);
+        }
+
+        /// <summary>
+        /// AddMapPackPage 로 더한 맵팩의 페이지를 뺀다.
+        /// </summary>
+        /// <param name="pack">맵팩.</param>
+        public void RemoveMapPackPage(MapPackManifestData pack)
+        {
+            int page = MissionData.addonPagePacks.IndexOf(pack);
+            if (page < 0) return;
+            MissionData.addonMissions.RemoveAt(page);
+            MissionData.addonPageNames.RemoveAt(page);
+            MissionData.addonPagePacks.RemoveAt(page);
+        }
+
+        /// <summary>
+        /// 미션 파일이 속한 맵팩을 찾는다: 등록된 Manifest 들의 미션 목록에 그 파일이 있는지 본다.
+        /// </summary>
+        /// <param name="missionFullPath">미션 파일 전체 경로.</param>
+        /// <returns>그 미션이 든 맵팩. 어느 Manifest 에도 없으면 null.</returns>
+        public MapPackManifestData FindMapPack(string missionFullPath)
+        {
+            if (string.IsNullOrEmpty(missionFullPath)) return null;
+
+            string target = Path.GetFullPath(missionFullPath);
+            foreach (MapPackManifestData pack in MissionData.addonPagePacks)
+            {
+                if (pack == null) continue;
+                foreach (string mission in pack.missions)
+                {
+                    string path = string.IsNullOrEmpty(mission) ? null : GamePath.Resolve(mission);
+                    if (path != null && string.Equals(Path.GetFullPath(path), target, System.StringComparison.OrdinalIgnoreCase)) return pack;
+                }
+            }
+            return null;
         }
 
         /// <summary>
@@ -267,25 +366,36 @@ namespace GodotXOPS
 
             foreach (string path in mifPaths)
             {
-                string name;
-                if (string.Equals(Path.GetExtension(path), MIF2File.Extension, System.StringComparison.OrdinalIgnoreCase))
-                {
-                    if (!MIF2File.Read(path, out ExtendedMissionData data, out string error))
-                    {
-                        Debugger.LogError($"Mission file read failed: {Path.GetRelativePath(GamePath.Root, path)} ({error})", nameof(DataManager));
-                        continue;
-                    }
-                    name = data.name ?? string.Empty;
-                }
-                else
-                {
-                    string[] lines = EncodingHelper.ReadAllLines(path);
-                    name = lines.Length > 0 ? lines[0] : string.Empty;
-                }
-
-                page.Add(new AddonMissionData { mifPath = path, name = name });
+                AddonMissionData entry = ReadMissionEntry(path);
+                if (entry != null) page.Add(entry);
             }
             return page;
+        }
+
+        /// <summary>
+        /// 미션 파일 하나의 목록 항목을 만든다. 목록에 나오는 이름은 MIF 는 첫 줄, MIF2 는 name 키다.
+        /// </summary>
+        /// <param name="path">미션 파일 전체 경로 (.mif 나 .mif2).</param>
+        /// <returns>목록 항목. 읽지 못한 MIF2 면 에러를 남기고 null.</returns>
+        private static AddonMissionData ReadMissionEntry(string path)
+        {
+            string name;
+            if (string.Equals(Path.GetExtension(path), MIF2File.Extension, System.StringComparison.OrdinalIgnoreCase))
+            {
+                if (!MIF2File.Read(path, out ExtendedMissionData data, out string error))
+                {
+                    Debugger.LogError($"Mission file read failed: {Path.GetRelativePath(GamePath.Root, path)} ({error})", nameof(DataManager));
+                    return null;
+                }
+                name = data.name ?? string.Empty;
+            }
+            else
+            {
+                string[] lines = EncodingHelper.ReadAllLines(path);
+                name = lines.Length > 0 ? lines[0] : string.Empty;
+            }
+
+            return new AddonMissionData { mifPath = path, name = name };
         }
 
         /// <summary>

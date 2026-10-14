@@ -12,7 +12,7 @@ namespace GodotXOPS.Dev
     /// 파라미터 전달, 출구와 분기, 줄의 저장 칸, 미션 변수, API 함수, 줄 제어, 자동 판정 끄기, 실패한 줄만 멈추는지, 로드 때 거절되는 경우.
     /// 이어서 기본 제공 묶음(godotdata/event/base.json)의 이벤트 전부를 한 미션에서 돌려 본다 (화면 글자, Interact, 카운트다운, 연출 포함).
     /// 명령행 인자("--" 뒤): --armor-sample 미션.pd2 는 점검 대신 그 PD2 에 방어구·헬멧과 재정비 이벤트의 시험용 구성을 더하고 종료한다 (에드온 데이터가 함께 있어야 한다. WriteArmorSample).
-    /// --image-sample 미션.pd2 는 점검 대신 그 PD2 에 화면 이미지(이벤트 74, 75)의 시험용 줄을 더하고 종료한다 (미션의 이미지 목록에 10000 과 10001 이 있어야 한다).
+    /// --image-sample 미션.pd2 는 점검 대신 그 PD2 에 화면 이미지(이벤트 74, 75)의 시험용 줄을 더하고 종료한다 (미션이 속한 맵팩의 이미지 목록에 10000 과 10001 이 있어야 한다).
     /// --stage-sample 미션.pd2 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더하고 종료한다 (눈으로 확인하는 용도).
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/event_check.tscn
     /// </summary>
@@ -23,7 +23,7 @@ namespace GodotXOPS.Dev
         private const int k_objectId = 7;
         private const int k_pathId = 50;
 
-        // 점검용 묶음의 종류 번호 (미션 전용 구간).
+        // 점검용 묶음의 종류 번호 (맵팩의 구간).
         private const int k_setVar = 10000;
         private const int k_waitVar = 10001;
         private const int k_branch = 10002;
@@ -161,6 +161,8 @@ func bump(p, state):
         private int m_checks;
         private readonly List<string> m_problems = new List<string>();
         private string m_folder;
+        // 점검용 미션이 속한 맵팩 (처음 로드할 때 등록하고 끝나면 뺀다).
+        private MapPackManifestData m_mapPack;
 
         public override void _Ready()
         {
@@ -214,6 +216,7 @@ func bump(p, state):
 
             MapLoader.UnloadPointData();
             MapLoader.UnloadMissionData();
+            if (m_mapPack != null) MIF2Check.UnregisterPack(m_mapPack);
             Directory.Delete(m_folder, true);
 
             GD.Print($"이벤트 점검 {m_checks}항목 — 문제 {m_problems.Count}건");
@@ -311,14 +314,25 @@ func bump(p, state):
             File.WriteAllText(Path.Combine(m_folder, scriptFile), script);
             File.WriteAllText(Path.Combine(m_folder, "pack.json"), JsonData.ToJson(pack));
             File.WriteAllLines(Path.Combine(m_folder, "map.msg"), new[] { "hello", "USE {interact} \uD55C" });
-            // 미션의 이미지 목록: 10000 은 읽을 수 있는 파일, 10001 은 없는 파일.
+            // 맵팩의 이미지 목록: 10000 은 읽을 수 있는 파일, 10001 은 없는 파일.
             File.WriteAllText(Path.Combine(m_folder, "images.json"), "{ \"imageData\": [ { \"name\": \"title\", \"imagePath\": \"data/title.dds\" }, { \"name\": \"missing\", \"imagePath\": \"data/none.png\" } ] }");
             var mission = new ExtendedMissionData
             {
                 name = "EVENT", blockPath = $"{k_workFolder}/map.bd2", pointPath = $"{k_workFolder}/map.pd2",
-                addonEventDataPath = $"{k_workFolder}/pack.json",
-                addonImageDataPath = $"{k_workFolder}/images.json",
             };
+            // 이벤트 묶음과 이미지는 맵팩이 든다. 점검용 미션을 그 맵팩에 등록해 둔다.
+            if (m_mapPack == null)
+            {
+                m_mapPack = new MapPackManifestData
+                {
+                    name = "EVENT PACK",
+                    missions = new List<string> { $"{k_workFolder}/event.mif2" },
+                    eventDataPath = $"{k_workFolder}/pack.json",
+                    imageDataPath = $"{k_workFolder}/images.json",
+                    manifestPath = $"{k_workFolder}/manifest.json",
+                };
+                MIF2Check.RegisterPack(m_mapPack);
+            }
             string missionPath = Path.Combine(m_folder, "event.mif2");
             return file.Write(Path.Combine(m_folder, "map.pd2"), out _) && MIF2File.Write(missionPath, mission, out _)
                 && MapLoader.LoadMissionFile(missionPath) && MapLoader.LoadPointData(MapLoader.Instance.MissionPD1Path);
@@ -495,13 +509,22 @@ func bump(p, state):
                 pack.events.Add(Define(k_setVar, "wait_var"));
                 return WriteAndLoad(pack, k_script, file);
             });
-            // 99 는 설치형 구간의 번호라 미션 묶음이 등록할 수 없다 (기본 묶음이 쓰지 않는 번호를 골랐다).
-            Reject("구간 밖의 번호(미션 묶음의 99)", "A point uses event type", () =>
+            // 99 는 설치형 구간의 번호라 맵팩의 묶음이 등록할 수 없다 (기본 묶음이 쓰지 않는 번호를 골랐다).
+            Reject("구간 밖의 번호(맵팩 묶음의 99)", "A point uses event type", () =>
             {
                 EventPackData pack = BuildPack();
                 pack.events.Add(Define(99, "set_var"));
                 PD2File other = BaseFile();
                 other.points.Add(Event(99, 100, 0, 101));
+                return WriteAndLoad(pack, k_script, other);
+            });
+            // 20000 은 미션의 번호이고 미션은 이벤트 묶음을 들고 오지 않는다.
+            Reject("구간 밖의 번호(맵팩 묶음의 20000)", "A point uses event type", () =>
+            {
+                EventPackData pack = BuildPack();
+                pack.events.Add(Define(EventManager.PackEventLast + 1, "set_var"));
+                PD2File other = BaseFile();
+                other.points.Add(Event(EventManager.PackEventLast + 1, 100, 0, 101));
                 return WriteAndLoad(pack, k_script, other);
             });
             Reject("틀린 칸 표기", "unknown slot", () =>
@@ -1074,8 +1097,8 @@ func bump(p, state):
 
         /// <summary>
         /// PD2 하나에 방어구·헬멧과 재정비 이벤트(30~35)를 눈으로 보는 시험용 구성을 더해 덮어쓴다 (mif2_check 의 --convert-official 로 만든 미션에 쓴다).
-        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 10000(플레이어, 방어구와 헬멧), 10001(방어구 입은 표적), 10002(맨몸 표적), 10003(근접 무기를 든 적), 10004(유탄 발사기가 달린 소총을 든 적), 무기 10002 와 10003(바닥에 놓는 것. 10003 이 근접 무기),
-        /// 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 미션 전용 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~15번(안내 문구).
+        /// 미션의 에드온 데이터가 함께 있어야 한다: 사람 20000(플레이어, 방어구와 헬멧), 20001(방어구 입은 표적), 20002(맨몸 표적), 20003(근접 무기를 든 적), 20004(유탄 발사기가 달린 소총을 든 적), 무기 20002 와 20003(바닥에 놓는 것. 20003 이 근접 무기),
+        /// 미션이 속한 맵팩의 이벤트 10000(사람의 HP·방어구·헬멧을 화면 글자로 띄우는 이벤트. 파라미터는 사람 P2, 칸 e0, 줄 e1), 메시지 10~15번(안내 문구).
         /// 놓는 것: 정면에 표적 두 줄(방어구 입은 표적 뒤에 맨몸 표적 / 맨몸 표적 둘), 오른쪽에 Interact 자리 여섯(체력, 방어구, 헬멧, 쏘는 적 부르기, 근접 무기를 든 적 부르기, 유탄 발사기를 쓰는 적 부르기).
         /// </summary>
         /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
@@ -1085,7 +1108,7 @@ func bump(p, state):
             const int waitInteract = 26, addHp = 31, addArmor = 33, addHelmet = 35, spawnHuman = 42, spawnWeapon = 43, setAutoJudge = 52;
             const int showVitals = 10000;
             // 더하는 포인트의 첫 식별번호, 표적의 식별번호, 에드온 번호.
-            const int firstId = 30000, targetId = 9001, addonFirst = 10000;
+            const int firstId = 30000, targetId = 9001, addonFirst = 20000;
             const int playerInfo = 30900, armoredInfo = 30901, plainInfo = 30902, shooterInfo = 30903, knifeInfo = 30904, grenadierInfo = 30905;
             // 쏘는 적으로 쓰는 기본 사람 데이터의 번호와 표적의 팀.
             const int shooterData = 2, enemyTeam = 1;
@@ -1406,7 +1429,7 @@ func bump(p, state):
 
         /// <summary>
         /// 화면 이미지: 이미지 놓기와 지우기(기본 묶음 74, 75)를 한 미션에서 돌린다.
-        /// 미션의 이미지 목록(10000 부터)의 번호, 놓인 값, 나타나고 사라지는 진하기, 시간이 다 된 이미지, 목록에 없는 번호, 칸의 범위, 미션이 끝날 때 지워지는지를 본다.
+        /// 맵팩의 이미지 목록(10000 부터)의 번호, 놓인 값, 나타나고 사라지는 진하기, 시간이 다 된 이미지, 목록에 없는 번호, 칸의 범위, 미션이 끝날 때 지워지는지를 본다.
         /// </summary>
         private void CheckScreenImages()
         {
@@ -1434,7 +1457,7 @@ func bump(p, state):
             }
 
             DataList<ImageData> list = DataManager.Instance.ImageParameterData.imageData;
-            Expect(list.Has(title) && list.Has(missingFile) && !list.Has(notListed) && list[title].imagePath == "data/title.dds", "미션의 이미지 목록이 10000 부터 붙지 않음");
+            Expect(list.Has(title) && list.Has(missingFile) && !list.Has(notListed) && list[title].imagePath == "data/title.dds", "맵팩의 이미지 목록이 10000 부터 붙지 않음");
 
             EventManager events = EventManager.Instance;
             events.BeginMission();
@@ -1474,7 +1497,7 @@ func bump(p, state):
             events.ForceEnd(false);
             Expect(events.HudImages().Count == 0, "미션이 끝났는데 화면 이미지가 남아 있음");
             MapLoader.UnloadMissionData();
-            Expect(!list.Has(title), "미션 정보를 내렸는데 미션의 이미지 목록이 남아 있음");
+            Expect(!list.Has(title), "미션 정보를 내렸는데 맵팩의 이미지 목록이 남아 있음");
         }
 
         /// <summary>

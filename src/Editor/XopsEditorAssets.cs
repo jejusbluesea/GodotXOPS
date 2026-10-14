@@ -128,11 +128,11 @@ namespace GodotXOPS.Editor
             right.AddChild(m_assetTree);
             BuildAssetPreview(split);
 
-            // 새 에드온 데이터 파일의 종류. 미션이 들고 올 수 있는 것들이다.
+            // 새 에드온 데이터 파일의 종류. 맵팩이나 미션이 들고 올 수 있는 것들이다 (미션이 들고 오지 못하는 종류는 만들기만 하고, Manifest 에는 손으로 적는다).
             m_assetKindMenu = new PopupMenu();
             for (int i = 0; i < AssetFile.Kinds.Length; i++)
             {
-                if (MissionPathField(AssetFile.Kinds[i].Type) != null) m_assetKindMenu.AddItem(AssetFile.Kinds[i].Name, i);
+                if (MissionPathField(AssetFile.Kinds[i].Type) != null || PackPathField(AssetFile.Kinds[i].Type) != null) m_assetKindMenu.AddItem(AssetFile.Kinds[i].Name, i);
             }
             m_assetKindMenu.IdPressed += id =>
             {
@@ -147,24 +147,83 @@ namespace GodotXOPS.Editor
         /// 미션 파일에서 그 종류의 에드온 데이터 파일을 가리키는 필드.
         /// </summary>
         /// <param name="type">데이터 클래스.</param>
-        /// <returns>ExtendedMissionData 의 필드. 미션이 들고 오지 않는 종류면 null.</returns>
+        /// <returns>ExtendedMissionData 의 필드. 미션이 들고 오지 않는 종류(하늘, 이벤트, 재질, 이펙트)면 null.</returns>
         private static FieldInfo MissionPathField(Type type)
         {
             string name = null;
             if (type == typeof(HumanParameterData)) name = nameof(ExtendedMissionData.addonHumanDataPath);
             else if (type == typeof(WeaponParameterData)) name = nameof(ExtendedMissionData.addonWeaponDataPath);
             else if (type == typeof(ObjectParameterData)) name = nameof(ExtendedMissionData.addonObjectDataPath);
-            else if (type == typeof(EffectParameterData)) name = nameof(ExtendedMissionData.addonEffectDataPath);
-            else if (type == typeof(BlockMaterialParameterData)) name = nameof(ExtendedMissionData.addonBlockMaterialDataPath);
             else if (type == typeof(SoundParameterData)) name = nameof(ExtendedMissionData.addonSoundDataPath);
             else if (type == typeof(ImageParameterData)) name = nameof(ExtendedMissionData.addonImageDataPath);
-            else if (type == typeof(SkyData)) name = nameof(ExtendedMissionData.addonSkyDataPath);
-            else if (type == typeof(EventPackData)) name = nameof(ExtendedMissionData.addonEventDataPath);
             return name == null ? null : typeof(ExtendedMissionData).GetField(name);
         }
 
         /// <summary>
-        /// 왼쪽의 파일 목록을 다시 채운다: 기본 데이터(godotdata 의 JSON. 설정 파일은 뺀다), 지금 미션의 에드온 데이터, 따로 연 파일.
+        /// 맵팩 Manifest 에서 그 종류의 데이터 파일을 가리키는 필드.
+        /// </summary>
+        /// <param name="type">데이터 클래스.</param>
+        /// <returns>MapPackManifestData 의 필드. 맵팩이 들고 오지 않는 종류면 null.</returns>
+        private static FieldInfo PackPathField(Type type)
+        {
+            string name = null;
+            if (type == typeof(HumanParameterData)) name = nameof(MapPackManifestData.humanDataPath);
+            else if (type == typeof(WeaponParameterData)) name = nameof(MapPackManifestData.weaponDataPath);
+            else if (type == typeof(ObjectParameterData)) name = nameof(MapPackManifestData.objectDataPath);
+            else if (type == typeof(EffectParameterData)) name = nameof(MapPackManifestData.effectDataPath);
+            else if (type == typeof(BlockMaterialParameterData)) name = nameof(MapPackManifestData.blockMaterialDataPath);
+            else if (type == typeof(SoundParameterData)) name = nameof(MapPackManifestData.soundDataPath);
+            else if (type == typeof(ImageParameterData)) name = nameof(MapPackManifestData.imageDataPath);
+            else if (type == typeof(SkyData)) name = nameof(MapPackManifestData.skyDataPath);
+            else if (type == typeof(EventPackData)) name = nameof(MapPackManifestData.eventDataPath);
+            return name == null ? null : typeof(MapPackManifestData).GetField(name);
+        }
+
+        /// <summary>
+        /// 열려 있는 미션이 속한 맵팩. 게임과 같이 등록된 Manifest 들의 미션 목록에서 미션 파일의 경로로 찾는다.
+        /// </summary>
+        /// <returns>맵팩. 미션 파일이 없거나(저장하지 않은 미션) 어느 Manifest 에도 없으면 null.</returns>
+        private MapPackManifestData DocumentPack()
+        {
+            if (m_document.MissionPath.Length == 0) return null;
+            string path = GamePath.Resolve(m_document.MissionPath);
+            return path == null ? null : DataManager.Instance.FindMapPack(path);
+        }
+
+        /// <summary>
+        /// 열려 있는 미션의 맵팩이나 미션 자신이 들고 오는 그 종류의 데이터 파일의 경로.
+        /// </summary>
+        /// <param name="type">데이터 클래스.</param>
+        /// <param name="pack">true 면 맵팩(10000 부터), false 면 미션(20000 부터).</param>
+        /// <returns>경로 (exe 폴더 기준). 없으면 null 이나 빈 문자열.</returns>
+        private string AddonPath(Type type, bool pack)
+        {
+            if (!pack) return MissionPathField(type)?.GetValue(m_document.Mission) as string;
+
+            MapPackManifestData mapPack = DocumentPack();
+            return mapPack == null ? null : PackPathField(type)?.GetValue(mapPack) as string;
+        }
+
+        /// <summary>
+        /// 열려 있는 미션의 맵팩이나 미션 자신의 데이터 파일을 연다. 에디터에 열려 있으면 그 내용(저장하지 않은 편집 포함)이다.
+        /// </summary>
+        /// <param name="type">데이터 클래스.</param>
+        /// <param name="pack">true 면 맵팩, false 면 미션.</param>
+        /// <returns>파일. 그 종류의 데이터가 없거나 읽지 못하거나 종류가 다르면 null.</returns>
+        private AssetFile AddonFile(Type type, bool pack)
+        {
+            string path = AddonPath(type, pack);
+            if (string.IsNullOrEmpty(path)) return null;
+            if (!m_assetFiles.TryGetValue(path, out AssetFile file))
+            {
+                if (!AssetFile.Load(path, out file, out _)) return null;
+                m_assetFiles[path] = file;
+            }
+            return file.FileKind.Type == type ? file : null;
+        }
+
+        /// <summary>
+        /// 왼쪽의 파일 목록을 다시 채운다: 기본 데이터(godotdata 의 JSON. 설정 파일은 뺀다), 지금 미션이 속한 맵팩의 데이터, 지금 미션의 에드온 데이터, 따로 연 파일.
         /// </summary>
         private void RefreshAssetList()
         {
@@ -186,16 +245,19 @@ namespace GodotXOPS.Editor
                 }
             }
 
-            var missionPaths = new List<string>();
-            foreach (AssetFile.Kind kind in AssetFile.Kinds)
+            foreach (bool pack in new[] { true, false })
             {
-                string path = MissionPathField(kind.Type)?.GetValue(m_document.Mission) as string;
-                if (!string.IsNullOrEmpty(path)) missionPaths.Add(path);
-            }
-            if (missionPaths.Count > 0) AddAssetHeader("This mission's addon data");
-            foreach (string path in missionPaths)
-            {
-                AddAssetRow(path);
+                var addonPaths = new List<string>();
+                foreach (AssetFile.Kind kind in AssetFile.Kinds)
+                {
+                    string path = AddonPath(kind.Type, pack);
+                    if (!string.IsNullOrEmpty(path)) addonPaths.Add(path);
+                }
+                if (addonPaths.Count > 0) AddAssetHeader(pack ? "Map pack data" : "This mission's addon data");
+                foreach (string path in addonPaths)
+                {
+                    AddAssetRow(path);
+                }
             }
 
             bool header = false;
@@ -257,7 +319,8 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 새 에드온 데이터 파일을 만들어 쓰고 연다. 지금 미션에 그 종류의 파일이 아직 없으면 미션이 이 파일을 가리키게 한다.
+        /// 새 에드온 데이터 파일을 만들어 쓰고 연다. 미션이 들고 오는 종류이고 지금 미션에 그 종류의 파일이 아직 없으면 미션이 이 파일을 가리키게 한다.
+        /// 맵팩만 들고 오는 종류(하늘, 이벤트, 재질, 이펙트)는 Manifest 에 손으로 적는다.
         /// </summary>
         /// <param name="relativePath">파일 경로 (exe 폴더 기준).</param>
         /// <param name="kind">종류.</param>

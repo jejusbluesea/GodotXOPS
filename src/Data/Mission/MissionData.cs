@@ -13,12 +13,14 @@ namespace GodotXOPS
         public List<DemoData> demoData = new List<DemoData>();
         public List<OfficialMissionData> officialMissions = new List<OfficialMissionData>();
 
-        // 애드온은 페이지(List) 단위로 나뉜다. 페이지 0 = addon 폴더 자동 로드분. addon.json 으로 페이지를 늘릴 수 있다.
-        // addonPageNames는 addonMissions와 같은 인덱스로 정렬된 각 페이지 이름(빈 문자열 가능).
-        // 둘 다 JSON 이 아니라 런타임 폴더 스캔으로 채운다.
+        // 애드온은 페이지(List) 단위로 나뉜다. 페이지 0 = addon 폴더 자동 로드분. 페이지 1 부터는 addon.json 에 적은 맵팩 Manifest 다.
+        // addonPageNames 와 addonPagePacks 는 addonMissions 와 같은 인덱스로 정렬된 페이지 이름(빈 문자열 가능)과 그 페이지의 맵팩(페이지 0 은 null)이다.
+        // 셋 다 JSON 이 아니라 런타임에 채운다.
         [JsonIgnore]
         public List<List<AddonMissionData>> addonMissions = new List<List<AddonMissionData>>();
         [JsonIgnore]
         public List<string> addonPageNames = new List<string>();
+        [JsonIgnore]
+        public List<MapPackManifestData> addonPagePacks = new List<MapPackManifestData>();
     }
 }

@@ -16,6 +16,7 @@ namespace GodotXOPS.Editor
         private Control m_missionPanel;
         private Label m_missionFileLabel;
         private Label m_missionMapLabel;
+        private Label m_missionPackLabel;
         // 칸마다의 "문서의 값으로 다시 채우기".
         private readonly List<Action> m_missionRefreshers = new List<Action>();
         private bool m_fillingMission;
@@ -87,19 +88,20 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Addon human data", "*.json", m => m.addonHumanDataPath, (m, v) => m.addonHumanDataPath = v);
             AddMissionPath(grid, "Addon weapon data", "*.json", m => m.addonWeaponDataPath, (m, v) => m.addonWeaponDataPath = v);
             AddMissionPath(grid, "Addon object data", "*.json", m => m.addonObjectDataPath, (m, v) => m.addonObjectDataPath = v);
-            AddMissionPath(grid, "Addon effect data", "*.json", m => m.addonEffectDataPath, (m, v) => m.addonEffectDataPath = v);
-            AddMissionPath(grid, "Addon block material data", "*.json", m => m.addonBlockMaterialDataPath, (m, v) => m.addonBlockMaterialDataPath = v);
             AddMissionPath(grid, "Addon sound data", "*.json", m => m.addonSoundDataPath, (m, v) => m.addonSoundDataPath = v);
             AddMissionPath(grid, "Addon image data", "*.json", m => m.addonImageDataPath, (m, v) => m.addonImageDataPath = v);
-            AddMissionPath(grid, "Addon sky data", "*.json", m => m.addonSkyDataPath, (m, v) => m.addonSkyDataPath = v);
-            AddMissionPath(grid, "Addon event pack", "*.json", m => m.addonEventDataPath, (m, v) => m.addonEventDataPath = v);
             AddMissionPath(grid, "Briefing script", "*.sgd", m => m.briefingScriptPath, (m, v) => m.briefingScriptPath = v);
             AddMissionPath(grid, "HUD script", "*.sgd", m => m.hudScriptPath, (m, v) => m.hudScriptPath = v);
             AddMissionPath(grid, "Result script", "*.sgd", m => m.resultScriptPath, (m, v) => m.resultScriptPath = v);
             AddMissionPath(grid, "Font image override", "*.bmp, *.png, *.jpg, *.dds", m => m.fontImageOverridePath, (m, v) => m.fontImageOverridePath = v);
+            column.AddChild(new HSeparator());
+            m_missionPackLabel = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+            column.AddChild(m_missionPackLabel);
             column.AddChild(new Label
             {
-                Text = "Numbers 10000 and up in the map point at the mission's addon data. The addon event pack adds this mission's own events to the Add menu.",
+                Text = "Numbers 10000 to 19999 point at the map pack's data, 20000 and up at this mission's addon data. "
+                    + "Sky, events, block materials and effects come only from the map pack. "
+                    + "A mission belongs to a map pack when a manifest listed in addon.json lists its file; edit the manifest by hand.",
                 Modulate = s_hintColor,
                 AutowrapMode = TextServer.AutowrapMode.WordSmart,
             });
@@ -231,11 +233,11 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 문서의 하늘을 3D 화면에 띄운다. 미션이 들고 오는 하늘(10000 번대)도 보이게 그 파일을 먼저 읽고, 안개는 끈다 (에디터는 맵 전체를 멀리서 본다).
+        /// 문서의 하늘을 3D 화면에 띄운다. 맵팩의 하늘(10000 번대)도 보이게 그 파일을 먼저 읽고, 안개는 끈다 (에디터는 맵 전체를 멀리서 본다).
         /// </summary>
         private void LoadEditorSky()
         {
-            MapLoader.LoadAddonSky(m_document.Mission.addonSkyDataPath);
+            MapLoader.LoadPackSky(AddonPath(typeof(SkyData), true));
             MapLoader.LoadSkyData(m_document.SkyIndex);
             MapLoader.ClearFog();
         }
@@ -258,18 +260,24 @@ namespace GodotXOPS.Editor
                 string block = string.IsNullOrEmpty(m_document.BlockPath) ? "(not saved yet)" : m_document.BlockPath;
                 string points = string.IsNullOrEmpty(m_document.PointPath) ? "(not saved yet)" : m_document.PointPath;
                 m_missionMapLabel.Text = $"Blocks: {block}\nPoints: {points}\nThe mission file points at these two files. They are filled in when the mission is saved.";
+                MapPackManifestData pack = DocumentPack();
+                m_missionPackLabel.Text = pack == null
+                    ? "Map pack: none (the mission is not listed in any manifest of addon.json)"
+                    : $"Map pack: {pack.name} ({pack.manifestPath})";
             }
 
             RefreshAssetList();
-            if (m_shownSky != mission.skyIndex || m_shownSkyData != mission.addonSkyDataPath)
+            string skyData = AddonPath(typeof(SkyData), true) ?? string.Empty;
+            if (m_shownSky != mission.skyIndex || m_shownSkyData != skyData)
             {
                 m_shownSky = mission.skyIndex;
-                m_shownSkyData = mission.addonSkyDataPath;
+                m_shownSkyData = skyData;
                 LoadEditorSky();
             }
-            if (m_shownEventPack != mission.addonEventDataPath)
+            string eventPack = AddonPath(typeof(EventPackData), true) ?? string.Empty;
+            if (m_shownEventPack != eventPack)
             {
-                m_shownEventPack = mission.addonEventDataPath;
+                m_shownEventPack = eventPack;
                 ReloadCatalog();
                 if (m_markers != null) RebuildPoints();
             }

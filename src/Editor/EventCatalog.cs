@@ -6,7 +6,7 @@ using GodotXOPS.IO;
 namespace GodotXOPS.Editor
 {
     /// <summary>
-    /// 에디터가 아는 이벤트 종류의 목록. 원본 이벤트(10 에서 19)는 여기서 정하고, 스크립트 이벤트는 등록 파일(설치형 godotdata/event/*.json 과 미션 전용 묶음)에서 읽는다.
+    /// 에디터가 아는 이벤트 종류의 목록. 원본 이벤트(10 에서 19)는 여기서 정하고, 스크립트 이벤트는 등록 파일(설치형 godotdata/event/*.json 과 맵팩의 묶음)에서 읽는다.
     /// 등록 파일만 읽고 스크립트는 로드하지 않는다. 에디터는 이것으로 이벤트의 이름과 입력 칸을 그린다.
     /// </summary>
     public sealed class EventCatalog
@@ -36,8 +36,8 @@ namespace GodotXOPS.Editor
         /// <summary>
         /// 목록을 다시 읽는다.
         /// </summary>
-        /// <param name="missionPackPath">미션 전용 묶음의 등록 파일 (exe 폴더 기준). 없으면 빈 문자열이나 null.</param>
-        public void Reload(string missionPackPath)
+        /// <param name="mapPackPath">지금 미션이 속한 맵팩의 묶음의 등록 파일 (exe 폴더 기준). 없으면 빈 문자열이나 null.</param>
+        public void Reload(string mapPackPath)
         {
             m_definitions.Clear();
             m_groups.Clear();
@@ -66,8 +66,8 @@ namespace GodotXOPS.Editor
                 }
             }
 
-            string missionPack = string.IsNullOrEmpty(missionPackPath) ? null : GamePath.Resolve(missionPackPath);
-            if (missionPack != null && File.Exists(missionPack)) AddPack(missionPack, "Mission");
+            string mapPack = string.IsNullOrEmpty(mapPackPath) ? null : GamePath.Resolve(mapPackPath);
+            if (mapPack != null && File.Exists(mapPack)) AddPack(mapPack, "Map pack");
         }
 
         /// <summary>

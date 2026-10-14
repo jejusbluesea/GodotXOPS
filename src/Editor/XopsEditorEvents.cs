@@ -79,11 +79,11 @@ namespace GodotXOPS.Editor
         private LineEdit m_entryEdit;
 
         /// <summary>
-        /// 이벤트 종류의 목록을 다시 읽고(설치형 묶음과 지금 미션의 묶음) 종류를 고르는 메뉴들을 다시 채운다.
+        /// 이벤트 종류의 목록을 다시 읽고(설치형 묶음과 지금 미션이 속한 맵팩의 묶음) 종류를 고르는 메뉴들을 다시 채운다.
         /// </summary>
         private void ReloadCatalog()
         {
-            m_catalog.Reload(m_document.Mission.addonEventDataPath);
+            m_catalog.Reload(AddonPath(typeof(EventPackData), true));
             PointTypeInfo.EventName = type => m_catalog.Get(type)?.name;
             if (m_addMenu == null) return;
 
@@ -540,13 +540,16 @@ namespace GodotXOPS.Editor
             {
                 m_choiceMenu.AddItem($"{i}  {names[i]}", i);
             }
-            // 이미지는 기본 목록이 비어 있고 미션의 목록(10000 부터)을 주로 쓰므로 그것도 함께 보여 준다.
+            // 이미지는 기본 목록이 비어 있고 맵팩(10000 부터)과 미션(20000 부터)의 목록을 주로 쓰므로 그것도 함께 보여 준다.
             int extra = 0;
-            if (slot.kind == "image" && AddonListOf(typeof(ImageParameterData), nameof(ImageParameterData.imageData)) is System.Collections.IList addon)
+            foreach (bool pack in new[] { true, false })
             {
+                if (slot.kind != "image" || AddonListOf(typeof(ImageParameterData), nameof(ImageParameterData.imageData), pack) is not System.Collections.IList addon) continue;
+
+                int offset = pack ? DataList<ImageData>.PackBase : DataList<ImageData>.MissionBase;
                 for (int i = 0; i < addon.Count; i++, extra++)
                 {
-                    m_choiceMenu.AddItem($"{DataList<ImageData>.AddonBase + i}  {ItemName(addon[i])}", DataList<ImageData>.AddonBase + i);
+                    m_choiceMenu.AddItem($"{offset + i}  {ItemName(addon[i])}", offset + i);
                 }
             }
             if (names.Count + extra == 0) m_choiceMenu.AddItem("(nothing to choose)", 0);
@@ -575,7 +578,8 @@ namespace GodotXOPS.Editor
 
             List<string> names = ChoiceNames(slot.kind);
             if (whole >= 0 && whole < names.Count) return names[whole];
-            return whole >= DataList<WeaponData>.AddonBase ? "mission addon data" : "(not in the list)";
+            if (whole >= DataList<WeaponData>.MissionBase) return "mission addon data";
+            return DataList<WeaponData>.IsAddon(whole) ? "map pack data" : "(not in the list)";
         }
 
         /// <summary>

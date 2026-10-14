@@ -5,6 +5,8 @@ extends Node
 ## 버튼은 누른 자리에서 뗐을 때만 동작한다 (누른 채 벗어나면 취소).
 
 const SCREEN_NAME := "mainmenu"
+# 맵팩의 메뉴 스크립트의 화면 이름 (GameBridge.MenuPackScreen 과 같다).
+const PACK_SCREEN_NAME := "mainmenu_pack"
 const BRIEFING_SCENE := "briefing"
 # 화면 스크립트가 한 번에 물을 수 있는 미션 이름의 수.
 const SCRIPT_MISSION_BATCH := 64
@@ -141,6 +143,15 @@ var _buttons := XopsButtons.new()
 var _ui: CanvasLayer
 # 이 화면을 맡은 화면 스크립트 (godotdata/ui 에 등록된 .sgd). 없으면 아래의 기본 화면을 그린다.
 var _script: XopsScriptScreen
+# 맵팩 페이지를 보고 있는 동안 타이틀과 버전 자리를 그리는 맵팩의 메뉴 스크립트 (Manifest 의 mainMenuScriptPath). 메뉴 위에 따로 돈다.
+var _pack_script: XopsScriptScreen
+# 보고 있는 페이지가 바뀌어 맵팩의 메뉴 스크립트를 다음 프레임에 바꿔야 하는지.
+var _pack_dirty := false
+# 메뉴가 마지막으로 알린 에드온 페이지 (기본 화면의 페이지, 또는 메뉴 스크립트의 show_page). 맵팩의 메뉴 스크립트에 넘긴다.
+var _shown_page := 0
+# 기본 화면의 타이틀과 버전. 맵팩의 메뉴 스크립트가 도는 동안 감춘다.
+var _title_layer: XopsLayer
+var _version_layer: XopsLayer
 
 # 버튼 하나 = {"shadow": XopsText, "main": XopsText, "x": 기준 x, "y": 기준 y}.
 var _up_slot: Dictionary
@@ -161,6 +172,10 @@ func _ready() -> void:
 	Game.LoadDemo()
 
 	_addon_exists = Game.AddonPageCount() > 1 or Game.AddonMissionCount(0) > 0
+	var state: String = Dev.value("--ui-state", "")
+	# 개발용 시작 상태: --ui-state addon --page 번호 로 그 에드온 페이지에서 시작한다.
+	if state == "addon" and Dev.has("--page"):
+		s_page = int(Dev.value("--page", "0"))
 	_is_addon = s_is_addon and _addon_exists
 	_page = clampi(s_page, 0, maxi(0, Game.AddonPageCount() - 1))
 	_scroll_index = clampi(s_addon_scroll if _is_addon else s_official_scroll, 0, _max_index())
@@ -168,7 +183,9 @@ func _ready() -> void:
 	_ui = CanvasLayer.new()
 	add_child(_ui)
 
-	var state: String = Dev.value("--ui-state", "")
+	# 글자를 만들기 전에 보고 있는 페이지의 맵팩을 정한다 (맵팩의 글꼴). 메뉴 스크립트는 자기 페이지를 show_page 로 다시 알린다.
+	_set_menu_page(_is_addon or (state == "addon" and _addon_exists), _page)
+
 	_script = XopsScriptScreen.start(_ui, SCREEN_NAME, _script_api(), {
 		"version": Game.Version(), "credit": Game.CreditText(), "state": state,
 		"official_count": Game.OfficialMissionCount(), "addon_pages": Game.AddonPageCount(), "addon_exists": _addon_exists,
@@ -186,6 +203,8 @@ func _exit_tree() -> void:
 	if _script != null:
 		_script.stop()
 		_script = null
+	_stop_pack_script()
+	Game.SetMenuPage(false, 0)
 
 
 ## OPTION 화면을 연다. state 가 "option-탭" 이면 그 탭에서 시작한다 (개발용 시작 상태).
@@ -197,15 +216,16 @@ func _open_option(state := "") -> void:
 ## 기본 화면을 만든다. 화면 스크립트가 없거나 실패했을 때 쓴다.
 func _build_default() -> void:
 	var ui := _ui
-	var title_layer := _layer(ui, TITLE_ORDER)
-	XopsUI.image(title_layer, XopsUI.TOP_LEFT, Game.LoadTexture(TITLE["path"]), TITLE["x"], TITLE["y"], TITLE["w"], TITLE["h"])
+	_title_layer = _layer(ui, TITLE_ORDER)
+	XopsUI.image(_title_layer, XopsUI.TOP_LEFT, Game.LoadTexture(TITLE["path"]), TITLE["x"], TITLE["y"], TITLE["w"], TITLE["h"])
 
-	var version_layer := _layer(ui, VERSION_ORDER)
+	_version_layer = _layer(ui, VERSION_ORDER)
 	var version: String = Game.Version()
-	XopsUI.text(version_layer, XopsUI.TOP_RIGHT, XopsUI.TOP_RIGHT, version,
+	XopsUI.text(_version_layer, XopsUI.TOP_RIGHT, XopsUI.TOP_RIGHT, version,
 		VERSION["x"] + 1, VERSION["y"] - 1, VERSION["w"], VERSION["h"], VERSION["shadow"])
-	XopsUI.text(version_layer, XopsUI.TOP_RIGHT, XopsUI.TOP_RIGHT, version,
+	XopsUI.text(_version_layer, XopsUI.TOP_RIGHT, XopsUI.TOP_RIGHT, version,
 		VERSION["x"], VERSION["y"], VERSION["w"], VERSION["h"], VERSION["color"])
+	_show_default_title()
 
 	_build_scroll(_layer(ui, SCROLL_ORDER))
 	_build_mission_list(_layer(ui, MISSION_ORDER))
@@ -243,6 +263,7 @@ func _process(delta: float) -> void:
 	if _left:
 		return
 
+	_update_pack_script(delta)
 	if _script != null:
 		if _process_script(delta):
 			return
@@ -459,6 +480,7 @@ func _switch_tab(to_addon: bool) -> void:
 	_update_scroll_thumb()
 	_update_switch_text()
 	_set_page_bar_visible(_is_addon and _multiple_pages())
+	_set_menu_page(_is_addon, _page)
 
 
 func _set_page_bar_visible(visible: bool) -> void:
@@ -581,6 +603,7 @@ func _update_main(pressed: bool, clicked: bool, held: bool, escape: bool) -> voi
 			_refresh_items()
 			_update_scroll_thumb()
 			_set_page_bar_visible(true)
+			_set_menu_page(true, _page)
 
 	for i in _menu_slots.size():
 		if _button(_menu_slots[i], pressed, clicked, held):
@@ -665,7 +688,8 @@ func _process_script(delta: float) -> bool:
 		if not _option.is_open():
 			_screen = "main"
 
-	var values := {"option_open": option_open, "player_exists": Game.PlayerExists()}
+	var values := {"option_open": option_open, "player_exists": Game.PlayerExists(),
+		"pack_page": Game.MenuPackActive(), "pack_title": _pack_script != null}
 	if values["player_exists"]:
 		var at: Vector3 = Game.PlayerPosition()
 		values["player"] = [at.x, at.y, at.z]
@@ -677,6 +701,7 @@ func _process_script(delta: float) -> bool:
 	if _left:
 		return true
 	var was_option := _screen == "option"
+	_set_menu_page(_is_addon, _page)
 	_build_default()
 	if was_option:
 		_set_screen("option")
@@ -693,6 +718,7 @@ func _script_api() -> Dictionary:
 		"load_mission": Callable(self, "_script_load_mission"),
 		"open_option": Callable(self, "_script_open_option"),
 		"quit": Callable(self, "_script_quit"),
+		"show_page": Callable(self, "_script_show_page"),
 	}
 
 
@@ -764,3 +790,64 @@ func _script_quit(_arguments: Dictionary) -> bool:
 	_left = true
 	Game.Quit()
 	return true
+
+
+## 메뉴 스크립트가 지금 보여 주는 탭과 페이지를 알린다 (addon, page). 맵팩의 페이지면 그 맵팩의 글꼴과 메뉴 스크립트가 적용된다.
+func _script_show_page(arguments: Dictionary) -> bool:
+	_set_menu_page(_script_addon(arguments), _script_int(arguments, "page"))
+	return true
+
+
+# ============================================================
+#  맵팩 페이지
+# ============================================================
+
+## 보고 있는 페이지를 게임에 알린다. 맵팩이 바뀌었으면 글자를 지금의 글꼴로 다시 그리고, 다음 프레임에 맵팩의 메뉴 스크립트를 바꾼다.
+func _set_menu_page(addon: bool, page: int) -> void:
+	_shown_page = page
+	if not Game.SetMenuPage(addon, page):
+		return
+	XopsText.font_texture = Game.FontTexture()
+	_redraw_texts(_ui)
+	_pack_dirty = true
+
+
+## 노드 아래의 스프라이트 글자를 전부 다시 그린다 (글꼴 그림이 바뀌었을 때).
+func _redraw_texts(node: Node) -> void:
+	if node == null:
+		return
+	for child in node.get_children():
+		if child is XopsText:
+			(child as XopsText).queue_redraw()
+		_redraw_texts(child)
+
+
+## 맵팩의 메뉴 스크립트를 바꿔 올리고 frame 을 부른다. 실패하면 그 스크립트만 내리고 기본 타이틀을 다시 보인다.
+func _update_pack_script(delta: float) -> void:
+	if _pack_dirty:
+		_pack_dirty = false
+		_stop_pack_script()
+		if Game.MenuPackActive():
+			_pack_script = XopsScriptScreen.start(_ui, PACK_SCREEN_NAME, {}, {
+				"version": Game.Version(), "pack": Game.MenuPackName(), "page": _shown_page, "pack_images": Game.MenuPackImageCount(),
+			})
+		_show_default_title()
+	if _pack_script == null:
+		return
+	if not _pack_script.frame({"option_open": _screen == "option"}, delta):
+		_stop_pack_script()
+		_show_default_title()
+
+
+func _stop_pack_script() -> void:
+	if _pack_script != null:
+		_pack_script.stop()
+		_pack_script = null
+
+
+## 기본 화면의 타이틀과 버전은 맵팩의 메뉴 스크립트가 없을 때만 보인다.
+func _show_default_title() -> void:
+	if _title_layer != null:
+		_title_layer.visible = _pack_script == null
+	if _version_layer != null:
+		_version_layer.visible = _pack_script == null

@@ -1,0 +1,27 @@
+# GodotXOPS sample map pack menu script: draws the title and version while the menu shows the map pack's page.
+# To use it, copy it next to the map pack and write its path in the manifest's "mainMenuScriptPath".
+# The game hides the built-in title and version while this script runs. The mission list and the OPTION / CREDIT / EXIT buttons stay as they are.
+# ctx: version, pack (the map pack's name), page, pack_images (how many images the map pack's image list has), saved.
+# Image numbers are numbers of the image list: 10000 and up are the map pack's images ("imageDataPath" of the manifest).
+# This sample draws image 10000 as the logo. Without it, the map pack's name is drawn as text.
+
+var api
+
+func init(a):
+	api = a
+
+func build(ctx):
+	var title_layer = api["layer"].call(1, false)
+	var version_layer = api["layer"].call(2, false)
+
+	if ctx["pack_images"] > 0:
+		api["image"].call(title_layer, {"pivot": 0, "x": 20, "y": -25, "w": 480, "h": 80, "source": 10000})
+	else:
+		api["text"].call(title_layer, {"pivot": 0, "align": 0, "x": 21, "y": -31, "text": ctx["pack"], "font_w": 28, "font_h": 34, "color": 0x000000})
+		api["text"].call(title_layer, {"pivot": 0, "align": 0, "x": 20, "y": -30, "text": ctx["pack"], "font_w": 28, "font_h": 34})
+
+	api["text"].call(version_layer, {"pivot": 2, "align": 2, "x": -9, "y": -76, "text": ctx["version"], "font_w": 16, "font_h": 19, "color": 0x000000})
+	api["text"].call(version_layer, {"pivot": 2, "align": 2, "x": -10, "y": -75, "text": ctx["version"], "font_w": 16, "font_h": 19})
+
+func frame(v, delta):
+	pass

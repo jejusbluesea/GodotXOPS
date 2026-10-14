@@ -2,6 +2,7 @@
 # To use it, copy mainmenu.json into godotdata/ui/.
 # ctx: version, credit (text), state (start state for development), official_count, addon_pages, addon_exists, saved.
 # The OPTION screen is not scripted: open_option() shows the built-in one, and v["option_open"] is true while it is open.
+# show_page() tells the game which tab and page are shown. On a map pack page v["pack_page"] is true, and v["pack_title"] is true while the pack's menu script draws the title.
 # Buttons work when the mouse is released over the element it was pressed on.
 # Most elements hang from the bottom right (pivot 8) or bottom left (pivot 6) of the screen, so offsets are measured from there.
 
@@ -53,6 +54,9 @@ var error_label = 0
 var main_group = []
 var switch_group = []
 var page_group = []
+var title_layer = 0
+var version_layer = 0
+var pack_title = false
 var credit_group = []
 var exit_group = []
 
@@ -111,8 +115,8 @@ func build(ctx):
 	if page < 0 or page >= page_count:
 		page = 0
 
-	var title_layer = api["layer"].call(1, false)
-	var version_layer = api["layer"].call(2, false)
+	title_layer = api["layer"].call(1, false)
+	version_layer = api["layer"].call(2, false)
 	scroll_layer = api["layer"].call(3, false)
 	var mission_layer = api["layer"].call(4, false)
 	var menu_layer = api["layer"].call(5, false)
@@ -199,6 +203,8 @@ func remember():
 
 # Reads the mission count of the current tab and restores its scroll position.
 func enter_tab():
+	# Tells the game which page is shown: on a map pack page the game uses the pack's font and draws its title script.
+	api["show_page"].call({"addon": is_addon, "page": page})
 	count = api["mission_count"].call({"addon": is_addon, "page": page})
 	scroll = official_scroll
 	if is_addon:
@@ -304,6 +310,12 @@ func frame(v, delta):
 	if v["player_exists"]:
 		var p = v["player"]
 		api["camera"].call({"position": [p[0] + 0.4, p[1] + 2.2, p[2] + 1.2], "euler": [25.0, 225.0, 0.0], "fov": 65.0})
+
+	# While a map pack's menu script draws the title, hide this title and version.
+	if v["pack_title"] != pack_title:
+		pack_title = v["pack_title"]
+		put(title_layer, "visible", not pack_title)
+		put(version_layer, "visible", not pack_title)
 
 	var fade = 1.0 - time / 2.0
 	if fade < 0.0:

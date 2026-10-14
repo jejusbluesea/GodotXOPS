@@ -882,7 +882,7 @@ namespace GodotXOPS.Editor
 
         /// <summary>
         /// 번호로 가리키는 데이터 항목을 찾는다. 에디터에 열려 있는 파일의 내용(저장하지 않은 편집 포함)을 먼저 보고, 없으면 게임이 읽어 둔 데이터를 본다.
-        /// 10000 이상의 번호는 지금 미션의 에드온 데이터에서 찾는다.
+        /// 10000 에서 19999 는 지금 미션이 속한 맵팩의 데이터, 20000 이상은 지금 미션의 에드온 데이터에서 찾는다.
         /// </summary>
         /// <typeparam name="T">항목의 형식.</typeparam>
         /// <param name="containerType">목록이 든 데이터 클래스.</param>
@@ -894,16 +894,12 @@ namespace GodotXOPS.Editor
             FieldInfo field = containerType.GetField(listName);
             if (field == null || index < 0) return null;
 
-            if (index >= DataList<T>.AddonBase)
+            if (DataList<T>.IsAddon(index))
             {
-                string addonPath = MissionPathField(containerType)?.GetValue(m_document.Mission) as string;
-                if (string.IsNullOrEmpty(addonPath)) return null;
-                if (!m_assetFiles.TryGetValue(addonPath, out AssetFile addon))
-                {
-                    if (!AssetFile.Load(addonPath, out addon, out _)) return null;
-                    m_assetFiles[addonPath] = addon;
-                }
-                return ItemAt<T>(addon.FileKind.Type == containerType ? field.GetValue(addon.Container) : null, index - DataList<T>.AddonBase);
+                bool pack = index < DataList<T>.MissionBase;
+                AssetFile addon = AddonFile(containerType, pack);
+                if (addon == null) return null;
+                return ItemAt<T>(field.GetValue(addon.Container), index - (pack ? DataList<T>.PackBase : DataList<T>.MissionBase));
             }
 
             return ItemAt<T>(ListOf(containerType, listName), index);

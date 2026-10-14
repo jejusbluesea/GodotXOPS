@@ -21,6 +21,42 @@
 - 커밋 `fdffa9d` 의 메시지에 취소한 프로젝트의 이름이 남아 있다 (공개 저장소의 기록이라 고치지 않았다).
 
 
+## 1.2.4: 맵팩의 화면과 글꼴, 메뉴 스크립트 (2026-10-14, 구현함, 커밋 전)
+
+- **구현한 것**: Manifest 의 키 다섯, `MapLoader.MissionScreenScript(화면, out fromPack)` 과 `MissionFontImagePath` 의 MIF2 → 맵팩 순서, `GameBridgeMenuPack.cs`(`SetMenuPage`, `MenuPackActive`, `MenuPackName`, `MenuPackImageCount`, `AddMapPack`), `ui/mainmenu.gd` 의 `_set_menu_page` / `_update_pack_script`, 메뉴 스크립트의 `show_page` 와 `v["pack_page"]` / `v["pack_title"]`, 예제 `mainmenu_pack.sgd` 와 `mainmenu.sgd` 의 수정, 개발용 인자 `--map-pack` 과 메뉴의 `--ui-state addon --page 번호`, `ui_check` 의 `CheckMapPackUiScript`, `DataManager.AddMapPackPage` / `RemoveMapPackPage`(점검의 `MIF2Check.RegisterPack` 도 이것을 쓴다), 문서. 점검 씬 전부 통과.
+- **눈으로 본 것** (`build/pack_demo/`, 공식 미션 1 을 바꾼 것 + 시험용 Manifest): 기본 메뉴와 예제 메뉴 스크립트 둘 다 맵팩 페이지에서 기본 타이틀이 감춰지고 맵팩의 로고(이미지 10000)와 버전이 그려진다 / 맵팩 글꼴이 메뉴의 글자 전부에 적용된다 (시험에는 글꼴이 아닌 그림을 넣어 깨져 보인다) / `<<` 로 addon 폴더 페이지로 가면 기본 타이틀과 `char.dds` 로 돌아온다.
+- **확인하지 못한 것**: 맵팩 미션을 실제로 플레이해 브리핑·HUD·결과에 맵팩의 스크립트와 글꼴이 쓰이는 화면 (수치로만 확인), OPTION 을 맵팩 페이지에서 열었을 때의 모습, 페이지를 넘길 때 스크립트를 컴파일하느라 멈칫하는 정도.
+
+사용자 결정:
+- 브리핑·HUD·결과 화면 스크립트와 글꼴 그림을 맵팩도 든다. 순서는 **MIF2 → 맵팩 → 설치형(godotdata/ui) → 기본**.
+- 메인 메뉴 스크립트는 **맵팩에만** 있다 (MIF2 에는 넣지 않는다). 맵팩 페이지에 들어서는 순간부터 그 맵팩의 글꼴과 메뉴 스크립트가 적용되고, 공식 미션 탭이나 다른 페이지로 가면 원래대로다.
+- 메뉴 스크립트가 맡는 것은 **타이틀과 버전 자리뿐**이다. 기본 메뉴의 타이틀 그림과 버전 글자를 게임이 숨기고 스크립트가 자기 것을 그린다. 미션 목록, 페이지 넘기기, OPTION / CREDIT / EXIT 는 그대로다. 마우스에 반응하는 장식, 배경 카메라, 배경 맵 바꾸기는 넣지 않는다.
+- 맵팩 글꼴은 그 페이지에 있는 동안 **메뉴 전체**에 적용한다 (OPTION, CREDIT, EXIT 포함).
+- 메뉴 전체를 바꾸는 설치형 메뉴 스크립트가 있으면 맵팩의 메뉴 스크립트는 **그 위에 겹쳐 그린다**. 설치형 스크립트에는 "맵팩 페이지에 있음"을 값으로 넘기고, 자기 타이틀을 숨길지는 그 스크립트가 정한다.
+
+내가 정한 것 (사용자에게 알렸다):
+- Manifest 의 키는 MIF2 와 같은 이름으로 `briefingScriptPath`, `hudScriptPath`, `resultScriptPath`, `fontImageOverridePath` 이고, 메뉴 스크립트는 `mainMenuScriptPath` 다.
+- 고른 것을 올리지 못하면 다음 것으로 넘어가지 않고 기본이다 (지금의 MIF2 규칙과 같다). 글꼴 그림도 같다.
+- 메뉴 스크립트는 다른 화면 스크립트와 계약이 같다 (`init` / `build` / `frame`). 화면 전용 함수는 없고, 이미지는 이미지 목록의 번호다 (등록 파일이 없다).
+- 메뉴 스크립트가 실패하면 그 층만 내리고 기본 타이틀을 다시 보인다. `AllowUiScript` 를 끄면 메뉴 스크립트는 없지만 글꼴은 적용된다.
+- 맵팩 페이지에 있는 동안 그 맵팩의 이미지 목록과 글꼴을 메뉴에도 붙인다. 미션을 고르면 지금처럼 미션 정보와 함께 다시 붙는다.
+
+## 1.2.4: 맵팩 Manifest (2026-10-14, 구현함, 커밋 전)
+
+사용자가 맵팩 설계를 바꿨다. 아래는 사용자 결정 + 사용자가 받은 권고안이다. 이름도 사용자가 그대로 받았다 (`addon.json` 의 `manifests`, Manifest 의 `humanDataPath` 같은 접두사 없는 키, Manifest 의 파일 이름은 자유).
+
+- **구현한 것**: `DataList` 두 층(`PackBase` / `MissionBase`, `SetPack` / `SetMission`, `IsAddon`), `MapPackManifestData`, `DataManager.ReadMapPack` / `ListPackMissions` / `FindMapPack`, `MapLoader.LoadPackData` / `UnloadPackData` / `MapPack`, `LoadPackSky`, 이벤트 구간 10000 에서 19999, 에디터(`DocumentPack`, `AddonPath`, `AddonFile`, 미션 모드의 맵팩 줄, 번호 메뉴의 세 층), 점검(`mif2_check`, `event_check`, `ui_check`, 에디터 `--selftest`), 문서 전부, 버전 1.2.4. 점검 씬 전부 통과.
+- **확인하지 못한 것**: 실제 맵팩(Manifest 를 `addon.json` 에 등록)을 메뉴에서 눌러 플레이하는 것 (점검은 등록 목록에 직접 끼워 본다), 에디터에서 맵팩의 미션을 열었을 때의 화면(맵팩 줄, 번호 메뉴, 하늘), 사용자의 Vol.0 파일(`build/1.2.2/godotxops_mappack/`)을 Manifest 로 옮기는 것.
+- 내가 정한 것 (구현하며): 맵팩 데이터는 미션 정보를 읽을 때마다 다시 읽는다 (같은 맵팩이면 그대로 두는 최적화는 하지 않았다. 이벤트 `.sgd` 도 전처럼 포인트를 로드할 때마다 컴파일한다) / 에디터의 New addon file 메뉴에 맵팩만 드는 네 종류도 나온다 (만들기만 하고 Manifest 에는 손으로 적는다) / 점검용 맵팩은 `MIF2Check.RegisterPack` 으로 부팅 때의 목록에 끼운다.
+
+- **번호 세 층**: 기본 0 에서 9999 / 맵팩 10000 에서 19999 / 미션(MIF2) 20000 부터. 맵팩은 Human, Weapon, Object, Sound, Image, Sky, Event, BlockMaterial, Effect 아홉 종을 전부 든다. **MIF2 는 Human, Weapon, Object, Sound, Image 다섯 종만** 든다 (`addonSkyDataPath`, `addonEventDataPath`, `addonBlockMaterialDataPath`, `addonEffectDataPath` 는 MIF2 에서 없앤다).
+- **Manifest 가 없으면 맵팩이 아니다.** Manifest = 맵팩 이름 + MIF2 목록(적은 순서가 메뉴의 순서) + 아홉 종의 데이터 경로. 기본 `addon/` 폴더(페이지 0)는 지금처럼 파일 이름 순서.
+- **등록**: `addon.json` 은 Manifest 파일의 경로 목록만 든다 (`addonName` 은 없어진다).
+- **미션의 소속**: 등록된 Manifest 들의 미션 목록에서 MIF2 경로로 거꾸로 찾는다 (MIF2 에 Manifest 경로를 적지 않는다). 에디터는 문서의 원래 경로로 찾아 플레이 테스트에 넘긴다. 어느 Manifest 에도 없는 MIF2 는 맵팩 없이 돈다.
+- **옛 MIF2 는 끊는다**: 없어진 키는 경고를 남기고 무시한다. 10000 번을 쓰던 미션 데이터는 손으로 20000 으로 고친다. 변환 도구는 만들지 않는다.
+- **에디터**: 맵팩 데이터(10000 번대)를 읽어 보여 주고 고를 수만 있게 한다. Manifest 편집 화면은 만들지 않는다. 미션 모드에서 없어진 네 칸은 뺀다.
+- 내가 정하고 사용자에게 알린 것 (반대가 없었다): 단독 MIF2 는 하늘·이벤트·재질·이펙트를 추가할 수 없다 (미션 하나짜리 맵팩으로 만든다) / 미션 데이터는 맵팩·기본 데이터를 가리킬 수 있고, 맵팩 데이터가 20000 번대를 가리키는 것은 막지 않고 문서에 "쓰지 말 것"으로 적는다 / Manifest 의 경로도 exe 폴더 기준 / Manifest 에 적혔는데 없는 MIF2 는 에러를 남기고 빼고, 폴더에만 있는 MIF2 는 나오지 않는다 / 순서는 목록 순서일 뿐이다 (다음 미션으로 잇기·잠금 없음) / 화면 스크립트 셋, 글꼴 그림, `skyIndex`, `defaultBlockMaterial` 은 MIF2 에 남는다 / MIF → MIF2 변환기는 추가 사물을 20000 으로 옮긴다 / Vol.0 의 재질 10000 에서 10003 과 그 이펙트는 맵팩 층이 되어 번호가 그대로다.
+
 ## 1.2.3 (2026-10-13, 작업 중)
 
 사용자가 맵을 만들면서 낸 네 가지를 넣었다. 1.2.2 는 릴리즈한 지 오래돼서 1.2.3 으로 올린다 (`global.json`, `export_presets.cfg` 를 1.2.3 으로 바꿨다. 태그 `v1.2.2` 는 `1af2c56` 에 둔다).

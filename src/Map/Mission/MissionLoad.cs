@@ -28,10 +28,7 @@ namespace GodotXOPS
         private string m_addonHumanDataPath = string.Empty;
         private string m_addonWeaponDataPath = string.Empty;
         private string m_addonObjectDataPath = string.Empty;
-        private string m_addonEffectDataPath = string.Empty;
-        private string m_addonBlockMaterialDataPath = string.Empty;
         private string m_addonSoundDataPath = string.Empty;
-        private string m_addonEventDataPath = string.Empty;
         private string m_addonImageDataPath = string.Empty;
         private string m_briefingScriptPath = string.Empty;
         private string m_hudScriptPath = string.Empty;
@@ -50,8 +47,8 @@ namespace GodotXOPS
         public int SkyIndex => m_skyIndex;
         public bool AdjustCollision => m_adjustCollision;
         public bool DarkScreen => m_darkScreen;
-        // 지금 미션이 스프라이트 글꼴 대신 쓰라고 적어 둔 그림의 경로 (exe 폴더 기준). 없으면 빈 문자열.
-        public string MissionFontImagePath => m_fontImageOverridePath;
+        // 지금 미션이 스프라이트 글꼴 대신 쓰라고 적어 둔 그림의 경로 (exe 폴더 기준). MIF2 에 없으면 미션이 속한 맵팩의 것이다. 둘 다 없으면 빈 문자열.
+        public string MissionFontImagePath => m_fontImageOverridePath.Length > 0 ? m_fontImageOverridePath : m_mapPack?.fontImageOverridePath ?? string.Empty;
         // 확장 미션 파일(MIF2)에서 읽은 미션인지.
         public bool ExtendedMission => m_extendedMission;
 
@@ -115,11 +112,12 @@ namespace GodotXOPS
         /// <summary>
         /// 미션 파일 하나를 읽어 미션 정보를 MapLoader 에 세팅한다. 맵 자체는 로드하지 않는다.
         /// 확장자가 .mif2 이면 확장 미션 파일(JSON)로, 그 밖에는 원본 MIF 로 읽는다.
-        /// 미션 목록에 없는 파일도 읽을 수 있다 (디버그 콘솔의 loadmissionmif).
+        /// 미션 목록에 없는 파일도 읽을 수 있다 (디버그 콘솔의 loadmissionmif). MIF2 가 등록된 맵팩의 미션이면 그 맵팩의 데이터도 붙인다.
         /// </summary>
         /// <param name="mifPath">미션 파일 전체 경로.</param>
+        /// <param name="packLookupPath">맵팩을 찾을 때 쓸 미션 경로 (전체 경로). null 이면 mifPath 로 찾는다. 에디터의 플레이 테스트처럼 다른 자리에 옮겨 쓴 미션을 원래 자리의 맵팩으로 돌릴 때 쓴다.</param>
         /// <returns>읽기에 성공했으면 true. 파일이 없거나 형식이 잘못됐으면 false.</returns>
-        public static bool LoadMissionFile(string mifPath)
+        public static bool LoadMissionFile(string mifPath, string packLookupPath = null)
         {
             UnloadMissionData();
 
@@ -129,7 +127,7 @@ namespace GodotXOPS
                 return false;
             }
 
-            if (HasExtension(mifPath, MIF2File.Extension)) return LoadExtendedMissionFile(mifPath);
+            if (HasExtension(mifPath, MIF2File.Extension)) return LoadExtendedMissionFile(mifPath, packLookupPath ?? mifPath);
 
             // .mif: 0 이름 / 1 정식 이름 / 2 BD1 / 3 PD1 / 4 하늘 번호 / 5 화면 플래그 / 6 추가 사물 / 7 이미지1 / 8 이미지2 / 9~ 브리핑
             string[] lines = EncodingHelper.ReadAllLines(mifPath);
@@ -162,8 +160,9 @@ namespace GodotXOPS
         /// 블록과 포인트는 확장 형식(BD2, PD2)이어야 한다. 원본 형식(BD1, PD1)은 원본 MIF 로 쓴다.
         /// </summary>
         /// <param name="path">MIF2 파일 전체 경로.</param>
+        /// <param name="packLookupPath">맵팩을 찾을 때 쓸 미션 경로 (전체 경로).</param>
         /// <returns>읽기에 성공했으면 true.</returns>
-        private static bool LoadExtendedMissionFile(string path)
+        private static bool LoadExtendedMissionFile(string path, string packLookupPath)
         {
             string label = Path.GetRelativePath(GamePath.Root, path);
             if (!MIF2File.Read(path, out ExtendedMissionData data, out string error))
@@ -198,12 +197,9 @@ namespace GodotXOPS
             loader.m_addonHumanDataPath = data.addonHumanDataPath ?? string.Empty;
             loader.m_addonWeaponDataPath = data.addonWeaponDataPath ?? string.Empty;
             loader.m_addonObjectDataPath = data.addonObjectDataPath ?? string.Empty;
-            loader.m_addonEffectDataPath = data.addonEffectDataPath ?? string.Empty;
-            loader.m_addonBlockMaterialDataPath = data.addonBlockMaterialDataPath ?? string.Empty;
             loader.m_addonSoundDataPath = data.addonSoundDataPath ?? string.Empty;
-            loader.m_addonEventDataPath = data.addonEventDataPath ?? string.Empty;
             loader.m_addonImageDataPath = data.addonImageDataPath ?? string.Empty;
-            LoadAddonSky(data.addonSkyDataPath);
+            LoadPackData(DataManager.Instance.FindMapPack(packLookupPath));
             loader.m_briefingScriptPath = data.briefingScriptPath ?? string.Empty;
             loader.m_hudScriptPath = data.hudScriptPath ?? string.Empty;
             loader.m_resultScriptPath = data.resultScriptPath ?? string.Empty;
@@ -213,29 +209,47 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 지금 미션이 그 화면을 대신 그리라고 적어 둔 화면 스크립트의 경로.
+        /// 지금 미션이 그 화면을 대신 그리라고 적어 둔 화면 스크립트의 경로. MIF2 에 적힌 것이 먼저이고, 없으면 미션이 속한 맵팩의 것이다.
         /// </summary>
         /// <param name="screen">화면 이름 ("briefing", "maingame", "result").</param>
-        /// <returns>스크립트 경로 (exe 폴더 기준). 미션이 그 화면을 바꾸지 않으면 빈 문자열.</returns>
-        public static string MissionScreenScript(string screen)
+        /// <param name="fromPack">맵팩의 것이면 true.</param>
+        /// <returns>스크립트 경로 (exe 폴더 기준). 미션도 맵팩도 그 화면을 바꾸지 않으면 빈 문자열.</returns>
+        public static string MissionScreenScript(string screen, out bool fromPack)
         {
             MapLoader loader = Instance;
-            if (string.Equals(screen, "briefing", StringComparison.OrdinalIgnoreCase)) return loader.m_briefingScriptPath;
-            if (string.Equals(screen, "maingame", StringComparison.OrdinalIgnoreCase)) return loader.m_hudScriptPath;
-            if (string.Equals(screen, "result", StringComparison.OrdinalIgnoreCase)) return loader.m_resultScriptPath;
-            return string.Empty;
+            MapPackManifestData pack = loader.m_mapPack;
+            string mission = string.Empty;
+            string packPath = string.Empty;
+            if (string.Equals(screen, "briefing", StringComparison.OrdinalIgnoreCase))
+            {
+                mission = loader.m_briefingScriptPath;
+                packPath = pack?.briefingScriptPath;
+            }
+            else if (string.Equals(screen, "maingame", StringComparison.OrdinalIgnoreCase))
+            {
+                mission = loader.m_hudScriptPath;
+                packPath = pack?.hudScriptPath;
+            }
+            else if (string.Equals(screen, "result", StringComparison.OrdinalIgnoreCase))
+            {
+                mission = loader.m_resultScriptPath;
+                packPath = pack?.resultScriptPath;
+            }
+
+            fromPack = string.IsNullOrEmpty(mission) && !string.IsNullOrEmpty(packPath);
+            return fromPack ? packPath : mission ?? string.Empty;
         }
 
         /// <summary>
-        /// 미션의 이미지 목록을 기본 목록 뒤(번호 10000 부터)에 붙인다. 다른 에드온 데이터는 맵을 로드할 때 붙지만,
+        /// 미션의 이미지 목록을 번호 20000 부터에 붙인다. 다른 미션 데이터는 맵을 로드할 때 붙지만,
         /// 이미지는 맵이 아직 없는 브리핑과 맵을 내린 결과 화면에서도 쓰므로 미션 정보와 함께 붙이고 UnloadMissionData 가 뗀다.
         /// </summary>
         private static void LoadMissionImages()
         {
             DataList<ImageData> list = DataManager.Instance.ImageParameterData.imageData;
-            list.ClearAddon();
+            list.ClearMission();
             ImageParameterData image = LoadAddonFile<ImageParameterData>(Instance.m_addonImageDataPath);
-            if (image != null) list.SetAddon(image.imageData);
+            if (image != null) list.SetMission(image.imageData);
         }
 
         /// <summary>
@@ -290,17 +304,14 @@ namespace GodotXOPS
             loader.m_addonHumanDataPath = string.Empty;
             loader.m_addonWeaponDataPath = string.Empty;
             loader.m_addonObjectDataPath = string.Empty;
-            loader.m_addonEffectDataPath = string.Empty;
-            loader.m_addonBlockMaterialDataPath = string.Empty;
             loader.m_addonSoundDataPath = string.Empty;
-            loader.m_addonEventDataPath = string.Empty;
             loader.m_addonImageDataPath = string.Empty;
-            loader.m_addonSky = null;
             loader.m_briefingScriptPath = string.Empty;
             loader.m_hudScriptPath = string.Empty;
             loader.m_resultScriptPath = string.Empty;
             loader.m_fontImageOverridePath = string.Empty;
-            if (DataManager.Loaded) DataManager.Instance.ImageParameterData.imageData.ClearAddon();
+            if (DataManager.Loaded) DataManager.Instance.ImageParameterData.imageData.ClearMission();
+            UnloadPackData();
         }
 
         /// <summary>

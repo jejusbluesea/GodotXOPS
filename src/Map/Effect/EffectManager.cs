@@ -241,14 +241,14 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 에드온 텍스처(번호 10000 이상)로 만들어 둔 머티리얼을 버린다. 미션이 바뀌면 같은 번호가 다른 텍스처를 가리킨다.
+        /// 에드온 텍스처(번호 10000 이상)로 만들어 둔 머티리얼을 버린다. 맵팩이 바뀌면 같은 번호가 다른 텍스처를 가리킨다.
         /// </summary>
         public void ClearAddonMaterials()
         {
             var stale = new List<(int texture, EffectBlendMode blend)>();
             foreach ((int texture, EffectBlendMode blend) key in m_materials.Keys)
             {
-                if (key.texture >= DataList<EffectTextureData>.AddonBase) stale.Add(key);
+                if (DataList<EffectTextureData>.IsAddon(key.texture)) stale.Add(key);
             }
             foreach ((int texture, EffectBlendMode blend) key in stale) m_materials.Remove(key);
         }

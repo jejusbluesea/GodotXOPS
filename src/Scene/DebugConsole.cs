@@ -447,8 +447,9 @@ namespace GodotXOPS
             DataList<WeaponData> weapons = DataManager.Instance.WeaponParameterData.weaponData;
             if (args.Length == 0 || !int.TryParse(args[0], out int weaponIndex) || !weapons.Has(weaponIndex))
             {
-                string addon = weapons.AddonCount > 0 ? $", or {DataList<WeaponData>.AddonBase} to {DataList<WeaponData>.AddonBase + weapons.AddonCount - 1} for the mission add-on weapons" : string.Empty;
-                return $"A weapon index is required (0 to {weapons.Count - 1}{addon})";
+                string pack = weapons.PackCount > 0 ? $", {DataList<WeaponData>.PackBase} to {DataList<WeaponData>.PackBase + weapons.PackCount - 1} for the map pack weapons" : string.Empty;
+                string mission = weapons.MissionCount > 0 ? $", {DataList<WeaponData>.MissionBase} to {DataList<WeaponData>.MissionBase + weapons.MissionCount - 1} for the mission weapons" : string.Empty;
+                return $"A weapon index is required (0 to {weapons.Count - 1}{pack}{mission})";
             }
 
             // 탄 수를 주면 장탄수만큼 장전하고 나머지를 예비 탄으로 둔다. 주지 않으면 사람 종류의 초기 탄약 배수를 쓴다 (SetWeapon 의 기본).
@@ -650,7 +651,7 @@ namespace GodotXOPS
             int count = DataManager.Instance.SkyData.skyTexturePath.Count;
             if (args.Length == 0 || !int.TryParse(args[0], out int skyIndex) || !MapLoader.TryGetSky(skyIndex, out _, out _))
             {
-                return $"A sky index is required (0 to {count - 1}, sky_data.json has {count} entries. 10000 and up: the mission's sky data)";
+                return $"A sky index is required (0 to {count - 1}, sky_data.json has {count} entries. 10000 to 19999: the map pack's sky data)";
             }
 
             m_skyIndex = skyIndex;

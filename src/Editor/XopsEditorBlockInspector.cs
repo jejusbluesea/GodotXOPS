@@ -374,7 +374,7 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 재질 번호를 사람이 알아볼 이름으로 적는다. 10000 이상은 지금 미션의 에드온 재질 파일에서 찾는다.
+        /// 재질 번호를 사람이 알아볼 이름으로 적는다. 10000 이상은 지금 미션이 속한 맵팩의 재질 파일에서 찾는다.
         /// </summary>
         /// <param name="materialIndex">재질 번호.</param>
         /// <returns>"[번호] 이름". 목록에 없는 번호면 번호만.</returns>
@@ -385,7 +385,7 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 재질 드롭다운을 채우고 텍스처 목록에서 고른 텍스처의 재질을 가리키게 한다: 미션의 기본 재질, 기본 데이터의 재질들, 지금 미션의 에드온 재질들(10000 부터).
+        /// 재질 드롭다운을 채우고 텍스처 목록에서 고른 텍스처의 재질을 가리키게 한다: 미션의 기본 재질, 기본 데이터의 재질들, 지금 미션이 속한 맵팩의 재질들(10000 부터).
         /// </summary>
         private void SyncTextureMaterial()
         {
@@ -398,16 +398,16 @@ namespace GodotXOPS.Editor
             m_textureMaterial.AddItem("(mission default)");
             m_materialOptionIndices.Add(k_defaultMaterial);
             System.Collections.IList materials = ListOf(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData));
-            System.Collections.IList addon = AddonListOf(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData));
+            System.Collections.IList pack = AddonListOf(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData), true);
             for (int i = 0; materials != null && i < materials.Count; i++)
             {
                 m_textureMaterial.AddItem($"[{i}] {ItemName(materials[i])}");
                 m_materialOptionIndices.Add(i);
             }
-            for (int i = 0; addon != null && i < addon.Count; i++)
+            for (int i = 0; pack != null && i < pack.Count; i++)
             {
-                m_textureMaterial.AddItem($"[{DataList<BlockMaterialData>.AddonBase + i}] {ItemName(addon[i])}  (mission)");
-                m_materialOptionIndices.Add(DataList<BlockMaterialData>.AddonBase + i);
+                m_textureMaterial.AddItem($"[{DataList<BlockMaterialData>.PackBase + i}] {ItemName(pack[i])}  (map pack)");
+                m_materialOptionIndices.Add(DataList<BlockMaterialData>.PackBase + i);
             }
 
             bool selected = m_textureSelected >= 0 && m_textureSelected < textures.Count;

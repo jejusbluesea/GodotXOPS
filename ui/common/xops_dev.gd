@@ -10,6 +10,7 @@ extends Node
 ##   --ui-script 경로        화면 스크립트의 등록 파일 하나(.json)나 등록 파일들이 든 폴더를 지정한다 (godotdata/ui 를 훑지 않는다).
 ##   --ui-script-stats       끝날 때 화면 스크립트의 frame 한 번에 든 평균 시간을 찍는다.
 ##   --demo 번호             메뉴 배경으로 늘 그 번호의 데모를 쓴다 (스크린샷을 견줄 때 배경을 고정한다).
+##   --map-pack 경로         맵팩 Manifest 하나를 어드온 페이지의 끝에 더한다 (addon.json 을 고치지 않는다).
 ##   --ui-quit 초         그 시간이 지나면 종료한다. 헤드리스로 화면 스크립트에 오류가 없는지 볼 때 쓴다.
 ##   --ui-click "목록"    가짜 입력을 차례로 넣는다. 띄어쓰기로 나눈 항목마다 "x,y"(그 자리를 클릭), "x,y,초"(그 시간 동안 누르고 있기),
 ##                        "key:이름"(키 한 번. 이름은 Godot 키 이름, 예: key:Q), "text:글자"(글자를 차례로 친다. 띄어쓰기는 key:Space 로 넣는다. 콘솔에 명령을 칠 때 쓴다).
@@ -46,6 +47,11 @@ func _ready() -> void:
 	Game.SetUiScriptOverride(value("--ui-script", ""))
 
 	Game.DemoOverride = int(value("--demo", "-1"))
+
+	# addon.json 을 고치지 않고 맵팩 하나를 어드온 페이지의 끝에 더한다.
+	var map_pack := value("--map-pack", "")
+	if not map_pack.is_empty():
+		Game.AddMapPack(map_pack)
 
 	_shot_path = value("--ui-shot", "")
 	_shot_time = float(value("--ui-time", str(DEFAULT_SHOT_TIME)))

@@ -101,6 +101,7 @@ namespace GodotXOPS.Dev
 
             foreach (string screen in new[] { "opening", "mainmenu", "briefing", "maingame", "result", "option" }) game.UiScriptFree(screen);
             CheckMissionUiScript(game, folder);
+            CheckMapPackUiScript(game, folder);
             game.SetUiScriptOverride(string.Empty);
             Godot.Collections.Dictionary values = game.HudValues();
             Expect(values.ContainsKey("hp") && values.ContainsKey("armor") && values.ContainsKey("armor_max") && values.ContainsKey("helmet") && values.ContainsKey("helmet_max") &&values.ContainsKey("weapon") && values.ContainsKey("message_text") && values.ContainsKey("result"), "화면 스크립트에 넘기는 값에 빠진 키가 있음");
@@ -108,7 +109,7 @@ namespace GodotXOPS.Dev
 
         /// <summary>
         /// 미션이 들고 오는 화면 스크립트와 이미지 목록: MIF2 에 적은 스크립트가 설치된 등록보다 먼저 올라오고, 올리지 못하면 설치된 것으로 넘어가지 않으며,
-        /// 미션이 바꾸지 않는 화면은 평소대로이고, 이미지는 미션의 목록(10000 부터)의 번호로 읽힌다. 미션의 글꼴 그림(fontImageOverridePath)도 여기서 본다.
+        /// 미션이 바꾸지 않는 화면은 평소대로이고, 이미지는 미션의 목록(20000 부터)의 번호로 읽힌다. 미션의 글꼴 그림(fontImageOverridePath)도 여기서 본다.
         /// </summary>
         /// <param name="game">창구.</param>
         /// <param name="folder">점검용 파일을 쓰는 폴더 (exe 폴더 기준).</param>
@@ -132,9 +133,9 @@ namespace GodotXOPS.Dev
             game.SetUiScriptOverride(string.Empty);
             Node hud = game.UiScriptLoad("maingame");
             Expect(hud != null && hud.HasMethod("frame") && hud.GetParent() == null && hud.Get("restrictions").AsBool(), "미션이 적은 HUD 스크립트가 올라오지 않았거나 격리가 걸리지 않음");
-            Expect(game.UiScriptImage("maingame", 10000) != null && game.ListImage(10000) != null, "미션의 이미지 목록의 이미지를 읽지 못함");
-            Expect(game.UiScriptImage("maingame", 10001) == null && game.UiScriptImage("maingame", 10002) == null && game.UiScriptImage("maingame", 10003) == null,
-                "없는 파일, 게임 폴더 밖, 목록에 없는 번호의 이미지가 null 이 아님");
+            Expect(game.UiScriptImage("maingame", 20000) != null && game.ListImage(20000) != null, "미션의 이미지 목록의 이미지를 읽지 못함");
+            Expect(game.UiScriptImage("maingame", 20001) == null && game.UiScriptImage("maingame", 20002) == null && game.UiScriptImage("maingame", 20003) == null && game.UiScriptImage("maingame", 10000) == null,
+                "없는 파일, 게임 폴더 밖, 목록에 없는 번호, 맵팩이 없는 맵팩 번호의 이미지가 null 이 아님");
             Expect(game.UiScriptImage("maingame", 0) == null, "미션의 스크립트에서 10000 미만의 번호가 (비어 있는) 기본 이미지 목록을 가리키지 않음");
 
             // 미션의 스크립트를 올리지 못하면 설치된 것이 있어도 기본 화면이고, 미션이 바꾸지 않는 화면은 설치된 것을 쓴다.
@@ -164,7 +165,66 @@ namespace GodotXOPS.Dev
             game.SetUiScriptOverride(string.Empty);
             game.UnloadMission();
             Expect(game.FontTexture() == normalFont, "미션을 내렸는데 미션의 글꼴 그림이 남아 있음");
-            Expect(game.UiScriptLoad("maingame") == null && game.ListImage(10000) == null, "미션을 내렸는데 그 미션의 화면 스크립트나 이미지가 남아 있음");
+            Expect(game.UiScriptLoad("maingame") == null && game.ListImage(20000) == null, "미션을 내렸는데 그 미션의 화면 스크립트나 이미지가 남아 있음");
+        }
+
+        /// <summary>
+        /// 맵팩의 화면과 글꼴: 순서가 MIF2 → 맵팩 → 설치된 등록 → 기본인지, 고른 것을 올리지 못하면 다음 것으로 넘어가지 않는지,
+        /// 메뉴가 맵팩 페이지를 보는 동안 그 맵팩의 글꼴·이미지 목록·메뉴 스크립트가 쓰이고 페이지를 떠나면 원래대로인지 본다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        /// <param name="folder">점검용 파일을 쓰는 폴더 (exe 폴더 기준).</param>
+        private void CheckMapPackUiScript(GameBridge game, string folder)
+        {
+            void Write(string name, string text) => System.IO.File.WriteAllText(GamePath.Resolve($"{folder}/{name}"), text);
+            Write("pack_images.json", "{ \"imageData\": [ { \"name\": \"logo\", \"imagePath\": \"data/title.dds\" } ] }");
+            var pack = new MapPackManifestData
+            {
+                name = "UI PACK",
+                missions = new System.Collections.Generic.List<string> { $"{folder}/pack_mission.mif2" },
+                imageDataPath = $"{folder}/pack_images.json",
+                hudScriptPath = "godotdata/ui/samples/hud.sgd",
+                briefingScriptPath = "godotdata/ui/samples/briefing.sgd",
+                fontImageOverridePath = "data/title.dds",
+                mainMenuScriptPath = "godotdata/ui/samples/mainmenu_pack.sgd",
+                manifestPath = $"{folder}/pack.json",
+            };
+            DataManager.Instance.AddMapPackPage(pack);
+            int page = DataManager.Instance.MissionData.addonPagePacks.IndexOf(pack);
+
+            var mission = new ExtendedMissionData { name = "PACK UI", blockPath = $"{folder}/none.bd2", pointPath = $"{folder}/none.pd2" };
+            string missionPath = GamePath.Resolve($"{folder}/pack_mission.mif2");
+            game.SetUiScriptOverride("godotdata/ui/samples");
+            Texture2D normalFont = game.LoadTexture("data/char.dds");
+            Texture2D packFont = game.LoadTexture("data/title.dds");
+
+            // 미션이 적지 않은 화면과 글꼴은 맵팩의 것, 맵팩도 적지 않은 화면은 설치된 것이다.
+            Expect(IO.MIF2File.Write(missionPath, mission, out _) && MapLoader.LoadMissionFile(missionPath) && ReferenceEquals(MapLoader.MapPack, pack), "점검용 맵팩의 미션을 읽지 못함");
+            Expect(game.UiScriptLoad("maingame") != null && game.UiScriptImage("maingame", 10000) != null, "맵팩의 HUD 스크립트가 올라오지 않았거나 맵팩의 이미지를 읽지 못함");
+            Expect(game.UiScriptLoad("result") != null && game.UiScriptImage("result", 0) != null, "맵팩이 바꾸지 않은 결과 화면에서 설치된 스크립트가 올라오지 않음");
+            Expect(game.FontTexture() == packFont, "미션이 글꼴을 적지 않았는데 맵팩의 글꼴이 쓰이지 않음");
+
+            // 미션이 적은 것이 먼저이고, 그것을 올리지 못하면 맵팩으로 넘어가지 않는다.
+            mission.hudScriptPath = $"{folder}/broken.sgd";
+            mission.fontImageOverridePath = "data/none.png";
+            Expect(IO.MIF2File.Write(missionPath, mission, out _) && MapLoader.LoadMissionFile(missionPath), "점검용 맵팩의 미션을 다시 읽지 못함");
+            Expect(game.UiScriptLoad("maingame") == null && game.UiScriptLoad("briefing") != null, "미션의 HUD 스크립트가 깨졌는데 맵팩의 것으로 넘어갔거나, 맵팩의 브리핑 스크립트가 올라오지 않음");
+            Expect(game.FontTexture() == normalFont, "미션의 글꼴 그림을 읽지 못했는데 맵팩의 글꼴로 넘어감");
+            foreach (string screen in new[] { "briefing", "maingame", "result" }) game.UiScriptFree(screen);
+            game.UnloadMission();
+
+            // 메뉴가 맵팩 페이지를 보는 동안: 맵팩의 글꼴, 이미지 목록(10000 부터), 메뉴 스크립트. 떠나면 원래대로다.
+            Expect(game.SetMenuPage(true, page) && game.MenuPackActive() && game.MenuPackName() == "UI PACK" && game.MenuPackImageCount() == 1, "맵팩 페이지를 알렸는데 메뉴의 맵팩이 정해지지 않음");
+            Expect(!game.SetMenuPage(true, page), "같은 페이지를 다시 알렸는데 바뀐 것으로 봄");
+            Expect(game.FontTexture() == packFont && game.ListImage(10000) != null && game.ListImage(10001) == null, "메뉴의 맵팩 페이지에서 맵팩의 글꼴이나 이미지가 쓰이지 않음");
+            Expect(game.UiScriptLoad("mainmenu_pack") != null && game.UiScriptImage("mainmenu_pack", 10000) != null, "맵팩의 메뉴 스크립트가 올라오지 않았거나 맵팩의 이미지를 읽지 못함");
+            game.UiScriptFree("mainmenu_pack");
+            Expect(game.SetMenuPage(true, 0) && !game.MenuPackActive() && game.FontTexture() == normalFont && game.ListImage(10000) == null
+                && game.UiScriptLoad("mainmenu_pack") == null, "addon 폴더의 페이지로 옮겼는데 맵팩의 글꼴·이미지·메뉴 스크립트가 남음");
+            game.SetMenuPage(false, 0);
+
+            game.SetUiScriptOverride(string.Empty);
+            DataManager.Instance.RemoveMapPackPage(pack);
         }
 
         /// <summary>

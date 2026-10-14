@@ -187,7 +187,7 @@ namespace GodotXOPS
                     if (type >= EventManager.ScriptEventFirst) scriptTypes.Add(type);
                 }
                 scriptTypes.Sort();
-                if (!EventManager.Instance.LoadScripts(scriptTypes, loader.m_addonEventDataPath))
+                if (!EventManager.Instance.LoadScripts(scriptTypes, loader.m_mapPack?.eventDataPath))
                 {
                     UnloadPointData();
                     return false;
@@ -404,7 +404,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 포인트가 에드온 번호(10000 이상)를 가리키는데 미션이 그 항목을 들고 오지 않았으면 경고를 남긴다. 디버그 콘솔에서 바로 보인다.
+        /// 포인트가 에드온 번호(맵팩 10000 부터, 미션 20000 부터)를 가리키는데 그 항목이 없으면 경고를 남긴다. 디버그 콘솔에서 바로 보인다.
         /// 10000 미만의 없는 번호는 원본 맵에도 있을 수 있어 조용히 건너뛴다.
         /// </summary>
         /// <typeparam name="T">항목의 형식.</typeparam>
@@ -413,9 +413,16 @@ namespace GodotXOPS
         /// <param name="what">무엇의 번호인지 (영어, 로그용).</param>
         private static void WarnMissingAddon<T>(DataList<T> list, int index, string what)
         {
-            if (index < DataList<T>.AddonBase || list.Has(index)) return;
+            if (!DataList<T>.IsAddon(index) || list.Has(index)) return;
 
-            Debugger.LogWarning($"A point refers to add-on {what} {index}, but the mission provides {list.AddonCount} add-on {what} entries", nameof(MapLoader));
+            if (index >= DataList<T>.MissionBase)
+            {
+                Debugger.LogWarning($"A point refers to mission {what} {index}, but the mission provides {list.MissionCount} {what} entries", nameof(MapLoader));
+            }
+            else
+            {
+                Debugger.LogWarning($"A point refers to map pack {what} {index}, but the map pack provides {list.PackCount} {what} entries", nameof(MapLoader));
+            }
         }
 
         /// <summary>

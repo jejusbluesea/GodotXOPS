@@ -12,22 +12,22 @@ namespace GodotXOPS
         // 어두운 화면 미션에서 스카이와 모델(사람·무기·소물·탄환)에 곱하는 밝기 (원본 D3DGraphics::RenderModel 의 darkflag).
         private const float k_darkModelBrightness = 0.8f;
 
-        // 지금 미션이 들고 온 하늘 (MIF2 의 addonSkyDataPath). 하늘 번호 10000 이상이 이 목록의 (번호 - 10000) 번째다. 없으면 null.
-        private SkyData m_addonSky;
+        // 지금 미션이 속한 맵팩의 하늘 (Manifest 의 skyDataPath). 하늘 번호 10000 에서 19999 가 이 목록의 (번호 - 10000) 번째다. 없으면 null.
+        private SkyData m_packSky;
 
         /// <summary>
-        /// 미션이 들고 오는 하늘 파일을 읽어 둔다. sky_data.json 과 같은 키를 쓰는 JSON 이고, 쓰는 것은 skyTexturePath 와 skyColor 두 목록뿐이다
-        /// (하늘 모델, 안개 거리, 카메라 거리는 게임 전체의 값이라 미션이 바꾸지 못한다). 미션 정보를 읽을 때 부르고 미션 정보를 내릴 때 뗀다:
-        /// 하늘은 맵과 따로 로드하므로 다른 에드온 데이터(LoadAddonData)와 함께 붙이지 않는다.
+        /// 맵팩의 하늘 파일을 읽어 둔다. sky_data.json 과 같은 키를 쓰는 JSON 이고, 쓰는 것은 skyTexturePath 와 skyColor 두 목록뿐이다
+        /// (하늘 모델, 안개 거리, 카메라 거리는 게임 전체의 값이라 맵팩이 바꾸지 못한다). 맵팩 데이터와 함께 미션 정보를 읽을 때 붙고 미션 정보를 내릴 때 떨어진다.
+        /// 에디터는 미션 정보를 읽지 않으므로 하늘을 띄울 때 직접 부른다.
         /// </summary>
-        /// <param name="relativePath">exe 폴더 기준 경로. 비어 있으면 미션의 하늘을 뗀다.</param>
-        public static void LoadAddonSky(string relativePath)
+        /// <param name="relativePath">exe 폴더 기준 경로. 비어 있으면 맵팩의 하늘을 뗀다.</param>
+        public static void LoadPackSky(string relativePath)
         {
-            Instance.m_addonSky = LoadAddonFile<SkyData>(relativePath);
+            Instance.m_packSky = LoadAddonFile<SkyData>(relativePath);
         }
 
         /// <summary>
-        /// 하늘 번호가 가리키는 텍스처와 안개 색을 찾는다. 10000 미만은 sky_data.json, 10000 이상은 미션의 하늘이다.
+        /// 하늘 번호가 가리키는 텍스처와 안개 색을 찾는다. 10000 미만은 sky_data.json, 10000 에서 19999 는 맵팩의 하늘이다. 미션(20000 부터)은 하늘을 들고 오지 않는다.
         /// </summary>
         /// <param name="skyIndex">하늘 번호.</param>
         /// <param name="texturePath">텍스처 경로 (exe 폴더 기준). 그 번호에 텍스처가 없으면 빈 문자열.</param>
@@ -40,10 +40,11 @@ namespace GodotXOPS
 
             SkyData source = DataManager.Instance.SkyData;
             int index = skyIndex;
-            if (skyIndex >= DataList<int>.AddonBase)
+            if (skyIndex >= DataList<int>.MissionBase) return false;
+            if (skyIndex >= DataList<int>.PackBase)
             {
-                source = Instance.m_addonSky;
-                index = skyIndex - DataList<int>.AddonBase;
+                source = Instance.m_packSky;
+                index = skyIndex - DataList<int>.PackBase;
             }
             if (source == null || index < 0) return false;
 
@@ -58,7 +59,7 @@ namespace GodotXOPS
         /// 스카이는 셰이더가 카메라 위치에 붙여 그리므로 노드 위치와 무관하게 항상 배경으로 보인다.
         /// 어두운 화면 미션이면 스카이와 모델의 밝기도 여기서 낮춘다 (미션 정보를 먼저 로드해야 한다).
         /// </summary>
-        /// <param name="textureIndex">하늘 번호. 10000 이상은 미션의 하늘이다. 텍스처가 없는 번호(0, 범위 밖)면 텍스처 없이 검정.</param>
+        /// <param name="textureIndex">하늘 번호. 10000 에서 19999 는 맵팩의 하늘이다. 텍스처가 없는 번호(0, 범위 밖)면 텍스처 없이 검정.</param>
         public static void LoadSkyData(int textureIndex)
         {
             UnloadSkyData();
@@ -87,9 +88,9 @@ namespace GodotXOPS
                     texture = ImageLoader.LoadTexture(fullTexturePath);
                 }
             }
-            else if (textureIndex >= DataList<int>.AddonBase)
+            else if (DataList<int>.IsAddon(textureIndex))
             {
-                Debugger.LogWarning($"Sky {textureIndex} is not in the mission's sky data (addonSkyDataPath).", nameof(MapLoader));
+                Debugger.LogWarning($"Sky {textureIndex} is not in the map pack's sky data (skyDataPath of the manifest).", nameof(MapLoader));
             }
 
             var sky = new MeshInstance3D
@@ -126,7 +127,7 @@ namespace GodotXOPS
         /// 원본 SetFog(true, skynumber) 대응. 선형 안개를 SkyData 의 fogStart ~ fogEnd 범위, 하늘 번호별 색으로 적용한다.
         /// SkyData.fog 가 false 면 안개를 끈다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)만 받는다.
         /// </summary>
-        /// <param name="skyIndex">하늘 번호. 10000 이상은 미션의 하늘이다. 색이 없는 번호면 검정(원본 default).</param>
+        /// <param name="skyIndex">하늘 번호. 10000 에서 19999 는 맵팩의 하늘이다. 색이 없는 번호면 검정(원본 default).</param>
         public static void ApplySkyFog(int skyIndex)
         {
             SkyData skyData = DataManager.Instance.SkyData;

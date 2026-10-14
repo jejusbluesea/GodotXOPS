@@ -11,8 +11,8 @@ namespace GodotXOPS.Dev
     /// <summary>
     /// 개발용 점검 씬 스크립트. 확장 미션 파일(MIF2)과 에드온 데이터를 확인한다.
     /// 1) 모든 공식 미션을 확장 형식 한 벌(BD2, PD2, MIF2)로 바꿔, 원본과 미션 정보가 같고 같은 난수 씨앗으로 돌린 시뮬레이션 결과가 같은지 본다.
-    /// 2) 직접 만든 MIF2 로 에드온 데이터(사람, 무기, 오브젝트, 이펙트, 재질)와 10000 번호 규칙, 없는 번호의 처리를 본다.
-    /// 3) MIF2 의 형식 오류, 미션 목록 스캔, 원본 MIF 의 추가 사물 변환을 본다.
+    /// 2) 직접 만든 맵팩과 MIF2 로 에드온 데이터(맵팩: 이펙트, 재질, 하늘, 사람 / 미션: 사람, 무기, 오브젝트)와 번호 규칙(맵팩 10000, 미션 20000), 없는 번호의 처리, 맵팩 찾기를 본다.
+    /// 3) MIF2 의 형식 오류와 옛 키, 미션 목록 스캔, 맵팩의 미션 목록, 원본 MIF 의 추가 사물 변환을 본다.
     /// 파일은 build/mif2_check/ 에 쓰고 끝나면 지운다.
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/mif2_check.tscn
     /// 명령행 인자("--" 뒤): --convert-official 번호|all 출력폴더 는 공식 미션을, --convert 입력.mif 출력폴더 는 MIF 미션을 확장 형식으로 바꾸고 종료한다 (경로는 exe 폴더 기준).
@@ -22,7 +22,9 @@ namespace GodotXOPS.Dev
         private const string k_workFolder = "build/mif2_check";
         private const int k_simulationTicks = 100;
         private const float k_positionTolerance = 1e-3f;
-        private const int k_addon = DataList<int>.AddonBase;
+        // 맵팩 데이터와 미션 데이터의 첫 번호.
+        private const int k_pack = DataList<int>.PackBase;
+        private const int k_addon = DataList<int>.MissionBase;
 
         private int m_checks;
         private readonly List<string> m_problems = new List<string>();
@@ -277,11 +279,31 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
-        /// 직접 만든 확장 미션으로 에드온 데이터를 확인한다. 에드온 파일은 기본 데이터의 항목을 복사해 값 하나씩만 바꾼 것이라,
-        /// 번호 10000 이 그 항목을 가리키는지를 바뀐 값으로 알 수 있다. 에드온 파일의 전역 설정은 무시돼야 한다.
+        /// 점검용 맵팩을 게임에 등록한다 (addon.json 을 고치지 않고 부팅 때 읽은 목록에 끼운다). 끝나면 UnregisterPack 으로 뺀다.
+        /// </summary>
+        /// <param name="pack">맵팩.</param>
+        public static void RegisterPack(MapPackManifestData pack)
+        {
+            DataManager.Instance.AddMapPackPage(pack);
+        }
+
+        /// <summary>
+        /// RegisterPack 으로 끼운 맵팩을 뺀다.
+        /// </summary>
+        /// <param name="pack">맵팩.</param>
+        public static void UnregisterPack(MapPackManifestData pack)
+        {
+            DataManager.Instance.RemoveMapPackPage(pack);
+        }
+
+        /// <summary>
+        /// 직접 만든 맵팩과 확장 미션으로 에드온 데이터를 확인한다. 에드온 파일은 기본 데이터의 항목을 복사해 값 하나씩만 바꾼 것이라,
+        /// 번호(맵팩 10000, 미션 20000)가 그 항목을 가리키는지를 바뀐 값으로 알 수 있다. 에드온 파일의 전역 설정은 무시돼야 한다.
+        /// 미션은 사람·무기·오브젝트를, 맵팩은 이펙트·재질·하늘과 사람 하나를 든다.
         /// </summary>
         private void CheckAddonData()
         {
+            const float packHumanHp = 888f;
             const float addonHumanHp = 777f;
             const int addonMagazine = 77;
             const float addonObjectHp = 55f;
@@ -313,6 +335,13 @@ namespace GodotXOPS.Dev
             human.humanData.Add(humanEntry);
             WriteJson($"{k_workFolder}/addon_human.json", human);
 
+            // 맵팩의 사람: 미션의 사람과 같은 목록의 다른 층에 붙는다.
+            var packHuman = new HumanParameterData();
+            HumanData packHumanEntry = Clone(baseHuman.humanData[0]);
+            packHumanEntry.hp = packHumanHp;
+            packHuman.humanData.Add(packHumanEntry);
+            WriteJson($"{k_workFolder}/pack_human.json", packHuman);
+
             var weapon = new WeaponParameterData();
             WeaponData weaponEntry = Clone(baseWeapon.weaponData[sourceWeapon]);
             weapon.bulletData.Add(Clone(baseWeapon.bulletData[weaponEntry.bulletIndex]));
@@ -338,23 +367,23 @@ namespace GodotXOPS.Dev
             var effect = new EffectParameterData();
             EffectData effectEntry = Clone(baseEffect.effectData[smoke]);
             effect.effectTextureData.Add(Clone(baseEffect.effectTextureData[effectEntry.emitters[0].textureIndex]));
-            foreach (EffectEmitter emitter in effectEntry.emitters) emitter.textureIndex = k_addon;
+            foreach (EffectEmitter emitter in effectEntry.emitters) emitter.textureIndex = k_pack;
             effect.effectData.Add(effectEntry);
             effect.effectGeneralData.poolInitialSize = poolSize + 1;
-            WriteJson($"{k_workFolder}/addon_effect.json", effect);
+            WriteJson($"{k_workFolder}/pack_effect.json", effect);
 
             var material = new BlockMaterialParameterData();
-            material.blockMaterialData.Add(new BlockMaterialData { name = "AddonFloor", hitEffect = k_addon, hitSounds = new List<string> { addonHitSound } });
-            WriteJson($"{k_workFolder}/addon_material.json", material);
+            material.blockMaterialData.Add(new BlockMaterialData { name = "AddonFloor", hitEffect = k_pack, hitSounds = new List<string> { addonHitSound } });
+            WriteJson($"{k_workFolder}/pack_material.json", material);
 
             // 하늘: 텍스처 둘과 안개 색 하나. 색이 없는 번호는 검정이다.
             var sky = new SkyData();
             sky.skyTexturePath.Add(addonSkyTexture);
             sky.skyTexturePath.Add(addonSkyTexture);
             sky.skyColor.Add(new Color32 { r = 10, g = 20, b = 30, a = 255 });
-            WriteJson($"{k_workFolder}/addon_sky.json", sky);
+            WriteJson($"{k_workFolder}/pack_sky.json", sky);
 
-            // --- 블록: 넓은 바닥. 재질은 전부 -1 이고 미션의 기본 재질이 에드온 재질이다 ---
+            // --- 블록: 넓은 바닥. 재질은 전부 -1 이고 미션의 기본 재질이 맵팩의 재질이다 ---
             var blocks = new BD2File { textureListPath = $"{k_workFolder}/addon_textures.json" };
             blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
             var textures = new BlockTextureListData();
@@ -383,16 +412,26 @@ namespace GodotXOPS.Dev
                 skyIndex = 1,
                 darkScreen = true,
                 briefing = new List<string> { "line one", "line two" },
-                defaultBlockMaterial = k_addon,
+                defaultBlockMaterial = k_pack,
                 addonHumanDataPath = $"{k_workFolder}/addon_human.json",
                 addonWeaponDataPath = $"{k_workFolder}/addon_weapon.json",
                 addonObjectDataPath = $"{k_workFolder}/addon_object.json",
-                addonEffectDataPath = $"{k_workFolder}/addon_effect.json",
-                addonBlockMaterialDataPath = $"{k_workFolder}/addon_material.json",
-                addonSkyDataPath = $"{k_workFolder}/addon_sky.json",
             };
             string missionPath = GamePath.Resolve($"{k_workFolder}/addon.mif2");
             MIF2File.Write(missionPath, mission, out _);
+
+            var pack = new MapPackManifestData
+            {
+                name = "PACK CHECK",
+                missions = new List<string> { $"{k_workFolder}/addon.mif2" },
+                humanDataPath = $"{k_workFolder}/pack_human.json",
+                effectDataPath = $"{k_workFolder}/pack_effect.json",
+                blockMaterialDataPath = $"{k_workFolder}/pack_material.json",
+                skyDataPath = $"{k_workFolder}/pack_sky.json",
+                manifestPath = $"{k_workFolder}/pack.json",
+            };
+            WriteJson(pack.manifestPath, pack);
+            RegisterPack(pack);
 
             // --- 로드 ---
             AIController.Enabled = false;
@@ -402,41 +441,51 @@ namespace GodotXOPS.Dev
             if (!loaded)
             {
                 Expect(false, "에드온 점검용 미션 로드 실패");
+                UnregisterPack(pack);
                 AIController.Enabled = true;
                 return;
             }
 
             Expect(loader.ExtendedMission && loader.MissionName == "ADDON CHECK" && loader.SkyIndex == 1 && loader.DarkScreen && !loader.AdjustCollision
-                && loader.MissionBriefing == "line one\nline two" && MapLoader.DefaultBlockMaterial == k_addon, "MIF2 의 미션 정보가 다름");
+                && loader.MissionBriefing == "line one\nline two" && MapLoader.DefaultBlockMaterial == k_pack, "MIF2 의 미션 정보가 다름");
+            Expect(ReferenceEquals(MapLoader.MapPack, pack), "Manifest 에 적힌 미션인데 맵팩을 찾지 못함");
 
-            // 목록마다 에드온이 붙었고 번호 10000 이 그 항목이다.
-            Expect(baseHuman.humanData.AddonCount == 1 && baseHuman.humanTypeData.AddonCount == 1 && baseWeapon.weaponData.AddonCount == 1
-                && baseWeapon.bulletData.AddonCount == 1 && baseWeapon.weaponModelData.AddonCount == 1 && baseObject.objectData.AddonCount == 1
-                && baseObject.objectModelData.AddonCount == 1 && baseObject.objectColliderData.AddonCount == 1 && baseEffect.effectData.AddonCount == 1
-                && baseEffect.effectTextureData.AddonCount == 1 && data.BlockMaterialParameterData.blockMaterialData.AddonCount == 1,
-                "에드온 데이터가 목록에 붙지 않음");
+            // 미션의 데이터는 20000 부터, 맵팩의 데이터는 10000 부터 붙는다.
+            Expect(baseHuman.humanData.MissionCount == 1 && baseHuman.humanTypeData.MissionCount == 1 && baseWeapon.weaponData.MissionCount == 1
+                && baseWeapon.bulletData.MissionCount == 1 && baseWeapon.weaponModelData.MissionCount == 1 && baseObject.objectData.MissionCount == 1
+                && baseObject.objectModelData.MissionCount == 1 && baseObject.objectColliderData.MissionCount == 1,
+                "미션의 에드온 데이터가 목록에 붙지 않음");
+            Expect(baseHuman.humanData.PackCount == 1 && baseEffect.effectData.PackCount == 1 && baseEffect.effectTextureData.PackCount == 1
+                && data.BlockMaterialParameterData.blockMaterialData.PackCount == 1 && baseWeapon.weaponData.PackCount == 0,
+                "맵팩의 데이터가 목록에 붙지 않음");
+            Expect(Mathf.IsEqualApprox(baseHuman.humanData[k_pack].hp, packHumanHp) && Mathf.IsEqualApprox(baseHuman.humanData[k_addon].hp, addonHumanHp),
+                "맵팩(10000)과 미션(20000)의 사람이 서로 다른 항목을 가리키지 않음");
             Expect(baseWeapon.weaponData.Has(k_addon) && !baseWeapon.weaponData.Has(k_addon + 1) && !baseWeapon.weaponData.Has(baseWeapon.weaponData.Count)
-                && !baseWeapon.weaponData.Has(-1) && baseWeapon.weaponData.Has(0), "번호가 있는지 묻는 결과가 다름 (에드온, 에드온 끝, 빈 구간, 음수, 기본)");
+                && !baseWeapon.weaponData.Has(k_pack) && !baseWeapon.weaponData.Has(-1) && baseWeapon.weaponData.Has(0),
+                "번호가 있는지 묻는 결과가 다름 (미션, 미션 끝, 빈 구간, 빈 맵팩, 음수, 기본)");
             Expect(baseWeapon.weaponData.Neighbor(baseWeapon.weaponData.Count - 1, 1) == k_addon && baseWeapon.weaponData.Neighbor(k_addon, 1) == 0
-                && baseWeapon.weaponData.Neighbor(0, -1) == k_addon, "기본 목록과 에드온을 잇는 다음·이전 번호가 다름");
+                && baseWeapon.weaponData.Neighbor(0, -1) == k_addon, "기본 목록과 미션 데이터를 잇는 다음·이전 번호가 다름");
+            Expect(baseHuman.humanData.Neighbor(baseHuman.humanData.Count - 1, 1) == k_pack && baseHuman.humanData.Neighbor(k_pack, 1) == k_addon
+                && baseHuman.humanData.Neighbor(k_addon, 1) == 0 && baseHuman.humanData.Neighbor(k_addon, -1) == k_pack, "기본·맵팩·미션을 잇는 다음·이전 번호가 다름");
             Expect(baseWeapon.weaponGeneralData.noneWeaponIndex == noneWeapon && baseEffect.effectGeneralData.poolInitialSize == poolSize,
                 "에드온 파일의 전역 설정이 기본 데이터를 바꿈");
 
-            // 하늘: 번호 10000 부터가 미션의 하늘이다. 텍스처는 있고 안개 색이 없는 번호는 검정, 목록에 없는 번호는 없다. 기본 번호는 그대로다.
-            bool addonSky = MapLoader.TryGetSky(k_addon, out string skyTexture, out Color skyFog);
-            bool addonSkyNoColor = MapLoader.TryGetSky(k_addon + 1, out string skyTextureNoColor, out Color skyFogNoColor);
-            Expect(addonSky && skyTexture == addonSkyTexture && skyFog.IsEqualApprox(new Color32 { r = 10, g = 20, b = 30, a = 255 }.ToColor()), "미션의 하늘(10000)이 텍스처와 안개 색을 주지 않음");
-            Expect(addonSkyNoColor && skyTextureNoColor == addonSkyTexture && skyFogNoColor == Colors.Black, "안개 색을 적지 않은 미션의 하늘이 검정이 아님");
-            Expect(!MapLoader.TryGetSky(k_addon + 2, out _, out _) && MapLoader.TryGetSky(1, out string baseSky, out _) && baseSky == data.SkyData.skyTexturePath[1],
-                "목록에 없는 미션의 하늘 번호를 받아들이거나 기본 하늘이 달라짐");
-            MapLoader.LoadSkyData(k_addon);
-            Expect(MapLoader.Instance.FindChild("Skybox", true, false) != null, "미션의 하늘 번호로 하늘이 만들어지지 않음");
+            // 하늘: 번호 10000 부터가 맵팩의 하늘이다. 텍스처는 있고 안개 색이 없는 번호는 검정, 목록에 없는 번호와 미션의 번호(20000)는 없다. 기본 번호는 그대로다.
+            bool addonSky = MapLoader.TryGetSky(k_pack, out string skyTexture, out Color skyFog);
+            bool addonSkyNoColor = MapLoader.TryGetSky(k_pack + 1, out string skyTextureNoColor, out Color skyFogNoColor);
+            Expect(addonSky && skyTexture == addonSkyTexture && skyFog.IsEqualApprox(new Color32 { r = 10, g = 20, b = 30, a = 255 }.ToColor()), "맵팩의 하늘(10000)이 텍스처와 안개 색을 주지 않음");
+            Expect(addonSkyNoColor && skyTextureNoColor == addonSkyTexture && skyFogNoColor == Colors.Black, "안개 색을 적지 않은 맵팩의 하늘이 검정이 아님");
+            Expect(!MapLoader.TryGetSky(k_pack + 2, out _, out _) && !MapLoader.TryGetSky(k_addon, out _, out _)
+                && MapLoader.TryGetSky(1, out string baseSky, out _) && baseSky == data.SkyData.skyTexturePath[1],
+                "목록에 없는 맵팩의 하늘 번호나 미션의 하늘 번호를 받아들이거나 기본 하늘이 달라짐");
+            MapLoader.LoadSkyData(k_pack);
+            Expect(MapLoader.Instance.FindChild("Skybox", true, false) != null, "맵팩의 하늘 번호로 하늘이 만들어지지 않음");
             MapLoader.LoadSkyData(loader.SkyIndex);
 
-            // 사람: 에드온 사람 종류로 스폰된다.
+            // 사람: 미션의 사람 종류로 스폰된다.
             Human player = MapLoader.Player;
             Expect(player != null && Mathf.IsEqualApprox(player.HP, addonHumanHp) && ReferenceEquals(player.HumanData, baseHuman.humanData[k_addon])
-                && ReferenceEquals(player.HumanTypeData, baseHuman.humanTypeData[k_addon]), "에드온 사람(10000)으로 스폰되지 않음");
+                && ReferenceEquals(player.HumanTypeData, baseHuman.humanTypeData[k_addon]), "미션의 사람(20000)으로 스폰되지 않음");
             Expect(MapLoader.HumanCount == 2 && ReferenceEquals(MapLoader.SearchHuman(5)?.HumanData, baseHuman.humanData[0]), "기본 사람(0)이 그대로 스폰되지 않음");
 
             // 무기: 에드온 무기 하나만 놓이고(없는 번호는 건너뜀), 쥐고 쏠 수 있다 (에드온 탄환과 모델을 쓴다).
@@ -462,11 +511,11 @@ namespace GodotXOPS.Dev
             // 오브젝트: 에드온 오브젝트 하나만 놓인다.
             SmallObject placed = MapLoader.SearchSmallObject(objectId);
             Expect(MapLoader.SmallObjects.Count == 1 && placed != null && placed.ObjectIndex == k_addon && Mathf.IsEqualApprox(placed.HP, addonObjectHp),
-                "에드온 오브젝트(10000)가 놓이지 않음");
+                "미션의 오브젝트(20000)가 놓이지 않음");
 
-            // 재질과 이펙트: 기본 재질(-1)이 에드온 재질이고, 그 재질의 에드온 이펙트와 소리가 난다.
+            // 재질과 이펙트: 기본 재질(-1)이 맵팩의 재질이고, 그 재질의 맵팩 이펙트와 소리가 난다.
             BlockMaterialData floor = MapLoader.GetFaceMaterial(MapLoader.Blocks[0], 0);
-            Expect(ReferenceEquals(floor, data.BlockMaterialParameterData.blockMaterialData[k_addon]), "기본 재질이 에드온 재질(10000)이 아님");
+            Expect(ReferenceEquals(floor, data.BlockMaterialParameterData.blockMaterialData[k_pack]), "기본 재질이 맵팩의 재질(10000)이 아님");
             int sounds = SoundManager.PlayCount;
             int particles = EffectManager.SpawnCount;
             var origin = new Vector3(-30f, 4.1f, -30f);
@@ -475,36 +524,44 @@ namespace GodotXOPS.Dev
             int expectedParticles = 0;
             foreach (EffectEmitter emitter in effectEntry.emitters) expectedParticles += emitter.spawnCount;
             Expect(shot != null && !shot.IsActive && SoundManager.PlayCount == sounds + 1 && SoundManager.LastPlayedPath == addonHitSound
-                && EffectManager.SpawnCount - particles == expectedParticles, "에드온 재질의 이펙트와 소리가 나지 않음");
+                && EffectManager.SpawnCount - particles == expectedParticles, "맵팩 재질의 이펙트와 소리가 나지 않음");
 
-            // 없는 에드온 번호 둘(무기, 오브젝트)에 경고가 남는다.
+            // 없는 미션 번호 둘(무기, 오브젝트)에 경고가 남는다.
             var levels = new List<LogLevel>();
             var texts = new List<string>();
             Debugger.GetSince(logsBefore, levels, texts);
-            int warnings = texts.FindAll(text => text.Contains("add-on weapon") || text.Contains("add-on object")).Count;
-            Expect(warnings == 2, $"없는 에드온 번호의 경고가 {warnings}건 (기대 2건)");
+            int warnings = texts.FindAll(text => text.Contains("mission weapon") || text.Contains("mission object")).Count;
+            Expect(warnings == 2, $"없는 미션 번호의 경고가 {warnings}건 (기대 2건)");
 
-            // 맵을 내리면 에드온이 떨어진다. 그 뒤에는 10000 이 없는 번호다.
+            // 맵을 내리면 미션의 데이터가 떨어진다. 그 뒤에는 20000 이 없는 번호다. 맵팩의 데이터는 미션 정보에 붙어 있어 남는다.
             MapLoader.UnloadPointData();
-            Expect(baseHuman.humanData.AddonCount == 0 && baseWeapon.weaponData.AddonCount == 0 && baseObject.objectData.AddonCount == 0
-                && baseEffect.effectData.AddonCount == 0 && data.BlockMaterialParameterData.blockMaterialData.AddonCount == 0 && !baseWeapon.weaponData.Has(k_addon)
-                && baseWeapon.weaponData.Neighbor(baseWeapon.weaponData.Count - 1, 1) == 0, "맵을 내린 뒤에도 에드온 데이터가 남아 있음");
-            // 하늘은 맵이 아니라 미션 정보에 붙어 있다. 맵을 내려도 남고, 미션 정보를 내리면 떨어진다.
-            Expect(MapLoader.TryGetSky(k_addon, out _, out _), "맵만 내렸는데 미션의 하늘이 떨어짐");
+            Expect(baseHuman.humanData.MissionCount == 0 && baseWeapon.weaponData.MissionCount == 0 && baseObject.objectData.MissionCount == 0
+                && !baseWeapon.weaponData.Has(k_addon) && baseWeapon.weaponData.Neighbor(baseWeapon.weaponData.Count - 1, 1) == 0, "맵을 내린 뒤에도 미션의 데이터가 남아 있음");
+            Expect(MapLoader.TryGetSky(k_pack, out _, out _) && baseHuman.humanData.Has(k_pack) && data.BlockMaterialParameterData.blockMaterialData.Has(k_pack),
+                "맵만 내렸는데 맵팩의 데이터가 떨어짐");
             MapLoader.UnloadMissionData();
-            Expect(!MapLoader.TryGetSky(k_addon, out _, out _), "미션 정보를 내린 뒤에도 미션의 하늘이 남아 있음");
+            Expect(!MapLoader.TryGetSky(k_pack, out _, out _) && baseHuman.humanData.PackCount == 0 && baseEffect.effectData.PackCount == 0
+                && data.BlockMaterialParameterData.blockMaterialData.PackCount == 0 && MapLoader.MapPack == null, "미션 정보를 내린 뒤에도 맵팩의 데이터가 남아 있음");
 
-            // 에드온 파일을 적지 않은 MIF2: 같은 포인트를 로드하면 에드온 번호는 전부 건너뛴다. 사람 종류가 없는 사람은 죽은 채로 스폰된다.
+            // 맵팩에 속하지 않고 에드온 파일을 적지 않은 MIF2: 같은 포인트를 로드하면 에드온 번호는 전부 건너뛴다. 사람 종류가 없는 사람은 죽은 채로 스폰된다.
+            UnregisterPack(pack);
             mission.addonHumanDataPath = string.Empty;
             mission.addonWeaponDataPath = string.Empty;
             mission.addonObjectDataPath = string.Empty;
-            mission.addonEffectDataPath = string.Empty;
-            mission.addonBlockMaterialDataPath = string.Empty;
             MIF2File.Write(missionPath, mission, out _);
             loaded = MapLoader.LoadMissionFile(missionPath) && MapLoader.LoadBlockData(loader.MissionBD1Path) && MapLoader.LoadPointData(loader.MissionPD1Path);
-            Expect(loaded && WeaponManager.Instance.CountActive() == 0 && MapLoader.SmallObjects.Count == 0 && MapLoader.HumanCount == 2
+            Expect(loaded && MapLoader.MapPack == null && WeaponManager.Instance.CountActive() == 0 && MapLoader.SmallObjects.Count == 0 && MapLoader.HumanCount == 2
                 && MapLoader.Player != null && !MapLoader.Player.Alive && MapLoader.SearchHuman(5).Alive, "에드온 파일이 없는 MIF2 에서 에드온 번호가 건너뛰어지지 않음");
-            Expect(MapLoader.GetFaceMaterial(MapLoader.Blocks[0], 0).hitEffect == 0, "에드온 재질이 없는데 기본 재질(10000)이 빈 재질이 아님");
+            Expect(MapLoader.GetFaceMaterial(MapLoader.Blocks[0], 0).hitEffect == 0, "맵팩이 없는데 기본 재질(10000)이 빈 재질이 아님");
+
+            // 맵팩은 다른 경로로도 찾을 수 있다 (에디터의 플레이 테스트가 임시 파일을 원래 자리의 맵팩으로 돌린다).
+            RegisterPack(pack);
+            string copyPath = GamePath.Resolve($"{k_workFolder}/copy.mif2");
+            MIF2File.Write(copyPath, mission, out _);
+            Expect(MapLoader.LoadMissionFile(copyPath) && MapLoader.MapPack == null, "Manifest 에 없는 미션이 맵팩을 얻음");
+            Expect(MapLoader.LoadMissionFile(copyPath, missionPath) && ReferenceEquals(MapLoader.MapPack, pack), "다른 경로로 맵팩을 찾지 못함");
+            UnregisterPack(pack);
+            MapLoader.UnloadMissionData();
 
             // 없는 에드온 파일을 가리키면 에러 로그가 남고 로드는 계속된다.
             mission.addonWeaponDataPath = $"{k_workFolder}/no_such.json";
@@ -610,7 +667,7 @@ namespace GodotXOPS.Dev
             Human tallHuman = MapLoader.SearchHuman(tallId);
             Human shrunkHuman = MapLoader.SearchHuman(shrunkId);
             Human plainHuman = MapLoader.SearchHuman(plainId);
-            Expect(baseHuman.controllerSizeData.AddonCount == 1 && baseHuman.humanHitboxSizeData.AddonCount == 1, "에드온의 몸 크기와 히트박스가 목록에 붙지 않음");
+            Expect(baseHuman.controllerSizeData.MissionCount == 1 && baseHuman.humanHitboxSizeData.MissionCount == 1, "에드온의 몸 크기와 히트박스가 목록에 붙지 않음");
             Expect(smallHuman != null && Mathf.IsEqualApprox(smallHuman.Controller.Height, smallHeight) && Mathf.IsEqualApprox(smallHuman.CameraHeight, smallCamera)
                 && ReferenceEquals(smallHuman.HitboxSize, baseHitbox), $"에드온 몸 크기(10000)가 붙지 않음 (키 {smallHuman?.Controller.Height}, 기대 {smallHeight})");
             Expect(tallHuman != null && Mathf.IsEqualApprox(tallHuman.Controller.Height, baseSize.height), "기본 사람의 몸 크기가 바뀜");
@@ -663,7 +720,7 @@ namespace GodotXOPS.Dev
 
             MapLoader.UnloadPointData();
             MapLoader.UnloadBlockData();
-            Expect(baseHuman.controllerSizeData.AddonCount == 0 && baseHuman.humanHitboxSizeData.AddonCount == 0, "맵을 내린 뒤에도 에드온의 몸 크기와 히트박스가 남아 있음");
+            Expect(baseHuman.controllerSizeData.MissionCount == 0 && baseHuman.humanHitboxSizeData.MissionCount == 0, "맵을 내린 뒤에도 에드온의 몸 크기와 히트박스가 남아 있음");
             AIController.Enabled = true;
         }
 
@@ -830,10 +887,42 @@ namespace GodotXOPS.Dev
             List<AddonMissionData> page = DataManager.ScanAddonMifs(scanFolder);
             Expect(page.Count == 2 && page[0].name == "LEGACY" && page[0].mifPath.EndsWith("a.mif") && page[1].name == "EXTENDED" && page[1].mifPath.EndsWith("b.mif2"),
                 "미션 목록 스캔이 .mif 와 .mif2 를 함께 모으지 않음");
+
+            // 맵팩의 미션 목록: Manifest 에 적은 순서 그대로이고, 없는 파일·MIF2 가 아닌 파일·읽지 못한 MIF2 는 에러를 남기고 뺀다. 폴더에만 있는 파일은 나오지 않는다.
+            File.WriteAllText(Path.Combine(scanFolder, "z.mif2"), "{ \"name\": \"LAST NAME FIRST\", \"blockPath\": \"a.bd2\", \"pointPath\": \"a.pd2\" }");
+            string scan = $"{k_workFolder}/scan";
+            File.WriteAllText(GamePath.Resolve($"{scan}/manifest.json"), JsonData.ToJson(new MapPackManifestData
+            {
+                name = "ORDER",
+                missions = new List<string> { $"{scan}/z.mif2", $"{scan}/no_such.mif2", $"{scan}/a.mif", $"{scan}/c.mif2", $"{scan}/b.mif2" },
+            }));
+            logs = Debugger.TotalCount;
+            MapPackManifestData manifest = DataManager.ReadMapPack($"{scan}/manifest.json");
+            List<AddonMissionData> packPage = manifest == null ? new List<AddonMissionData>() : DataManager.ListPackMissions(manifest);
+            Expect(manifest != null && manifest.name == "ORDER" && manifest.manifestPath == $"{scan}/manifest.json"
+                && packPage.Count == 2 && packPage[0].name == "LAST NAME FIRST" && packPage[1].name == "EXTENDED", "맵팩의 미션 목록이 Manifest 의 순서가 아니거나 빼야 할 것을 넣음");
+            levels.Clear();
+            texts.Clear();
+            Debugger.GetSince(logs, levels, texts);
+            Expect(texts.Exists(text => text.Contains("Map pack mission not found")) && texts.Exists(text => text.Contains("Map pack missions must be MIF2"))
+                && texts.Exists(text => text.Contains("Mission file read failed")), "맵팩의 미션 목록에서 뺀 것(없는 파일, MIF, 읽지 못한 MIF2)의 에러가 남지 않음");
+            errors = Debugger.ErrorCount;
+            Expect(DataManager.ReadMapPack($"{scan}/no_manifest.json") == null && Debugger.FirstErrorSince(errors).StartsWith("Map pack manifest open failed"),
+                "없는 Manifest 를 읽음");
+
+            // 1.2.3 까지의 MIF2 키(하늘, 이벤트, 재질, 이펙트)는 경고를 남기고 무시한다.
+            File.WriteAllText(path, "{ \"name\": \"OLD\", \"blockPath\": \"a.bd2\", \"pointPath\": \"a.pd2\", \"addonSkyDataPath\": \"x.json\", \"addonEventDataPath\": \"y.json\" }");
+            logs = Debugger.TotalCount;
+            levels.Clear();
+            texts.Clear();
+            Expect(MapLoader.LoadMissionFile(path) && MapLoader.MapPack == null, "옛 키가 있는 MIF2 를 읽지 못함");
+            Debugger.GetSince(logs, levels, texts);
+            Expect(texts.Exists(text => text.Contains("addonSkyDataPath")) && texts.Exists(text => text.Contains("addonEventDataPath")), "MIF2 의 옛 키에 경고가 남지 않음");
+            MapLoader.UnloadMissionData();
         }
 
         /// <summary>
-        /// 원본 MIF 의 추가 사물(addon-object)이 확장 형식에서 에드온 오브젝트(10000)로 옮겨지는지 확인한다.
+        /// 원본 MIF 의 추가 사물(addon-object)이 확장 형식에서 미션의 에드온 오브젝트(20000)로 옮겨지는지 확인한다.
         /// 훈련장의 블록에, 추가 사물 포인트 하나가 있는 PD1 과 MIF 를 직접 만들어 쓴다.
         /// </summary>
         private void CheckLegacyAddonObject()
@@ -904,9 +993,9 @@ namespace GodotXOPS.Dev
                 SmallObject moved = MapLoader.SearchSmallObject(objectId);
                 Expect(loaded && loader.ExtendedMission && loader.SkyIndex == 2 && loader.AdjustCollision && loader.DarkScreen
                     && loader.MissionBriefing == "briefing a\nbriefing b" && loader.MissionAddonObjectPath == string.Empty, "변환한 MIF2 의 미션 정보가 다름");
-                Expect(moved != null && moved.ObjectIndex == k_addon && Mathf.IsEqualApprox(moved.HP, addonHp) && parameter.objectData.AddonCount == 1
+                Expect(moved != null && moved.ObjectIndex == k_addon && Mathf.IsEqualApprox(moved.HP, addonHp) && parameter.objectData.MissionCount == 1
                     && parameter.objectModelData[k_addon].modelData[0].modelPath == sourceModel.modelData[0].modelPath
-                    && parameter.objectColliderData[k_addon].shapes.Count == 1, "추가 사물이 에드온 오브젝트(10000)로 옮겨지지 않음");
+                    && parameter.objectColliderData[k_addon].shapes.Count == 1, "추가 사물이 미션의 에드온 오브젝트(20000)로 옮겨지지 않음");
                 Expect(Mathf.IsZeroApprox(parameter.objectData[legacyIndex].hp), "확장 미션에서 원본의 예약 자리가 비워지지 않음");
                 MapLoader.UnloadPointData();
             }

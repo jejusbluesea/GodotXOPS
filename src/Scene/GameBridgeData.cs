@@ -33,7 +33,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 어드온 페이지 수. 페이지 0 은 addon 폴더이고 그 뒤는 addon.json 으로 추가한 폴더다.
+        /// 어드온 페이지 수. 페이지 0 은 addon 폴더이고 그 뒤는 addon.json 에 적은 맵팩이다.
         /// </summary>
         /// <returns>페이지 수.</returns>
         public int AddonPageCount()
@@ -107,20 +107,21 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 스프라이트 글자가 지금 써야 하는 글꼴 그림. 로드된 미션이 글꼴 그림을 적어 두었으면(MIF2 의 fontImageOverridePath) 그것이고, 아니면 data/char.dds 다.
-        /// 미션의 그림을 읽지 못하면 경고를 한 번 남기고 평소의 글꼴을 쓴다. 화면이 글자를 만들 때마다 부르므로 미션 정보가 바뀌면 다음 화면부터 따라간다.
+        /// 스프라이트 글자가 지금 써야 하는 글꼴 그림. 찾는 순서는 로드된 미션(MIF2 의 fontImageOverridePath) → 그 미션이 속한 맵팩 → 메뉴가 보고 있는 맵팩 페이지 → data/char.dds 다.
+        /// 고른 그림을 읽지 못하면 경고를 한 번 남기고 평소의 글꼴을 쓴다 (다음 것으로 넘어가지 않는다). 화면이 글자를 만들 때마다 부르므로 미션 정보가 바뀌면 다음 화면부터 따라간다.
         /// </summary>
         /// <returns>글꼴 텍스처. 평소의 글꼴도 읽지 못하면 null.</returns>
         public Texture2D FontTexture()
         {
             string path = MapLoader.Instance.MissionFontImagePath;
+            if (string.IsNullOrEmpty(path) && MapLoader.MapPack == null) path = m_menuPack?.fontImageOverridePath;
             if (!string.IsNullOrEmpty(path) && path != m_fontOverrideFailed)
             {
                 Texture2D texture = LoadTexture(path);
                 if (texture != null) return texture;
 
                 m_fontOverrideFailed = path;
-                Debugger.LogWarning($"Mission font image could not be read: {path}. Using {k_fontPath}.", nameof(GameBridge));
+                Debugger.LogWarning($"Font image override could not be read: {path}. Using {k_fontPath}.", nameof(GameBridge));
             }
             return LoadTexture(k_fontPath);
         }

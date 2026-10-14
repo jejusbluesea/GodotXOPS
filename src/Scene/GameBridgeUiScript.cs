@@ -11,6 +11,8 @@ namespace GodotXOPS
     public partial class GameBridge
     {
         private const string k_uiPackFolder = "godotdata/ui";
+        // 메뉴에서 맵팩 페이지에 있는 동안 타이틀과 버전 자리를 그리는 맵팩 스크립트의 화면 이름. 메뉴 스크립트와 함께 올라가 있을 수 있다.
+        public const string MenuPackScreen = "mainmenu_pack";
         // 등록 파일 하나가 가질 수 있는 이미지 수의 상한.
         private const int k_uiMaxImages = 256;
 
@@ -30,7 +32,7 @@ namespace GodotXOPS
             public readonly SandboxScript script = new SandboxScript();
             public readonly List<string> imagePaths = new List<string>();
             public readonly Dictionary<int, Texture2D> images = new Dictionary<int, Texture2D>();
-            // 미션이 들고 온 스크립트인지. 등록 파일이 없어 자기 이미지 목록도 없으므로, 번호는 전부 이미지 목록(이벤트와 같은 번호)을 가리킨다.
+            // 미션이나 맵팩이 들고 온 스크립트인지. 등록 파일이 없어 자기 이미지 목록도 없으므로, 번호는 전부 이미지 목록(이벤트와 같은 번호)을 가리킨다.
             public bool fromMission;
         }
 
@@ -54,7 +56,8 @@ namespace GodotXOPS
 
         /// <summary>
         /// 그 화면을 맡은 스크립트를 샌드박스에 올린다. 스크립트의 함수는 부르지 않는다.
-        /// 지금 미션이 그 화면의 스크립트를 적어 두었으면 그것이 설치된 등록보다 먼저다 (맵이 의도한 화면이 보여야 한다). 그 스크립트를 올리지 못하면 설치된 것으로 넘어가지 않고 기본 화면이다.
+        /// 찾는 순서는 미션(MIF2) → 미션이 속한 맵팩 → 설치된 등록(godotdata/ui)이다 (맵이 의도한 화면이 보여야 한다). 고른 스크립트를 올리지 못하면 다음 것으로 넘어가지 않고 기본 화면이다.
+        /// 메뉴의 맵팩 스크립트(MenuPackScreen)는 메뉴가 지금 보고 있는 맵팩 페이지의 것뿐이다.
         /// 같은 화면의 것이 이미 올라가 있으면 내리고 다시 올린다. 다른 화면의 것은 그대로 둔다.
         /// </summary>
         /// <param name="screen">화면 이름 (예: "maingame").</param>
@@ -66,8 +69,20 @@ namespace GodotXOPS
             if (!ConfigManager.Instance.GetBool(ConfigManager.SectionGeneral, ConfigManager.KeyAllowUiScript, true)) return null;
 
             UiPackData pack = null;
-            string source = "the mission file";
-            string scriptPath = MapLoader.MissionScreenScript(screen);
+            string scriptPath;
+            string source;
+            if (string.Equals(screen, MenuPackScreen, StringComparison.OrdinalIgnoreCase))
+            {
+                // 메뉴의 맵팩 스크립트는 맵팩에만 있다. 설치된 등록으로 넘어가지 않는다.
+                scriptPath = m_menuPack?.mainMenuScriptPath;
+                if (string.IsNullOrEmpty(scriptPath)) return null;
+                source = $"the map pack manifest {m_menuPack.manifestPath}";
+            }
+            else
+            {
+                scriptPath = MapLoader.MissionScreenScript(screen, out bool fromPack);
+                source = fromPack ? $"the map pack manifest {MapLoader.MapPack?.manifestPath}" : "the mission file";
+            }
             if (string.IsNullOrEmpty(scriptPath))
             {
                 pack = FindUiPack(screen, out source);
@@ -127,7 +142,7 @@ namespace GodotXOPS
 
         /// <summary>
         /// 화면 스크립트가 번호로 가리킨 이미지를 텍스처로 읽는다. 10000 미만은 그 화면의 등록 파일의 이미지 목록(한 번 읽은 것은 스크립트를 내릴 때까지 갖고 있는다),
-        /// 10000 이상은 미션의 이미지 목록이다 (이벤트가 그리는 것과 같은 목록). 미션이 들고 온 스크립트는 등록 파일이 없으므로 10000 미만도 이미지 목록(godotdata/image_data.json)의 번호다.
+        /// 10000 이상은 이미지 목록이다 (이벤트가 그리는 것과 같은 목록. 맵팩 10000 부터, 미션 20000 부터). 미션이 들고 온 스크립트는 등록 파일이 없으므로 10000 미만도 이미지 목록(godotdata/image_data.json)의 번호다.
         /// </summary>
         /// <param name="screen">화면 이름.</param>
         /// <param name="index">이미지의 번호.</param>
@@ -135,7 +150,7 @@ namespace GodotXOPS
         public Texture2D UiScriptImage(string screen, int index)
         {
             UiScriptSlot slot = FindUiScript(screen);
-            if (index >= DataList<ImageData>.AddonBase || (slot != null && slot.fromMission)) return ListImage(index);
+            if (DataList<ImageData>.IsAddon(index) || (slot != null && slot.fromMission)) return ListImage(index);
 
             if (slot == null || index < 0 || index >= slot.imagePaths.Count) return null;
             if (slot.images.TryGetValue(index, out Texture2D cached)) return cached;
@@ -148,16 +163,23 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 이미지 목록(godotdata/image_data.json, 10000 이상은 미션의 목록)의 그 번호의 이미지를 텍스처로 읽는다. 이벤트가 놓은 이미지를 메인게임이 그릴 때 쓴다.
+        /// 이미지 목록(godotdata/image_data.json, 10000 부터는 맵팩, 20000 부터는 미션의 목록)의 그 번호의 이미지를 텍스처로 읽는다. 이벤트가 놓은 이미지를 메인게임이 그릴 때 쓴다.
         /// </summary>
         /// <param name="number">이미지 목록의 번호.</param>
         /// <returns>텍스처. 없는 번호이거나 읽지 못하면 null.</returns>
         public Texture2D ListImage(int number)
         {
+            string path;
             DataList<ImageData> list = DataManager.Instance.ImageParameterData.imageData;
-            if (!list.Has(number)) return null;
+            if (list.Has(number))
+            {
+                path = list[number].imagePath ?? string.Empty;
+            }
+            else if (!MenuPackImagePath(number, out path))
+            {
+                return null;
+            }
 
-            string path = list[number].imagePath ?? string.Empty;
             if (m_listImages.TryGetValue(path, out Texture2D cached)) return cached;
 
             Texture2D texture = LoadTexture(path);
