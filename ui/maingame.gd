@@ -131,6 +131,7 @@ var _simple_name: XopsText
 var _crosshair: Array[ColorRect] = []
 var _crosshair_gap := 0
 var _crosshair_length := 10
+var _crosshair_thick := 1
 var _crosshair_static := false
 var _last_gap := -1
 
@@ -404,7 +405,8 @@ func _build_crosshair() -> void:
 	_crosshair_gap = ConfigManager.GetInt("General", "aimGap", 3)
 	_crosshair_length = ConfigManager.GetInt("General", "aimLength", 10)
 	_crosshair_static = ConfigManager.GetBool("General", "StaticAim", false)
-	var thick: int = ConfigManager.GetInt("General", "aimThick", 1)
+	_crosshair_thick = ConfigManager.GetInt("General", "aimThick", 1)
+	var thick := _crosshair_thick
 	var color := Color(
 		ConfigManager.GetFloat("General", "aimColorR", 1.0), ConfigManager.GetFloat("General", "aimColorG", 0.0),
 		ConfigManager.GetFloat("General", "aimColorB", 0.0), ConfigManager.GetFloat("General", "aimColorA", 1.0))
@@ -559,12 +561,19 @@ func _name_font(value: String, font: Vector2, limit: int) -> Vector2:
 # ============================================================
 
 ## 막대의 안쪽 끝이 화면 가운데에서 gap 만큼 떨어지게 놓는다.
+## 길이·두께·간격을 층의 배율을 곱한 화면 픽셀에서 정수로 맞춘 뒤 층 좌표로 되돌린다.
+## UIScale 이 4.5 처럼 정수가 아니면 층 좌표의 1 이 4.5 픽셀이라, 그대로 두면 막대마다 반올림이 달라 두께와 간격이 어긋난다.
 func _spread_crosshair(gap: int) -> void:
-	var offset := gap + _crosshair_length * 0.5
-	var points := [Vector2(-offset, 0), Vector2(offset, 0), Vector2(0, offset), Vector2(0, -offset)]
+	var factor: float = (_layers[CROSSHAIR_ORDER] as XopsLayer).scale.x
+	var thick := maxf(roundf(_crosshair_thick * factor), 1.0)
+	var length := maxf(roundf(_crosshair_length * factor), 1.0)
+	var offset := roundf(gap * factor) + length * 0.5
+	# 두께가 홀수 픽셀이면 가운데 줄이 한 픽셀에 오도록 반 픽셀 민다 (화면의 가운데는 픽셀 경계다).
+	var shift := 0.5 if int(thick) % 2 == 1 else 0.0
+	var points := [Vector2(-offset, -shift), Vector2(offset, -shift), Vector2(shift, offset), Vector2(shift, -offset)]
 	for i in 4:
-		var bar := _crosshair[i]
-		XopsUI.place(bar, XopsUI.CENTER, points[i].x, points[i].y, bar.size.x, bar.size.y)
+		var size := Vector2(length, thick) if i < 2 else Vector2(thick, length)
+		XopsUI.place(_crosshair[i], XopsUI.CENTER, points[i].x / factor, points[i].y / factor, size.x / factor, size.y / factor)
 
 
 func _set_scope_visible(visible: bool) -> void:

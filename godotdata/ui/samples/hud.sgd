@@ -32,6 +32,7 @@ var crosshair = []
 var cross_gap = 3
 var cross_length = 10
 var cross_static = false
+var cross_thick = 1
 var scope_image = 0
 var scope_bars = []
 var scope_lines = 0
@@ -165,7 +166,8 @@ func build(ctx):
 	cross_gap = int(api["config_number"].call("General", "aimGap"))
 	cross_length = int(api["config_number"].call("General", "aimLength"))
 	cross_static = api["config_bool"].call("General", "StaticAim")
-	var thick = int(api["config_number"].call("General", "aimThick"))
+	cross_thick = int(api["config_number"].call("General", "aimThick"))
+	var thick = cross_thick
 	var cross_color = rgb(api["config_number"].call("General", "aimColorR"), api["config_number"].call("General", "aimColorG"), api["config_number"].call("General", "aimColorB"))
 	var cross_alpha = api["config_number"].call("General", "aimColorA")
 	for i in range(4):
@@ -228,11 +230,7 @@ func frame(v, delta):
 		var gap = cross_gap
 		if not cross_static:
 			gap = cross_gap + v["error_range"]
-		var offset = gap + cross_length * 0.5
-		put(crosshair[0], "x", -offset)
-		put(crosshair[1], "x", offset)
-		put(crosshair[2], "y", offset)
-		put(crosshair[3], "y", -offset)
+		place_crosshair(gap, v["ui_scale"])
 
 	if v["exists"]:
 		if mode == "normal":
@@ -365,6 +363,22 @@ func update_scope(v):
 	put_box(scope_bars[2], 0, (h + gy) / 2.0, sw, gy)
 	put_box(scope_bars[3], 0, -(h + gy) / 2.0, sw, gy)
 	return scope_hides
+
+# Puts the crosshair bars so their inner ends are gap away from the centre.
+# Length, thickness and gap are rounded to whole screen pixels and turned back into layer units:
+# with a UIScale like 4.5 one layer unit is 4.5 pixels, and the bars would round differently.
+func place_crosshair(gap, scale):
+	var thick = max(int(cross_thick * scale + 0.5), 1)
+	var length = max(int(cross_length * scale + 0.5), 1)
+	var offset = int(gap * scale + 0.5) + length * 0.5
+	# With an odd thickness, move half a pixel so the middle row falls on one pixel (the centre of the screen is a pixel edge).
+	var shift = 0.0
+	if thick % 2 == 1:
+		shift = 0.5
+	put_box(crosshair[0], -offset / scale, -shift / scale, length / scale, thick / scale)
+	put_box(crosshair[1], offset / scale, -shift / scale, length / scale, thick / scale)
+	put_box(crosshair[2], shift / scale, offset / scale, thick / scale, length / scale)
+	put_box(crosshair[3], shift / scale, -offset / scale, thick / scale, length / scale)
 
 func put_box(id, x, y, w, h):
 	put(id, "x", x)

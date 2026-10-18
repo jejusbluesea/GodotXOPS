@@ -319,6 +319,7 @@ dotnet build GodotXOPS.csproj
 - 공용 도우미는 `ui/common/`: `XopsUI`(요소 만들기·배치), `XopsText`(`char.dds` 스프라이트 글자), `XopsLayer`(층과 배율), `XopsLines`(스코프 조준선), `xops_dev.gd`(Autoload `Dev`, 개발용 인자).
 - **배치 좌표는 UnityXOPS 화면 좌표 그대로다**: 기준점(화면이나 부모 안의 한 점)에서의 오프셋, +x 오른쪽, +y **위쪽**. `XopsUI`가 Godot 좌표로 바꾼다. 화면 스크립트에서 y 부호를 직접 뒤집지 않는다.
 - **층의 배율은 두 가지다** (`XopsUI.layer(parent, order, scaled)`): `scaled = true`는 화면 높이를 480으로 보고 확대하고, `false`는 픽셀 1:1에 설정의 `UIScale`을 곱한다. 어느 요소가 어느 쪽인지는 Lua 를 따른다 (HUD·메뉴는 픽셀, 스코프·중앙 문구·암전은 확대).
+- **Control 의 픽셀 스냅은 꺼 두었다** (`project.godot` 의 `gui/common/snap_controls_to_pixels=false`, 2026-10-18): 배율을 곱하기 전의 층 좌표에서 반올림해서 UIScale 4.5(4K) 같은 정수가 아닌 배율에서 스코프 그림과 검은 막대 사이에 틈이 났고 조준선이 어긋났다. `rendering/2d/snap/snap_2d_transforms_to_pixel` 도 같은 결과라 쓰지 않는다. 한 픽셀이 중요한 요소는 화면 픽셀에서 정수로 맞춘 뒤 배율로 나눠 놓는다 (`_spread_crosshair`, 예제 `hud.sgd` 의 `place_crosshair`). 640x480 의 화면은 전과 픽셀이 같았다.
 - **GDScript 는 창구 Autoload 만 부른다**: `Game`(`GameBridge`), `EventManager`, `ConfigManager`, `InputManager`. 게임플레이 노드를 직접 만지지 않는다. 창구의 좌표·각도 인자는 UnityXOPS 공간이다 (카메라 위치, 무기 표시 자리).
 - 미션 로드가 실패한 이유는 `Game.LastLoadError()`(영어 한 줄, 로드 중 처음 남은 에러 로그)로 읽는다. 메뉴는 미션을 눌렀는데 실패하면 타이틀 아래에 그 문구를 잠깐 띄운다 (`LOAD_ERROR` 상수. 원본의 "block data open failed" 에 해당).
 - `Game`이 하는 일: 화면 전환(`ChangeScene`), 맵 로드(`LoadOpening`, `LoadDemo`, `ReloadBackground`, `LoadMission`, `LoadMissionFile`, `LoadMapFiles`, `BeginMission`, `RestartMission`, `ReloadMission`, `UnloadMap`, `UnloadMission`), 장면 카메라, 벽 블라인드 판정, 미션 목록·브리핑·통계 조회, HUD 가 읽는 플레이어 값, 3D 무기 표시(`HudWeaponView`), 밝기·감마 사각형.

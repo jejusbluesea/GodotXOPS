@@ -430,3 +430,4 @@ godot --path . -- --window 640x480 --scene maingame --mission 1 --ui-shot shot.p
 - JSON 에 있는 값은 그대로 읽습니다. 원본 상수로 하드코딩하지 않습니다.
 - 무기 동작은 데이터 필드로만 가릅니다. 코드에 무기 번호를 쓰지 않습니다.
 - 빌드 경고 0개를 유지합니다. Godot 이 만드는 `.cs.uid` 파일은 커밋합니다.
+- 화면 요소는 층의 배율(높이 480 기준, 또는 UIScale)로 확대됩니다. Godot 의 Control 픽셀 스냅(`gui/common/snap_controls_to_pixels`)은 배율을 곱하기 전의 층 좌표에서 반올림해서, 배율이 4.5 처럼 정수가 아니면 맞닿은 요소 사이에 틈이 생기므로 꺼 두었습니다 (2D 변환 스냅도 같은 이유로 쓰지 않습니다). 한 픽셀이 중요한 요소(조준선)는 화면 픽셀에서 정수로 맞춘 값을 배율로 나눠 놓습니다 (`ui/maingame.gd` 의 `_spread_crosshair`, 예제 `hud.sgd` 의 `place_crosshair`).
