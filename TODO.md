@@ -21,9 +21,18 @@
 - 커밋 `fdffa9d` 의 메시지에 취소한 프로젝트의 이름이 남아 있다 (공개 저장소의 기록이라 고치지 않았다).
 
 
+## 1.2.5 (2026-10-18, 버그 수정)
+
+**4K 에서 스코프의 틈과 조준선 어긋남을 고쳤다** (사용자 신고: 3840x2160, UIScale 4.5. 640x480 에서는 이상 없음). 커밋 `753df1d`.
+
+- 원인: Godot 의 Control 픽셀 스냅이 배율을 곱하기 전의 층 좌표에서 반올림한다 (층 좌표 1 = 4.5 픽셀). `rendering/2d/snap/snap_2d_transforms_to_pixel` 도 같은 결과였다 (재 보고 확인했다).
+- 고친 것: `gui/common/snap_controls_to_pixels=false`. 조준선은 화면 픽셀에서 정수로 맞춘 길이·두께·간격을 배율로 나눠 놓는다 (`_spread_crosshair`, 예제 `hud.sgd` 의 `place_crosshair`).
+- 확인: 4K 스크린샷의 픽셀 측정(스코프 x=480 의 틈 없음, 조준선 네 방향 간격 14px·두께 5px 로 대칭, 예제 스크립트도 같은 픽셀), 640x480 의 메뉴·OPTION·브리핑·메인게임·결과를 전과 비교해 UI 는 같다 (배경 데모, 마우스 포인터 선, 브리핑의 깜박임만 다르다). `ui_check`, 메인게임 헤드리스, 에디터 `--selftest` 통과. **사용자의 4K 모니터에서는 아직 보지 않았다.**
+- 버전 1.2.5 (`global.json`, `export_presets.cfg`), 태그 `v1.2.5`. README 세 개의 "최신 릴리즈"와 `ROADMAP.md` 를 1.2.5 로 고쳤다. 릴리즈 폴더(익스포트·압축)와 GitHub 의 릴리즈 페이지는 아직 만들지 않았다.
+
 ## 1.2.4 릴리즈 (2026-10-14)
 
-**1.2.4 를 릴리즈했다 (2026-10-14, 이것이 최신이다)**: https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.4 , 첨부 `GodotXOPS_1.2.4.7z`. 게시는 사용자가 했다 (한 번은 게시가 되지 않아 다시 했다). 게시 뒤에 README 세 개의 "최신 릴리즈"와 "앞으로 할 것", `ROADMAP.md` 의 1.2.3·1.2.4 상태, `CLAUDE.md` 를 고쳤다. 아래는 준비할 때의 기록이다.
+**1.2.4 를 릴리즈했다 (2026-10-14)**: https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.4 , 첨부 `GodotXOPS_1.2.4.7z`. 게시는 사용자가 했다 (한 번은 게시가 되지 않아 다시 했다). 게시 뒤에 README 세 개의 "최신 릴리즈"와 "앞으로 할 것", `ROADMAP.md` 의 1.2.3·1.2.4 상태, `CLAUDE.md` 를 고쳤다. 아래는 준비할 때의 기록이다.
 
 - 커밋 `f68d77f`, 태그 `v1.2.4`(푸시함). 릴리즈 폴더 `build/1.2.4/GodotXOPS/`(익스포트 결과물, git 이 추적하는 `godotdata/` 46개, `addon.json`, `dist/` 의 두 파일, `LICENSE.txt`)와 릴리즈 노트 `build/1.2.4/release_notes.md`. 익스포트 빌드에서 메뉴와 `script_probe` 가 헤드리스로 종료 코드 0. 압축과 게시는 사용자가 한다.
 - 게시한 뒤 고칠 것은 고쳤다 (위).
