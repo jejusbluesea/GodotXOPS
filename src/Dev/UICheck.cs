@@ -171,6 +171,7 @@ namespace GodotXOPS.Dev
         /// <summary>
         /// 맵팩의 화면과 글꼴: 순서가 MIF2 → 맵팩 → 설치된 등록 → 기본인지, 고른 것을 올리지 못하면 다음 것으로 넘어가지 않는지,
         /// 메뉴가 맵팩 페이지를 보는 동안 그 맵팩의 글꼴·이미지 목록·메뉴 스크립트가 쓰이고 페이지를 떠나면 원래대로인지 본다.
+        /// 맵팩의 커스텀 바인딩(inputDataPath)이 미션과 메뉴의 맵팩 페이지를 따라 붙고 떨어지는지, 화면 스크립트의 값에 들어가는지도 본다.
         /// </summary>
         /// <param name="game">창구.</param>
         /// <param name="folder">점검용 파일을 쓰는 폴더 (exe 폴더 기준).</param>
@@ -178,11 +179,14 @@ namespace GodotXOPS.Dev
         {
             void Write(string name, string text) => System.IO.File.WriteAllText(GamePath.Resolve($"{folder}/{name}"), text);
             Write("pack_images.json", "{ \"imageData\": [ { \"name\": \"logo\", \"imagePath\": \"data/title.dds\" } ] }");
+            Write("pack_input.json", "{ \"bindings\": [ { \"name\": \"check_pack_key\", \"baseValue\": \"<Keyboard>/k\" } ] }");
+            InputManager input = InputManager.Instance;
             var pack = new MapPackManifestData
             {
                 name = "UI PACK",
                 missions = new System.Collections.Generic.List<string> { $"{folder}/pack_mission.mif2" },
                 imageDataPath = $"{folder}/pack_images.json",
+                inputDataPath = $"{folder}/pack_input.json",
                 hudScriptPath = "godotdata/ui/samples/hud.sgd",
                 briefingScriptPath = "godotdata/ui/samples/briefing.sgd",
                 fontImageOverridePath = "data/title.dds",
@@ -203,6 +207,7 @@ namespace GodotXOPS.Dev
             Expect(game.UiScriptLoad("maingame") != null && game.UiScriptImage("maingame", 10000) != null, "맵팩의 HUD 스크립트가 올라오지 않았거나 맵팩의 이미지를 읽지 못함");
             Expect(game.UiScriptLoad("result") != null && game.UiScriptImage("result", 0) != null, "맵팩이 바꾸지 않은 결과 화면에서 설치된 스크립트가 올라오지 않음");
             Expect(game.FontTexture() == packFont, "미션이 글꼴을 적지 않았는데 맵팩의 글꼴이 쓰이지 않음");
+            Expect(input.IsCustomAction("check_pack_key"), "맵팩의 미션을 읽었는데 맵팩의 커스텀 바인딩이 없음");
 
             // 미션이 적은 것이 먼저이고, 그것을 올리지 못하면 맵팩으로 넘어가지 않는다.
             mission.hudScriptPath = $"{folder}/broken.sgd";
@@ -212,6 +217,7 @@ namespace GodotXOPS.Dev
             Expect(game.FontTexture() == normalFont, "미션의 글꼴 그림을 읽지 못했는데 맵팩의 글꼴로 넘어감");
             foreach (string screen in new[] { "briefing", "maingame", "result" }) game.UiScriptFree(screen);
             game.UnloadMission();
+            Expect(!input.IsCustomAction("check_pack_key"), "미션을 내렸는데 맵팩의 커스텀 바인딩이 남음");
 
             // 메뉴가 맵팩 페이지를 보는 동안: 맵팩의 글꼴, 이미지 목록(10000 부터), 메뉴 스크립트. 떠나면 원래대로다.
             Expect(game.SetMenuPage(true, page) && game.MenuPackActive() && game.MenuPackName() == "UI PACK" && game.MenuPackImageCount() == 1, "맵팩 페이지를 알렸는데 메뉴의 맵팩이 정해지지 않음");
@@ -219,8 +225,13 @@ namespace GodotXOPS.Dev
             Expect(game.FontTexture() == packFont && game.ListImage(10000) != null && game.ListImage(10001) == null, "메뉴의 맵팩 페이지에서 맵팩의 글꼴이나 이미지가 쓰이지 않음");
             Expect(game.UiScriptLoad("mainmenu_pack") != null && game.UiScriptImage("mainmenu_pack", 10000) != null, "맵팩의 메뉴 스크립트가 올라오지 않았거나 맵팩의 이미지를 읽지 못함");
             game.UiScriptFree("mainmenu_pack");
+            Expect(input.IsCustomAction("check_pack_key"), "메뉴의 맵팩 페이지에서 맵팩의 커스텀 바인딩이 없음");
+            Godot.Collections.Dictionary values = game.HudValues();
+            Expect(values.ContainsKey("custom_held") && values["custom_held"].AsGodotDictionary().ContainsKey("check_pack_key")
+                && values["custom_pressed"].AsGodotDictionary().ContainsKey("check_pack_key"), "화면 스크립트의 값에 커스텀 바인딩이 없음");
             Expect(game.SetMenuPage(true, 0) && !game.MenuPackActive() && game.FontTexture() == normalFont && game.ListImage(10000) == null
-                && game.UiScriptLoad("mainmenu_pack") == null, "addon 폴더의 페이지로 옮겼는데 맵팩의 글꼴·이미지·메뉴 스크립트가 남음");
+                && game.UiScriptLoad("mainmenu_pack") == null && !input.IsCustomAction("check_pack_key"),
+                "addon 폴더의 페이지로 옮겼는데 맵팩의 글꼴·이미지·메뉴 스크립트·커스텀 바인딩이 남음");
             game.SetMenuPage(false, 0);
 
             game.SetUiScriptOverride(string.Empty);

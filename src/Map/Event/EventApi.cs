@@ -115,6 +115,8 @@ namespace GodotXOPS
                 ["hud_image_clear"] = Callable.From((int slot, float fade) => { if (Enter()) m_events.ClearHudImage(slot, fade); }),
                 ["interact_pressed"] = Callable.From(() => Enter() && m_events.InteractPressed),
                 ["interact_held"] = Callable.From(() => Enter() && m_events.InteractHeld),
+                ["input_pressed"] = Callable.From((string action) => Enter() && m_events.CustomPressed(action)),
+                ["input_held"] = Callable.From((string action) => Enter() && m_events.CustomHeld(action)),
                 ["key_name"] = Callable.From((string action) => Enter() ? KeyLabel(action) : string.Empty),
                 ["set_auto_judge"] = Callable.From((bool enabled) => { if (Enter()) m_events.AutoJudge = enabled; }),
                 ["end_mission"] = Callable.From((bool complete) => { if (Enter()) m_events.ForceEnd(complete); }),

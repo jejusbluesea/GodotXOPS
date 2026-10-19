@@ -10,6 +10,8 @@ namespace GodotXOPS
     {
         public List<ConfigSection> sections = new List<ConfigSection>();
         public InputActionDefinition[] bindings = new InputActionDefinition[0];
+        // 커스텀 바인딩(등록 파일이 정한 버튼) 가운데 유저가 처음 키와 다르게 바꾼 것. 등록한 맵팩이 지금 없어도 남긴다.
+        public List<CustomBindingValue> customBindings = new List<CustomBindingValue>();
     }
 
     /// <summary>

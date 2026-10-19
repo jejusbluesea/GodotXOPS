@@ -41,6 +41,7 @@ namespace GodotXOPS.Editor
             new Kind("Sound data", typeof(SoundParameterData)),
             new Kind("Image data", typeof(ImageParameterData)),
             new Kind("Event pack", typeof(EventPackData)),
+            new Kind("Custom bindings", typeof(CustomBindingListData)),
             new Kind("Sky data", typeof(SkyData)),
             new Kind("Mission list", typeof(MissionData)),
             new Kind("Global data", typeof(GlobalData)),

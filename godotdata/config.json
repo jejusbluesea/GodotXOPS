@@ -194,6 +194,13 @@
           "value": "65",
           "min": 60,
           "max": 90
+        },
+        {
+          "name": "enableFog",
+          "type": "bool",
+          "value": "true",
+          "min": 0,
+          "max": 0
         }
       ]
     },
@@ -337,5 +344,6 @@
       ],
       "composites": []
     }
-  ]
+  ],
+  "customBindings": []
 }

@@ -90,6 +90,7 @@ namespace GodotXOPS
             {
                 BuildAction(def);
             }
+            LoadInstalledCustomBindings();
         }
 
         public override void _Input(InputEvent inputEvent)
@@ -279,7 +280,7 @@ namespace GodotXOPS
 
         /// <summary>
         /// 단일 버튼 액션의 바인딩(인덱스 0)을 지정 경로로 교체한다. 라이브 액션에 즉시 반영하고,
-        /// ConfigManager의 bindings 데이터도 갱신해 저장(Save) 시 유지되게 한다. 방향 묶음에는 쓰지 않는다.
+        /// ConfigManager의 bindings 데이터도 갱신해 저장(Save) 시 유지되게 한다 (커스텀 바인딩은 customBindings). 방향 묶음에는 쓰지 않는다.
         /// </summary>
         /// <param name="action">액션 이름.</param>
         /// <param name="path">새 바인딩 경로(예 "&lt;Keyboard&gt;/space").</param>
@@ -294,6 +295,10 @@ namespace GodotXOPS
 
             entry.definition.bindings[0] = path;
             ApplyButtonBindings(entry);
+            if (m_customActive.TryGetValue(action, out CustomBindingData custom))
+            {
+                ConfigManager.Instance.SetCustomBinding(custom.name, path, custom.baseValue);
+            }
             return true;
         }
 
@@ -305,12 +310,19 @@ namespace GodotXOPS
         {
             foreach (ActionEntry entry in m_actions.Values)
             {
-                ApplyButtonBindings(entry);
+                if (m_customActive.ContainsKey(entry.definition.name))
+                {
+                    RefreshCustomBinding(entry);
+                }
+                else
+                {
+                    ApplyButtonBindings(entry);
+                }
             }
         }
 
         /// <summary>
-        /// 현재 등록된 모든 액션 이름을 반환한다.
+        /// 현재 등록된 모든 액션 이름을 반환한다 (지금 쓰는 커스텀 바인딩 포함).
         /// </summary>
         /// <returns>액션 이름 배열.</returns>
         public string[] GetActionNames()

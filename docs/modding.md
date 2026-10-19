@@ -52,7 +52,8 @@ GodotXOPS 는 원본 XOPS 에서 코드에 박혀 있던 수치를 `godotdata/` 
 
 | 파일 | 내용 |
 |---|---|
-| `config.json` | 게임 설정과 키 바인딩. 메뉴의 OPTION 에서 SAVE 하면 덮어씁니다. `General`의 `AllowConsole`은 OPTION 에 없는 설정이고, `"true"`로 바꾸면 어느 화면에서든 F11 로 디버그 콘솔이 열립니다 ([개발 문서](development.md#디버그-콘솔)) `AllowEventScript` 도 OPTION 에 없는 설정이고, `"false"` 로 바꾸면 [스크립트 이벤트](#스크립트-이벤트)를 쓰는 미션을 로드하지 않습니다. `AllowUiScript` 도 OPTION 에 없는 설정이고, `"false"` 로 바꾸면 [화면 스크립트](#화면-스크립트)를 쓰지 않습니다 |
+| `config.json` | 게임 설정과 키 바인딩. 메뉴의 OPTION 에서 SAVE 하면 덮어씁니다. `General`의 `AllowConsole`은 OPTION 에 없는 설정이고, `"true"`로 바꾸면 어느 화면에서든 F11 로 디버그 콘솔이 열립니다 ([개발 문서](development.md#디버그-콘솔)) `AllowEventScript` 도 OPTION 에 없는 설정이고, `"false"` 로 바꾸면 [스크립트 이벤트](#스크립트-이벤트)를 쓰는 미션을 로드하지 않습니다. `AllowUiScript` 도 OPTION 에 없는 설정이고, `"false"` 로 바꾸면 [화면 스크립트](#화면-스크립트)를 쓰지 않습니다. `customBindings` 는 유저가 바꾼 [커스텀 바인딩](#커스텀-바인딩)의 키입니다 |
+| `input/*.json` | 설치형 [커스텀 바인딩](#커스텀-바인딩). 기본은 없습니다 (폴더도 없습니다) |
 | `global.json` | 제품 이름, 버전, 크레딧에 나오는 라이선스 문구 |
 | `mission_data.json` | 오프닝·메뉴 배경 맵, 공식 미션 목록 |
 | `sky_data.json` | 스카이 모델과 텍스처, 안개 |
@@ -586,10 +587,10 @@ AI 가 스코프 무기를 다룰 때의 값은 `human/ai.json` 의 `aiScopeData
 | `skyMeshPath` | 하늘을 그리는 모델 (`.x`). 비워 두면 하늘을 그리지 않습니다 |
 | `skyTexturePath` | 스카이 번호별 텍스처 |
 | `skyColor` | 스카이 번호별 안개의 색 (0 에서 255 사이의 정수) |
-| `fog` | `false` 면 안개를 쓰지 않습니다 |
+| `fog` | `false` 면 안개를 쓰지 않습니다. `true` 여도 유저가 OPTION 의 Graphic 에서 Fog 를 끄면(`config.json` 의 `enableFog`) 안개가 없습니다 |
 | `fogStart`, `fogEnd` | 안개가 시작하는 거리와 완전히 가리는 거리 (m) |
 
-카메라가 그리는 거리는 여기가 아니라 설정(`config.json` 의 `Graphic` 에 있는 `nearClippingPlane`, `farClippingPlane`)에 있습니다. 1.2.2 까지 이 파일에 있던 같은 이름의 두 키는 쓰이지 않던 것이라 1.2.3 에서 뺐습니다 (파일에 남아 있으면 경고를 남기고 무시합니다).
+카메라가 그리는 거리는 여기가 아니라 설정(`config.json` 의 `Graphic` 에 있는 `nearClippingPlane`, `farClippingPlane`. OPTION 의 Graphic 에서 Near, Far)에 있습니다. 안개를 끄고 Far 가 짧으면(기본 80 m) 그 거리에서 맵이 잘려 보입니다. 안개가 그 경계를 가리고 있었기 때문입니다. 1.2.2 까지 이 파일에 있던 같은 이름의 두 키는 쓰이지 않던 것이라 1.2.3 에서 뺐습니다 (파일에 남아 있으면 경고를 남기고 무시합니다).
 
 ### `global.json`
 
@@ -753,6 +754,7 @@ PD2 에는 아래 제한이 없습니다. PD1 미션은 원본과 똑같이 진�
   "addonObjectDataPath": "",
   "addonSoundDataPath": "",
   "addonImageDataPath": "",
+  "addonInputDataPath": "",
   "briefingScriptPath": "",
   "hudScriptPath": "",
   "resultScriptPath": "",
@@ -773,6 +775,7 @@ PD2 에는 아래 제한이 없습니다. PD1 미션은 원본과 똑같이 진�
 | `briefing` | 브리핑 본문. 항목 하나가 한 줄입니다 |
 | `defaultBlockMaterial` | 재질을 적지 않은(`materialIndex` -1) 텍스처의 면과 그리지 않는 면이 쓰는 [재질](#블록-재질) 번호. 0 이 원본의 벽 착탄입니다. **-1 을 적으면 안 됩니다** (없는 재질이 되어 이펙트도 소리도 나지 않습니다) |
 | `addon...DataPath` | 이 미션이 들고 오는 추가 데이터 파일 다섯 가지 (아래). 비워 두면 없습니다 |
+| `addonInputDataPath` | 이 미션에서만 쓰는 [커스텀 바인딩](#커스텀-바인딩)의 등록 파일. 비워 두면 없습니다 |
 | `briefingScriptPath`, `hudScriptPath`, `resultScriptPath` | 이 미션에서만 브리핑, HUD, 결과 화면을 대신 그리는 [화면 스크립트](#미션이-들고-오는-화면)(`.sgd`). 비워 두면 평소의 화면입니다 |
 | `fontImageOverridePath` | 이 미션에서만 스프라이트 글꼴(`data/char.dds`) 대신 쓰는 그림 (아래). 비워 두면 평소의 글꼴입니다 |
 
@@ -1178,8 +1181,10 @@ func wait_enemies_near(p, state):
 | `random(n)` | 0 이상 n 미만의 난수 |
 | `interact_pressed()` | 이번 틱에 플레이어가 Interact 키를 눌렀는지 |
 | `interact_held()` | 이번 틱에 플레이어가 Interact 키를 누르고 있는지 (꾹 눌러야 하는 이벤트를 만들 때 틱마다 셉니다) |
+| `input_pressed(이름)` | 이번 틱에 플레이어가 그 [커스텀 바인딩](#커스텀-바인딩)을 눌렀는지. 없는 이름이면 거짓 |
+| `input_held(이름)` | 이번 틱에 플레이어가 그 커스텀 바인딩을 누르고 있는지. 없는 이름이면 거짓 |
 | `message_text(번호)` | `.msg` 의 문구. `{액션 이름}` 은 키 이름으로 바뀐 채로 옵니다 |
-| `key_name(액션)` | 그 액션에 설정된 키의 이름 (예: `key_name("interact")` → `F`) |
+| `key_name(액션)` | 그 액션에 설정된 키의 이름 (예: `key_name("interact")` → `F`). 커스텀 바인딩의 이름도 됩니다 |
 
 **조작**
 
@@ -1307,6 +1312,42 @@ api["hud_text"].call(0, "02:35", {"font": 1, "anchor": 2, "x": -10.0, "y": -10.0
 - 설치한 화면 스크립트(`godotdata/ui/`)에서는 10000 이상의 번호가 이미지 목록(맵팩 10000 부터, 미션 20000 부터)이고, 10000 미만은 그 등록 파일의 `images` 입니다.
 
 다른 에드온 데이터와 달리 미션의 이미지 목록은 미션 정보와 함께 읽습니다. 그래서 맵이 뜨기 전의 브리핑과 맵이 내려간 뒤의 결과 화면에서도 쓸 수 있습니다. 없는 번호나 읽지 못한 파일은 그려지지 않고 경고만 남습니다.
+
+## 커스텀 바인딩
+
+기본 조작(점프, 발사, Interact 등) 말고도 에드온이 쓸 버튼을 더할 수 있습니다. 더한 버튼은 OPTION 의 **Custom** 탭에서 유저가 키를 바꿀 수 있고, [스크립트 이벤트](#api)와 [화면 스크립트](#frame-이-받는-값)가 이름으로 읽습니다. 버튼을 눌렀을 때 무엇을 할지는 스크립트가 정합니다 (게임이 그 버튼으로 하는 일은 없습니다).
+
+```json
+{
+  "bindings": [
+    { "name": "flashlight", "label": "Light", "baseValue": "<Keyboard>/v" },
+    { "name": "radio", "label": "Radio", "baseValue": "<Mouse>/middleButton" }
+  ]
+}
+```
+
+| 키 | 뜻 |
+|---|---|
+| `name` | 액션 이름. 영문자, 숫자, 밑줄만 씁니다. 스크립트가 이 이름으로 읽습니다 |
+| `label` | OPTION 에 보이는 이름. 스프라이트 글꼴이라 영문이고 8자까지 보입니다. 비우면 `name` 입니다 |
+| `baseValue` | 처음 키. `config.json` 의 키 바인딩과 같은 형식입니다 (`<Keyboard>/키`, `<Mouse>/leftButton` 등). 비우면 묶인 키가 없습니다 |
+
+**등록하는 곳은 세 군데입니다.**
+
+| 곳 | 쓰이는 때 |
+|---|---|
+| `godotdata/input/*.json` (설치형) | 늘. 파일 이름 순서로 읽습니다 |
+| 맵팩 Manifest 의 `inputDataPath` | 그 맵팩의 미션을 하는 동안과, 메뉴에서 그 맵팩의 페이지를 보는 동안 |
+| MIF2 의 `addonInputDataPath` | 그 미션을 하는 동안 (미션 정보를 읽을 때 붙고 메뉴로 돌아가면 떨어집니다) |
+
+- OPTION 의 Custom 탭에는 지금 쓰이는 것만 나옵니다. 설치형 → 맵팩 → 미션 순서이고, 하나도 없으면 탭이 없습니다. 한 페이지에 14개이고 넘치면 페이지를 넘깁니다.
+- **미션의 버튼은 지금은 OPTION 에서 키를 바꿀 수 없습니다.** OPTION 은 메뉴에서만 열리고 메뉴에는 미션 정보가 없기 때문입니다. 그 미션 동안 처음 키(또는 전에 같은 이름으로 바꿔 둔 키)로 동작합니다. 여러 미션이 쓰는 버튼은 맵팩에 등록하세요.
+- 유저가 바꾼 키는 `config.json` 의 `customBindings` 에 이름으로 남습니다 (처음 키와 같으면 남기지 않습니다). **이름이 같으면 맵팩이 달라도 같은 키 설정을 씁니다.** 같은 이름이 여러 곳에 있으면 앞의 곳(설치형 → 맵팩 → 미션)의 `label` 과 `baseValue` 를 씁니다.
+- OPTION 의 RESET 은 커스텀 바인딩도 전부(지금 보이지 않는 맵팩의 것도) 처음 키로 되돌립니다.
+- 기본 조작과 같은 이름(`jump`, `fire`, `interact` 등), 쓸 수 없는 글자가 든 이름은 경고를 남기고 뺍니다. 처음 키가 잘못됐거나 예약 키(Esc, F1 에서 F12)면 경고를 남기고 묶지 않습니다.
+- 키가 기본 조작과 겹쳐도 막지 않습니다 (기본 조작끼리도 그렇습니다). 두 동작이 함께 일어납니다.
+- 이벤트에서는 Interact 처럼 살아 있는 플레이어의 입력만 받고, 눌림은 다음 틱 한 번, 누르고 있음은 다음 틱부터입니다. 조작 잠금 이벤트는 이 버튼을 막지 않습니다.
+- `.msg` 의 문구와 `message_text` 에서 `{이름}` 은 그 버튼의 키 이름으로 바뀝니다 (예: `{flashlight}` → `V`).
 
 ## 화면 스크립트
 
@@ -1527,6 +1568,7 @@ api["hud_text"].call(0, "02:35", {"font": 1, "anchor": 2, "x": -10.0, "y": -10.0
 | `start_count` | 미션이 시작된 횟수. 값이 바뀌면 미션이 다시 시작된 것입니다 |
 | `message_id`, `message_text`, `message_alpha` | 이벤트 메시지의 번호(없으면 −1), 글, 진하기 |
 | `hud_visible` | 이벤트가 HUD 를 켜 두었는지 (Show HUD). 감추는 일은 게임이 하므로 스크립트는 읽기만 합니다 |
+| `custom_held`, `custom_pressed` | [커스텀 바인딩](#커스텀-바인딩)의 이름 → 지금 누르고 있는지 / 이번 프레임에 눌렸는지. 지금 쓰이는 것만 들어 있습니다 |
 
 **이벤트가 HUD 를 끌 때** (1.2.1): 이벤트 Show HUD 가 HUD 를 끄면 게임이 스크립트의 층을 통째로 감춥니다. 꺼도 남아야 하는 것(이벤트 메시지, 미션을 시작하고 끝낼 때의 암전과 종료 문구, 벽 블라인드)은 `layer` 의 셋째 인자 `overlay` 를 참으로 준 층에 둡니다. `overlay` 를 주지 않은 스크립트는 HUD 가 꺼져 있는 동안 이벤트 메시지도 보이지 않습니다. 미션이 끝나면 HUD 는 다시 보입니다. 이벤트의 암전과 레터박스, 이벤트가 놓은 글자는 스크립트와 무관하게 게임이 그립니다.
 
@@ -1534,7 +1576,7 @@ api["hud_text"].call(0, "02:35", {"font": 1, "anchor": 2, "x": -10.0, "y": -10.0
 
 다른 화면 위에 덮여 뜨는 화면입니다 (지금은 메뉴가 엽니다). 메뉴가 기본 화면이든 스크립트든 상관없이 따로 등록합니다. 값은 바꾸는 즉시 게임에 들어가고, `config_save` 가 파일에 씁니다. `close` 는 저장하지 않은 변경을 되돌립니다.
 
-- `ctx`: `tab`(시작할 탭의 이름. 없으면 빈 글자), `sections`(설정 섹션 이름의 배열).
+- `ctx`: `tab`(시작할 탭의 이름. 없으면 빈 글자), `sections`(설정 섹션 이름의 배열), `custom`(지금 쓰이는 [커스텀 바인딩](#커스텀-바인딩)의 배열. 항목마다 `name`, `label`). 키는 기본 조작처럼 `binding` 과 `bind_listen` 에 `name` 을 줘서 다룹니다. 예제 `option.sgd` 는 `custom` 이 있으면 Custom 탭을 더합니다.
 - `v`: `bind_listening`(키를 기다리는 액션의 이름. 없으면 빈 글자), `bind_captured`(이번 프레임에 키를 받았는지).
 
 | 함수 | 내용 |
@@ -1542,10 +1584,10 @@ api["hud_text"].call(0, "02:35", {"font": 1, "anchor": 2, "x": -10.0, "y": -10.0
 | `config_set({"section", "key", "value"})` | 설정 값을 바꿉니다. 형이 맞아야 하고 범위는 게임이 자릅니다. `AllowConsole`, `AllowEventScript`, `AllowUiScript` 와 해상도는 여기서 바꿀 수 없습니다. 바꿨으면 참을 돌려줍니다 |
 | `config_range({"section", "key"})` | 설정의 범위: `min`, `max`. UIScale 의 상한은 해상도를 따라 바뀝니다 |
 | `config_save()` | 설정을 파일에 쓰고 창 모드·해상도·UIScale 을 적용합니다 |
-| `config_reset()` | 설정과 키 바인딩을 처음 값으로 되돌립니다 (저장은 따로) |
+| `config_reset()` | 설정과 키 바인딩(커스텀 바인딩 포함)을 처음 값으로 되돌립니다 (저장은 따로) |
 | `resolution()` | 해상도: `position`(고를 수 있는 목록에서의 자리), `count`(목록의 수), `label`(이름) |
 | `resolution_set({"position"})` | 해상도를 목록의 그 자리의 것으로 바꿉니다 (저장할 때 적용됩니다) |
-| `actions()` | 입력 액션 이름의 배열 |
+| `actions()` | 입력 액션 이름의 배열 (지금 쓰이는 커스텀 바인딩 포함) |
 | `binding({"action"})` | 그 액션에 묶인 키의 경로 (예: `<Keyboard>/leftShift`) |
 | `bind_listen({"action"})` | 그 액션의 키를 다음에 눌리는 키나 마우스 버튼으로 바꾸기 시작합니다. 키는 게임이 받아서 넣습니다. 빈 이름을 주면 그만둡니다 |
 | `close()` | 저장하지 않은 변경을 되돌리고 화면을 닫습니다 |
@@ -1635,6 +1677,7 @@ Manifest 의 예입니다.
     "eventDataPath": "mappacks/vol0/events.json",
     "blockMaterialDataPath": "mappacks/vol0/materials.json",
     "effectDataPath": "mappacks/vol0/effects.json",
+    "inputDataPath": "mappacks/vol0/input.json",
     "briefingScriptPath": "",
     "hudScriptPath": "mappacks/vol0/hud.sgd",
     "resultScriptPath": "",
@@ -1648,6 +1691,7 @@ Manifest 의 예입니다.
 | `name` | 메뉴의 페이지 이름 |
 | `missions` | 맵팩의 미션(MIF2). 적은 순서대로 메뉴에 나옵니다 |
 | `...DataPath` | 맵팩의 데이터 파일. 번호 10000 부터입니다 ([맵팩과 미션의 추가 데이터](#맵팩과-미션의-추가-데이터-에드온-데이터)). 비워 두면 없습니다 |
+| `inputDataPath` | 맵팩의 [커스텀 바인딩](#커스텀-바인딩)의 등록 파일. 번호가 아니라 이름으로 가리킵니다. 비워 두면 없습니다 |
 | `briefingScriptPath`, `hudScriptPath`, `resultScriptPath` | 맵팩의 미션에서 브리핑, HUD, 결과 화면을 대신 그리는 화면 스크립트 ([맵팩이 들고 오는 화면](#맵팩이-들고-오는-화면)). 미션(MIF2)이 적은 것이 먼저입니다 |
 | `fontImageOverridePath` | 맵팩의 미션과, 메뉴에서 맵팩의 페이지를 보는 동안 쓰는 스프라이트 글꼴 그림. 미션(MIF2)이 적은 것이 먼저입니다 |
 | `mainMenuScriptPath` | 메뉴에서 맵팩의 페이지를 보는 동안 타이틀과 버전 자리를 그리는 화면 스크립트 ([메뉴 스크립트](#맵팩이-들고-오는-화면)) |

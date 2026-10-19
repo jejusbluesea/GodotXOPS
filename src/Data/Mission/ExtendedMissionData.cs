@@ -33,6 +33,8 @@ namespace GodotXOPS
         public string addonObjectDataPath = string.Empty;
         public string addonSoundDataPath = string.Empty;
         public string addonImageDataPath = string.Empty;
+        // 이 미션에서만 쓰는 커스텀 바인딩 등록 파일. 메뉴에는 미션 정보가 없어서 이 미션을 하는 동안만 액션이 있다. 비워 두면 없다.
+        public string addonInputDataPath = string.Empty;
         // 이 미션에서만 기본 화면 대신 그리는 화면 스크립트(.sgd). 비워 두면 평소의 화면이다. 이미지는 이미지 목록(맵팩 10000 부터, 미션 20000 부터)을 번호로 그린다.
         public string briefingScriptPath = string.Empty;
         public string hudScriptPath = string.Empty;

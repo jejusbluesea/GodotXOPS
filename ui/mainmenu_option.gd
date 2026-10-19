@@ -1,6 +1,7 @@
 class_name MenuOption
 extends RefCounted
 ## OPTION 화면의 기본 내용 (XopsOption 이 띄운다). 섹션 바(General / Input / Graphic / Sound)에서 탭을 고르고, 탭마다 설정 줄을 세로로 늘어놓는다.
+## 커스텀 바인딩(등록 파일이 정한 버튼)이 지금 하나라도 있으면 Custom 탭이 끝에 붙는다. 열 때마다 다시 본다 (메뉴의 맵팩 페이지를 따라 바뀐다).
 ## 값은 바꾸는 즉시 ConfigManager 에 들어가 화면에 반영되고(밝기·감마, 음량), SAVE 를 눌러야 파일에 남는다.
 ## 창 모드·해상도·VSync 와 UIScale 은 SAVE 때 적용한다 (UIScale 을 바로 적용하면 누르고 있던 화살표가 손 밑에서 움직인다). BACK 은 저장하지 않은 변경을 되돌린다 (XopsOption 이 처리).
 ## 버튼의 색·눌림·클릭 판정은 받은 XopsButtons 로 한다.
@@ -80,6 +81,14 @@ const FRAME_LIMIT := {"label": "FrameLimit", "chars": 5, "step": 1}
 const BRIGHT := {"label": "Bright", "chars": 6, "step": 0.01, "format": "%.2f"}
 const GAMMA := {"label": "Gamma", "chars": 5, "step": 0.1, "format": "%.1f"}
 const FOV := {"label": "FOV", "chars": 4, "step": 1}
+const FOG_LABEL := "Fog"
+const NEAR := {"label": "Near", "chars": 6, "step": 0.01, "format": "%.2f"}
+const FAR := {"label": "Far", "chars": 6, "step": 10.0, "format": "%.0f"}
+
+# ----- Custom: 맨 위 줄이 페이지 넘기기, 그 아래 일곱 줄에 둘씩 -----
+const CUSTOM_TAB := "Custom"
+const CUSTOM_PAGE := {"label": "Page", "chars": 7}
+const CUSTOM_ROWS := 7
 
 # ----- Sound -----
 const MASTER_VOLUME := {"label": "MasterVolume", "chars": 6, "step": 0.01, "format": "%.2f"}
@@ -104,10 +113,10 @@ var _section_page := 0
 var _selected := ""
 
 # 탭 이름 → 그 탭의 줄 배경들.
-var _panels := {"General": [], "Input": [], "Graphic": [], "Sound": []}
+var _panels := {"General": [], "Input": [], "Graphic": [], "Sound": [], CUSTOM_TAB: []}
 # 탭 이름 → 체크박스 / 값 조절 줄 목록.
-var _checks := {"General": [], "Input": [], "Graphic": [], "Sound": []}
-var _steppers := {"General": [], "Input": [], "Graphic": [], "Sound": []}
+var _checks := {"General": [], "Input": [], "Graphic": [], "Sound": [], CUSTOM_TAB: []}
+var _steppers := {"General": [], "Input": [], "Graphic": [], "Sound": [], CUSTOM_TAB: []}
 
 var _color_prev: Dictionary
 var _color_value: Dictionary
@@ -117,6 +126,15 @@ var _resolution_value: Dictionary
 var _resolution_next: Dictionary
 var _bind_slots := {}
 var _bind_listening := ""
+
+var _custom_actions := PackedStringArray()
+var _custom_page := 0
+var _custom_page_prev: Dictionary
+var _custom_page_value: Dictionary
+var _custom_page_next: Dictionary
+var _custom_rows: Array[ColorRect] = []
+# 칸 하나: {"label": 이름 칸, "key": 키 칸}. 줄마다 둘씩, 위에서부터.
+var _custom_slots: Array[Dictionary] = []
 
 var _save_reset_bg: ColorRect
 var _save_slot: Dictionary
@@ -132,6 +150,7 @@ func _init(buttons: XopsButtons, layer: XopsLayer, on_scale: Callable) -> void:
 	_build_input()
 	_build_graphic()
 	_build_sound()
+	_build_custom()
 	_build_save_reset()
 	set_visible(false)
 
@@ -223,10 +242,37 @@ func _build_graphic() -> void:
 	_stepper("Graphic", LEFT + _selector_width(BRIGHT["label"], BRIGHT["chars"], GAP) + GAP, _row_y(4),
 		GAMMA, "Graphic", "gamma", false, GAP)
 	_stepper("Graphic", LEFT, _row_y(5), FOV, "Graphic", "fov", true, LABEL_GAP)
+	_checkbox("Graphic", LEFT + _selector_width(FOV["label"], FOV["chars"], LABEL_GAP) + GAP, _row_y(5),
+		FOG_LABEL, "Graphic", "enableFog")
+	_stepper("Graphic", LEFT, _row_y(6), NEAR, "Graphic", "nearClippingPlane", false, GAP)
+	_stepper("Graphic", LEFT + _selector_width(NEAR["label"], NEAR["chars"], GAP) + GAP, _row_y(6),
+		FAR, "Graphic", "farClippingPlane", false, GAP)
 
 
 func _build_sound() -> void:
 	_stepper("Sound", LEFT, _row_y(0), MASTER_VOLUME, "Sound", "MasterVolume", false, LABEL_GAP)
+
+
+func _build_custom() -> void:
+	var page_bg := _row_panel(CUSTOM_TAB, LEFT, _row_y(0), _selector_width(CUSTOM_PAGE["label"], CUSTOM_PAGE["chars"], LABEL_GAP))
+	var cells := _selector_cells(page_bg, 0, CUSTOM_PAGE["label"], CUSTOM_PAGE["chars"], LABEL_GAP)
+	_custom_page_prev = cells["prev"]
+	_custom_page_value = cells["value"]
+	_custom_page_next = cells["next"]
+
+	var label_width := BIND_LABEL_CHARS * FONT.x
+	var key_width := BIND_KEY_CHARS * FONT.x
+	var unit_width := label_width + BIND_LABEL_GAP + key_width
+	var row_width := BIND_PER_ROW * unit_width + (BIND_PER_ROW - 1) * BIND_UNIT_GAP
+	for row in CUSTOM_ROWS:
+		var bg := _row_panel(CUSTOM_TAB, LEFT, _row_y(1 + row), row_width)
+		_custom_rows.append(bg)
+		for column in BIND_PER_ROW:
+			var x := column * (unit_width + BIND_UNIT_GAP)
+			_custom_slots.append({
+				"label": _cell(bg, x, label_width, "", XopsUI.MIDDLE_LEFT),
+				"key": _cell(bg, x + label_width + BIND_LABEL_GAP, key_width, ""),
+			})
 
 
 func _build_save_reset() -> void:
@@ -320,7 +366,22 @@ func set_visible(visible: bool) -> void:
 	_section_bar.visible = visible
 	_save_reset_bg.visible = visible
 	_bind_listening = ""
+	if visible:
+		_update_section_names()
 	_show_tab()
+
+
+## 탭 이름들을 다시 정한다: 설정의 섹션들과, 커스텀 바인딩이 있으면 Custom.
+func _update_section_names() -> void:
+	_section_names = ConfigManager.GetSectionNames()
+	_custom_actions = InputManager.GetCustomActionNames()
+	_custom_page = 0
+	if _custom_actions.size() > 0:
+		_section_names.append(CUSTOM_TAB)
+	if not _selected in _section_names:
+		_selected = _section_names[0] if _section_names.size() > 0 else ""
+	@warning_ignore("integer_division")
+	_section_page = mini(_section_page, maxi(0, (_section_names.size() - 1) / SECTION_PER_PAGE))
 
 
 ## 탭을 고른다. 없는 이름이면 그대로 둔다.
@@ -353,6 +414,7 @@ func refresh() -> void:
 	_refresh_resolution()
 	for action: String in BIND_ACTIONS:
 		_refresh_bind(action)
+	_refresh_custom()
 
 
 func _refresh_section_bar() -> void:
@@ -407,12 +469,42 @@ func _refresh_resolution() -> void:
 
 
 func _refresh_bind(action: String) -> void:
-	var shown := BIND_LISTENING
-	if _bind_listening != action:
-		var path: String = InputManager.GetActionBinding(action)
-		var key := path.get_slice("/", path.get_slice_count("/") - 1)
-		shown = "[" + ("?" if key.is_empty() else BIND_ABBREV.get(key, key.to_upper())) + "]"
-	_buttons.set_text(_bind_slots[action], shown)
+	if _bind_slots.has(action):
+		_buttons.set_text(_bind_slots[action], _bind_text(action))
+	else:
+		_refresh_custom()
+
+
+## 액션의 키를 칸에 쓸 글자. 기다리는 중이면 [...].
+func _bind_text(action: String) -> String:
+	if _bind_listening == action:
+		return BIND_LISTENING
+	var path: String = InputManager.GetActionBinding(action)
+	var key := path.get_slice("/", path.get_slice_count("/") - 1)
+	return "[" + ("?" if key.is_empty() else BIND_ABBREV.get(key, key.to_upper())) + "]"
+
+
+func _custom_page_count() -> int:
+	return maxi(1, ceili(float(_custom_actions.size()) / _custom_slots.size()))
+
+
+## Custom 탭의 페이지와 칸들을 지금 페이지의 커스텀 바인딩으로 채운다. 빈 칸과 빈 줄은 감춘다.
+func _refresh_custom() -> void:
+	var showing := _visible and _selected == CUSTOM_TAB
+	_buttons.set_text(_custom_page_value, "[%d/%d]" % [_custom_page + 1, _custom_page_count()])
+	for i in _custom_slots.size():
+		var index := _custom_page * _custom_slots.size() + i
+		var exists := index < _custom_actions.size()
+		var slot: Dictionary = _custom_slots[i]
+		_buttons.set_visible(slot["label"], exists)
+		_buttons.set_visible(slot["key"], exists)
+		if exists:
+			var action := _custom_actions[index]
+			_buttons.set_text(slot["label"], InputManager.GetCustomLabel(action).left(BIND_LABEL_CHARS))
+			_buttons.set_text(slot["key"], _bind_text(action))
+		if i % BIND_PER_ROW == 0:
+			@warning_ignore("integer_division")
+			_custom_rows[i / BIND_PER_ROW].visible = showing and exists
 
 
 # ============================================================
@@ -436,6 +528,8 @@ func update(delta: float, pressed: bool, clicked: bool, held: bool) -> void:
 			_update_color(pressed, clicked, held)
 		"Input":
 			_update_binds(pressed, clicked)
+		CUSTOM_TAB:
+			_update_custom(pressed, clicked, held)
 		"Graphic":
 			_update_resolution(pressed, clicked, held)
 
@@ -550,25 +644,51 @@ func _update_resolution(pressed: bool, clicked: bool, held: bool) -> void:
 
 ## 키 바인딩: 칸을 클릭하면 기다리는 상태가 되고, 그 뒤 처음 눌린 키나 마우스 버튼으로 바꾼다.
 func _update_binds(pressed: bool, clicked: bool) -> void:
-	var captured := false
-	if not _bind_listening.is_empty():
-		var path: String = InputManager.GetFirstPressedKeyPath()
-		if not path.is_empty():
-			InputManager.SetActionBinding(_bind_listening, path)
-			var done := _bind_listening
-			_bind_listening = ""
-			_refresh_bind(done)
-			captured = true
-
+	var captured := _capture_bind()
 	for action: String in BIND_ACTIONS:
-		var main: XopsText = _bind_slots[action]["main"]
-		var hovered := main.is_hovered()
-		var owned: bool = _buttons.owns_press(main, hovered, pressed)
-		main.color = DISABLED if _bind_listening == action else (HOVER if hovered else NORMAL)
-		if clicked and _bind_listening.is_empty() and hovered and owned:
-			_bind_listening = action
-			_refresh_bind(action)
-
+		_update_bind_slot(_bind_slots[action], action, pressed, clicked)
 	# 마우스 버튼으로 바꾼 경우, 그 누름을 뗄 때 같은 칸이 다시 기다리는 상태로 들어가지 않게 누름을 버린다.
 	if captured:
 		_buttons.press_capture = null
+
+
+## Custom 탭: 페이지 넘기기와 지금 페이지의 키 칸들.
+func _update_custom(pressed: bool, clicked: bool, held: bool) -> void:
+	var captured := _capture_bind()
+	var direction := _arrows(_custom_page_prev, _custom_page_next, _custom_page > 0, _custom_page < _custom_page_count() - 1,
+		pressed, clicked, held)
+	if direction != 0:
+		_bind_listening = ""
+		_custom_page += direction
+		_refresh_custom()
+	for i in _custom_slots.size():
+		var index := _custom_page * _custom_slots.size() + i
+		if index < _custom_actions.size():
+			_update_bind_slot(_custom_slots[i]["key"], _custom_actions[index], pressed, clicked)
+	if captured:
+		_buttons.press_capture = null
+
+
+## 기다리는 키가 들어왔으면 넣는다. 반환: 이 프레임에 받았으면 true.
+func _capture_bind() -> bool:
+	if _bind_listening.is_empty():
+		return false
+	var path: String = InputManager.GetFirstPressedKeyPath()
+	if path.is_empty():
+		return false
+	InputManager.SetActionBinding(_bind_listening, path)
+	var done := _bind_listening
+	_bind_listening = ""
+	_refresh_bind(done)
+	return true
+
+
+## 키 칸 하나의 색과 클릭. 클릭하면 그 액션의 키를 기다린다.
+func _update_bind_slot(slot: Dictionary, action: String, pressed: bool, clicked: bool) -> void:
+	var main: XopsText = slot["main"]
+	var hovered := main.is_hovered()
+	var owned: bool = _buttons.owns_press(main, hovered, pressed)
+	main.color = DISABLED if _bind_listening == action else (HOVER if hovered else NORMAL)
+	if clicked and _bind_listening.is_empty() and hovered and owned:
+		_bind_listening = action
+		_refresh_bind(action)

@@ -101,6 +101,8 @@ namespace GodotXOPS
             Config = ok ? loaded : BuildDefaultConfig();
             Config.sections ??= new List<ConfigSection>();
             Config.bindings ??= new InputActionDefinition[0];
+            Config.customBindings ??= new List<CustomBindingValue>();
+            Config.customBindings.RemoveAll(value => value == null || string.IsNullOrEmpty(value.name));
         }
 
         /// <summary>
@@ -502,6 +504,7 @@ namespace GodotXOPS
                     m_savedBindings[def.name] = def.bindings[0];
                 }
             }
+            SnapshotCustomBindings();
         }
 
         /// <summary>
@@ -510,6 +513,7 @@ namespace GodotXOPS
         public void RevertToSaved()
         {
             RestoreValues(m_savedValues);
+            RevertCustomBindings();
             RestoreBindings(m_savedBindings);
         }
 
@@ -534,7 +538,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 등록된 초기값으로 설정 값을 되돌린다(옵션 화면 RESET). 저장은 별도(Save)로 한다.
+        /// 등록된 초기값으로 설정 값을 되돌린다(옵션 화면 RESET). 커스텀 바인딩은 전부(지금 없는 맵팩의 것도) 처음 키로 돌아간다. 저장은 별도(Save)로 한다.
         /// </summary>
         public void ResetToDefaults()
         {
@@ -544,6 +548,7 @@ namespace GodotXOPS
             bool allowUiScript = GetBool(SectionGeneral, KeyAllowUiScript, true);
 
             RestoreValues(m_defaults);
+            Config.customBindings.Clear();
             RestoreBindings(m_defaultBindings);
             SetBool(SectionGeneral, KeyAllowConsole, allowConsole);
             SetBool(SectionGeneral, KeyAllowEventScript, allowEventScript);
@@ -574,7 +579,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 주어진 (액션명 → 경로) 맵으로 Config 바인딩(0번)을 덮어쓰고, 라이브 액션에도 재적용한다(BACK/RESET용).
+        /// 주어진 (액션명 → 경로) 맵으로 Config 바인딩(0번)을 덮어쓰고, 라이브 액션에도 재적용한다(BACK/RESET용). 커스텀 바인딩은 customBindings 대로 다시 맞춘다.
         /// </summary>
         /// <param name="source">복원할 바인딩 맵.</param>
         private void RestoreBindings(Dictionary<string, string> source)

@@ -16,7 +16,7 @@ The goal is to reproduce the feel of the original. Movement, collision, and bull
 
 - Play the original missions and addon missions (opening → menu → briefing → game → result)
 - The original AI, mission events, and mission complete / failure checks
-- Key bindings, resolution, brightness and gamma, crosshair shape, and volume in the menu's OPTION screen
+- Key bindings, resolution, brightness and gamma, fog and draw distance, crosshair shape, and volume in the menu's OPTION screen. The keys of buttons added by add-ons (custom bindings) are changed there too
 - Human, weapon, small object, and effect values editable through JSON files in `godotdata/`
 - Things the original does not have can be made with data alone: armor and helmets, health regeneration, melee weapons, weapons loaded one round at a time, a grenade launcher attached to a gun, and the range and order in which the AI uses weapons. The default data does not use them, so the original missions play as before
 - Map packs: several missions and the data they share (humans, weapons, sky, events, materials and more) bundled by one manifest; registering it in `addon.json` makes it one addon page in the menu
@@ -111,7 +111,7 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events, data extensions such as armor and melee weapons, and per-mission screens, 1.2.3 added per-texture materials and UV editing in the editor, 1.2.4 added map packs (manifests) and their screens and fonts, and 1.2.5 fixed UI misalignment on large screens such as 4K. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
+The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events, data extensions such as armor and melee weapons, and per-mission screens, 1.2.3 added per-texture materials and UV editing in the editor, 1.2.4 added map packs (manifests) and their screens and fonts, and 1.2.5 fixed UI misalignment on large screens such as 4K. 1.3.0, in progress, adds custom bindings and the fog and draw distance settings. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
 
 ## License and notices
 

@@ -15,6 +15,14 @@ namespace GodotXOPS
         // 지금 미션이 속한 맵팩의 하늘 (Manifest 의 skyDataPath). 하늘 번호 10000 에서 19999 가 이 목록의 (번호 - 10000) 번째다. 없으면 null.
         private SkyData m_packSky;
 
+        // 지금 떠 있는 하늘의 번호. 하늘이 없으면 -1. 안개 설정을 바꾼 뒤 다시 적용할 때 쓴다 (RefreshFog).
+        private int m_loadedSkyIndex = -1;
+        // 안개를 그리고 있는지 (셰이더의 전역 값은 헤드리스에서 읽을 수 없어서 따로 든다).
+        private bool m_fogActive;
+
+        // 지금 안개를 그리고 있으면 true.
+        public static bool FogActive => Loaded && Instance.m_fogActive;
+
         /// <summary>
         /// 맵팩의 하늘 파일을 읽어 둔다. sky_data.json 과 같은 키를 쓰는 JSON 이고, 쓰는 것은 skyTexturePath 와 skyColor 두 목록뿐이다
         /// (하늘 모델, 안개 거리, 카메라 거리는 게임 전체의 값이라 맵팩이 바꾸지 못한다). 맵팩 데이터와 함께 미션 정보를 읽을 때 붙고 미션 정보를 내릴 때 떨어진다.
@@ -102,6 +110,7 @@ namespace GodotXOPS
                 ExtraCullMargin = 16384f,
             };
             Instance.m_skyRoot.AddChild(sky);
+            Instance.m_loadedSkyIndex = textureIndex;
 
             ApplySkyFog(textureIndex);
             RenderingServer.GlobalShaderParameterSet(s_modelBrightnessGlobal, Instance.m_darkScreen ? k_darkModelBrightness : 1f);
@@ -118,6 +127,7 @@ namespace GodotXOPS
                 skyRoot.RemoveChild(child);
                 child.Free();
             }
+            Instance.m_loadedSkyIndex = -1;
 
             ClearFog();
             RenderingServer.GlobalShaderParameterSet(s_modelBrightnessGlobal, 1f);
@@ -125,13 +135,13 @@ namespace GodotXOPS
 
         /// <summary>
         /// 원본 SetFog(true, skynumber) 대응. 선형 안개를 SkyData 의 fogStart ~ fogEnd 범위, 하늘 번호별 색으로 적용한다.
-        /// SkyData.fog 가 false 면 안개를 끈다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)만 받는다.
+        /// SkyData.fog 가 false 이거나 설정의 enableFog 가 꺼져 있으면 안개를 끈다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)와 이펙트 셰이더만 받는다.
         /// </summary>
         /// <param name="skyIndex">하늘 번호. 10000 에서 19999 는 맵팩의 하늘이다. 색이 없는 번호면 검정(원본 default).</param>
         public static void ApplySkyFog(int skyIndex)
         {
             SkyData skyData = DataManager.Instance.SkyData;
-            if (!skyData.fog)
+            if (!skyData.fog || !ConfigManager.Instance.GetBool(ConfigManager.SectionGraphic, ConfigManager.KeyEnableFog, true))
             {
                 ClearFog();
                 return;
@@ -142,6 +152,17 @@ namespace GodotXOPS
             // 셰이더가 sRGB 값 그대로 섞으므로 색을 선형으로 바꾸지 않고 넘긴다. w = 1 은 안개 사용.
             RenderingServer.GlobalShaderParameterSet(s_fogColorGlobal, new Vector4(color.R, color.G, color.B, 1f));
             RenderingServer.GlobalShaderParameterSet(s_fogRangeGlobal, new Vector2(skyData.fogStart, skyData.fogEnd));
+            Instance.m_fogActive = true;
+        }
+
+        /// <summary>
+        /// 설정의 안개 켜기를 지금 떠 있는 하늘에 다시 적용한다 (OPTION 의 SAVE). 하늘이 없으면 아무것도 하지 않는다.
+        /// </summary>
+        public static void RefreshFog()
+        {
+            if (!Loaded || Instance.m_loadedSkyIndex < 0) return;
+
+            ApplySkyFog(Instance.m_loadedSkyIndex);
         }
 
         /// <summary>
@@ -150,6 +171,7 @@ namespace GodotXOPS
         public static void ClearFog()
         {
             RenderingServer.GlobalShaderParameterSet(s_fogColorGlobal, Vector4.Zero);
+            if (Loaded) Instance.m_fogActive = false;
         }
     }
 }

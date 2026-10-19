@@ -226,6 +226,14 @@ namespace GodotXOPS
         {
             EventManager events = EventManager.Instance;
             Human player = Player;
+            InputManager input = InputManager.Instance;
+            var customHeld = new Godot.Collections.Dictionary();
+            var customPressed = new Godot.Collections.Dictionary();
+            foreach (string action in input.CustomActionNames)
+            {
+                customHeld[action] = input.IsPressed(action);
+                customPressed[action] = input.WasPressed(action);
+            }
             return new Godot.Collections.Dictionary
             {
                 { "exists", PlayerExists() },
@@ -253,6 +261,8 @@ namespace GodotXOPS
                 { "message_text", events.MessageText },
                 { "message_alpha", events.MessageAlpha },
                 { "hud_visible", events.HudVisible },
+                { "custom_held", customHeld },
+                { "custom_pressed", customPressed },
             };
         }
 

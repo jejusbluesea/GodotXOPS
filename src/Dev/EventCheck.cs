@@ -211,6 +211,7 @@ func bump(p, state):
                 CheckStaging();
                 CheckScreenText();
                 CheckScreenImages();
+                CheckCustomInput();
                 CheckDocumentExample();
             }
 
@@ -308,8 +309,10 @@ func bump(p, state):
         /// <param name="script">스크립트 소스.</param>
         /// <param name="file">포인트 데이터.</param>
         /// <param name="scriptFile">스크립트 파일 이름.</param>
+        /// <param name="configure">미션 파일을 쓰기 전에 고칠 것 (없으면 null).</param>
         /// <returns>로드에 성공했으면 true.</returns>
-        private bool WriteAndLoad(EventPackData pack, string script, PD2File file, string scriptFile = "pack.sgd")
+        private bool WriteAndLoad(EventPackData pack, string script, PD2File file, string scriptFile = "pack.sgd",
+            Action<ExtendedMissionData> configure = null)
         {
             File.WriteAllText(Path.Combine(m_folder, scriptFile), script);
             File.WriteAllText(Path.Combine(m_folder, "pack.json"), JsonData.ToJson(pack));
@@ -320,6 +323,7 @@ func bump(p, state):
             {
                 name = "EVENT", blockPath = $"{k_workFolder}/map.bd2", pointPath = $"{k_workFolder}/map.pd2",
             };
+            configure?.Invoke(mission);
             // 이벤트 묶음과 이미지는 맵팩이 든다. 점검용 미션을 그 맵팩에 등록해 둔다.
             if (m_mapPack == null)
             {
@@ -1498,6 +1502,65 @@ func bump(p, state):
             Expect(events.HudImages().Count == 0, "미션이 끝났는데 화면 이미지가 남아 있음");
             MapLoader.UnloadMissionData();
             Expect(!list.Has(title), "미션 정보를 내렸는데 맵팩의 이미지 목록이 남아 있음");
+        }
+
+        /// <summary>
+        /// 커스텀 바인딩의 입력: 미션(MIF2 의 addonInputDataPath)이 등록한 버튼을 API input_pressed / input_held / key_name 으로 읽는다.
+        /// 눌림은 다음 틱 한 번, 누르고 있음은 다음 틱부터이고, 없는 이름은 거짓이다. 미션 정보를 내리면 그 버튼도 없다.
+        /// </summary>
+        private void CheckCustomInput()
+        {
+            const string script = @"var api
+
+func init(a):
+	api = a
+
+func keys(p, state):
+	if api[""input_pressed""].call(""check_key""):
+		api[""set_var""].call(80, api[""get_var""].call(80) + 1)
+	if api[""input_held""].call(""check_key""):
+		api[""set_var""].call(81, api[""get_var""].call(81) + 1)
+	if api[""input_pressed""].call(""nope""):
+		api[""set_var""].call(82, 1)
+	if api[""key_name""].call(""check_key"") == ""K"":
+		api[""set_var""].call(83, 1)
+	return -1
+";
+            File.WriteAllText(Path.Combine(m_folder, "input.json"),
+                "{ \"bindings\": [ { \"name\": \"check_key\", \"label\": \"Check\", \"baseValue\": \"<Keyboard>/k\" } ] }");
+            var pack = new EventPackData { scriptPath = $"{k_workFolder}/pack.sgd" };
+            pack.events.Add(Define(10000, "keys"));
+            PD2File file = BaseFile();
+            file.eventEntryIds.Add(100);
+            file.points.Add(Event(10000, 100, 0, 101));
+
+            int errors = Debugger.ErrorCount;
+            bool loaded = WriteAndLoad(pack, script, file, "pack.sgd", mission => mission.addonInputDataPath = $"{k_workFolder}/input.json");
+            Expect(loaded, $"커스텀 바인딩 점검의 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+            if (!loaded) return;
+
+            InputManager input = InputManager.Instance;
+            Expect(input.IsCustomAction("check_key") && input.GetActionBinding("check_key") == "<Keyboard>/k", "미션의 커스텀 바인딩이 액션이 되지 않음");
+
+            EventManager events = EventManager.Instance;
+            events.BeginMission();
+            SimClock.Step();
+            Expect(events.GetVariable(83) == 1, "key_name 이 커스텀 바인딩의 키를 주지 않음");
+            Expect(events.GetVariable(80) == 0 && events.GetVariable(81) == 0, "누르지 않았는데 커스텀 바인딩이 눌림");
+
+            events.QueueCustomPressed("CHECK_KEY");
+            events.SetCustomHeld("check_key", true);
+            SimClock.Step();
+            Expect(events.GetVariable(80) == 1 && events.GetVariable(81) == 1, "input_pressed / input_held 가 커스텀 바인딩을 읽지 못함 (이름은 대소문자 무시)");
+            SimClock.Step();
+            Expect(events.GetVariable(80) == 1 && events.GetVariable(81) == 2, "눌림이 한 틱 넘게 남거나 누르고 있음이 이어지지 않음");
+            events.SetCustomHeld("check_key", false);
+            SimClock.Step();
+            Expect(events.GetVariable(81) == 2 && events.GetVariable(82) == 0 && !events.LineStopped(0), "뗀 뒤에도 누르고 있거나, 없는 이름이 눌림");
+
+            MapLoader.UnloadPointData();
+            MapLoader.UnloadMissionData();
+            Expect(!input.IsCustomAction("check_key") && !input.HasAction("check_key"), "미션 정보를 내렸는데 미션의 커스텀 바인딩이 남아 있음");
         }
 
         /// <summary>

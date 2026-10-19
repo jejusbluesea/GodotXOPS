@@ -10,7 +10,7 @@ namespace GodotXOPS
         private ImageParameterData m_menuPackImages;
 
         /// <summary>
-        /// 메뉴가 지금 보고 있는 페이지를 알린다. 맵팩의 페이지면 그 맵팩의 글꼴 그림과 이미지 목록과 메뉴 스크립트를 쓰게 되고, 아니면 원래대로다.
+        /// 메뉴가 지금 보고 있는 페이지를 알린다. 맵팩의 페이지면 그 맵팩의 글꼴 그림과 이미지 목록과 메뉴 스크립트와 커스텀 바인딩을 쓰게 되고, 아니면 원래대로다.
         /// 메뉴(기본 화면이나 메뉴 스크립트의 show_page)가 탭이나 페이지를 바꿀 때마다, 메뉴를 떠날 때 부른다.
         /// </summary>
         /// <param name="addon">에드온 탭이면 true. 거짓이면 page 는 무시한다.</param>
@@ -24,6 +24,7 @@ namespace GodotXOPS
 
             m_menuPack = pack;
             m_menuPackImages = pack == null ? null : MapLoader.LoadAddonFile<ImageParameterData>(pack.imageDataPath);
+            InputManager.Instance.LoadCustomLayer(CustomBindingLayer.MenuPack, pack?.inputDataPath);
             return true;
         }
 

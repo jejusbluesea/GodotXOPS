@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Text;
 using Godot;
 
@@ -52,6 +54,11 @@ namespace GodotXOPS
         // Interact 키를 누르고 있는지: 프레임에서 들어온 값과 이번 틱의 것으로 확정한 값.
         private bool m_interactHeldInput;
         private bool m_interactHeldNow;
+        // 커스텀 바인딩의 입력: 지난 틱 뒤에 눌린 것, 이번 틱의 것으로 확정한 것, 프레임에서 누르고 있던 것, 이번 틱에 누르고 있는 것. 액션 이름이다.
+        private readonly HashSet<string> m_customPending = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> m_customNow = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> m_customHeldInput = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> m_customHeldNow = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // 화면 글자의 내용이 바뀔 때마다 오르는 값. HUD 는 이 값이 바뀌었을 때만 HudTexts 를 다시 읽는다.
         public int HudRevision => m_hudRevision;
@@ -75,6 +82,60 @@ namespace GodotXOPS
         public void SetInteractHeld(bool held)
         {
             m_interactHeldInput = held;
+        }
+
+        /// <summary>
+        /// 플레이어의 커스텀 바인딩 입력을 받는다 (PlayerController 가 프레임마다). 눌린 것은 다음 틱 한 번, 누르고 있는 것은 다음 틱부터 반영된다.
+        /// </summary>
+        /// <param name="input">입력 매니저.</param>
+        public void ReadCustomInput(InputManager input)
+        {
+            foreach (string action in input.CustomActionNames)
+            {
+                if (input.WasPressed(action)) QueueCustomPressed(action);
+                SetCustomHeld(action, input.IsPressed(action));
+            }
+        }
+
+        /// <summary>
+        /// 플레이어가 커스텀 바인딩을 눌렀음을 알린다. 다음 틱 한 번 동안 CustomPressed 가 참이다.
+        /// </summary>
+        /// <param name="action">액션 이름.</param>
+        public void QueueCustomPressed(string action)
+        {
+            if (!string.IsNullOrEmpty(action)) m_customPending.Add(action);
+        }
+
+        /// <summary>
+        /// 플레이어가 커스텀 바인딩을 누르고 있는지 알린다. 다음 틱부터 CustomHeld 에 반영된다.
+        /// </summary>
+        /// <param name="action">액션 이름.</param>
+        /// <param name="held">누르고 있으면 true.</param>
+        public void SetCustomHeld(string action, bool held)
+        {
+            if (string.IsNullOrEmpty(action)) return;
+            if (held) m_customHeldInput.Add(action);
+            else m_customHeldInput.Remove(action);
+        }
+
+        /// <summary>
+        /// 이번 틱에 플레이어가 그 커스텀 바인딩을 눌렀는지. 살아 있는 플레이어가 지난 틱 뒤에 누른 것만 친다.
+        /// </summary>
+        /// <param name="action">액션 이름 (대소문자 무시).</param>
+        /// <returns>눌렀으면 true. 없는 이름이면 false.</returns>
+        public bool CustomPressed(string action)
+        {
+            return action != null && m_customNow.Contains(action);
+        }
+
+        /// <summary>
+        /// 이번 틱에 플레이어가 그 커스텀 바인딩을 누르고 있는지. 살아 있는 플레이어만 친다.
+        /// </summary>
+        /// <param name="action">액션 이름 (대소문자 무시).</param>
+        /// <returns>누르고 있으면 true. 없는 이름이면 false.</returns>
+        public bool CustomHeld(string action)
+        {
+            return action != null && m_customHeldNow.Contains(action);
         }
 
         /// <summary>
@@ -181,7 +242,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 틱의 처음에: 프레임에서 들어온 Interact 입력을 이번 틱의 것으로 확정한다.
+        /// 틱의 처음에: 프레임에서 들어온 Interact 와 커스텀 바인딩의 입력을 이번 틱의 것으로 확정한다.
         /// </summary>
         private void LatchInteract()
         {
@@ -190,6 +251,15 @@ namespace GodotXOPS
             m_interactNow = m_interactPending && alive;
             m_interactPending = false;
             m_interactHeldNow = m_interactHeldInput && alive;
+
+            m_customNow.Clear();
+            m_customHeldNow.Clear();
+            if (alive)
+            {
+                m_customNow.UnionWith(m_customPending);
+                m_customHeldNow.UnionWith(m_customHeldInput);
+            }
+            m_customPending.Clear();
         }
 
         /// <summary>
@@ -211,7 +281,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 화면 글자와 Interact 입력을 처음 상태로 되돌린다 (미션 시작, 종료, 맵 내리기).
+        /// 화면 글자와 Interact·커스텀 바인딩의 입력을 처음 상태로 되돌린다 (미션 시작, 종료, 맵 내리기).
         /// </summary>
         private void ResetHud()
         {
@@ -221,6 +291,10 @@ namespace GodotXOPS
             m_interactNow = false;
             m_interactHeldInput = false;
             m_interactHeldNow = false;
+            m_customPending.Clear();
+            m_customNow.Clear();
+            m_customHeldInput.Clear();
+            m_customHeldNow.Clear();
         }
 
         /// <summary>

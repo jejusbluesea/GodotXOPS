@@ -52,7 +52,8 @@ func open(tab := "") -> void:
 	_open = true
 	_close_requested = false
 	_listening = ""
-	_script = XopsScriptScreen.start(_root, SCREEN_NAME, _script_api(), {"tab": tab, "sections": Array(ConfigManager.GetSectionNames())})
+	_script = XopsScriptScreen.start(_root, SCREEN_NAME, _script_api(),
+		{"tab": tab, "sections": Array(ConfigManager.GetSectionNames()), "custom": _custom_bindings()})
 	if _script == null:
 		_show_builtin(tab)
 
@@ -168,6 +169,14 @@ func _script_api() -> Dictionary:
 		"bind_listen": Callable(self, "_script_bind_listen"),
 		"close": Callable(self, "_script_close"),
 	}
+
+
+## 지금 쓰는 커스텀 바인딩: [{"name": 액션 이름, "label": OPTION 에 보이는 이름}, ...]. 키는 binding / bind_listen 으로 다룬다.
+func _custom_bindings() -> Array:
+	var result := []
+	for action: String in InputManager.GetCustomActionNames():
+		result.append({"name": action, "label": InputManager.GetCustomLabel(action)})
+	return result
 
 
 func _script_text(arguments: Dictionary, key: String) -> String:

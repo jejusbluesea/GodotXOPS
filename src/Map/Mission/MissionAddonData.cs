@@ -88,6 +88,7 @@ namespace GodotXOPS
             if (image != null) data.ImageParameterData.imageData.SetPack(image.imageData);
 
             LoadPackSky(pack.skyDataPath);
+            if (InputManager.Loaded) InputManager.Instance.LoadCustomLayer(CustomBindingLayer.Pack, pack.inputDataPath);
         }
 
         /// <summary>
@@ -98,6 +99,7 @@ namespace GodotXOPS
             MapLoader loader = Instance;
             loader.m_mapPack = null;
             loader.m_packSky = null;
+            if (InputManager.Loaded) InputManager.Instance.SetCustomLayer(CustomBindingLayer.Pack, null);
             if (!DataManager.Loaded) return;
 
             DataManager data = DataManager.Instance;

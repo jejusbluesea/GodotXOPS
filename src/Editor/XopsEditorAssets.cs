@@ -156,6 +156,7 @@ namespace GodotXOPS.Editor
             else if (type == typeof(ObjectParameterData)) name = nameof(ExtendedMissionData.addonObjectDataPath);
             else if (type == typeof(SoundParameterData)) name = nameof(ExtendedMissionData.addonSoundDataPath);
             else if (type == typeof(ImageParameterData)) name = nameof(ExtendedMissionData.addonImageDataPath);
+            else if (type == typeof(CustomBindingListData)) name = nameof(ExtendedMissionData.addonInputDataPath);
             return name == null ? null : typeof(ExtendedMissionData).GetField(name);
         }
 
@@ -176,6 +177,7 @@ namespace GodotXOPS.Editor
             else if (type == typeof(ImageParameterData)) name = nameof(MapPackManifestData.imageDataPath);
             else if (type == typeof(SkyData)) name = nameof(MapPackManifestData.skyDataPath);
             else if (type == typeof(EventPackData)) name = nameof(MapPackManifestData.eventDataPath);
+            else if (type == typeof(CustomBindingListData)) name = nameof(MapPackManifestData.inputDataPath);
             return name == null ? null : typeof(MapPackManifestData).GetField(name);
         }
 

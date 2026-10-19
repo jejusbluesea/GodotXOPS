@@ -29,6 +29,11 @@ namespace GodotXOPS
         public const string KeyGamma = "gamma";
         public const string KeyMasterVolume = "MasterVolume";
         public const string KeyUIScale = "UIScale";
+        public const string KeyNearClippingPlane = "nearClippingPlane";
+        public const string KeyFarClippingPlane = "farClippingPlane";
+        public const string KeyFov = "fov";
+        // 안개를 그릴지. 끄면 하늘 데이터와 무관하게 안개가 없다 (화면만. AI 의 시야와 무관하다).
+        public const string KeyEnableFog = "enableFog";
         // 디버그 콘솔(메인게임의 F11)을 허용할지. 옵션 화면에 없는 설정이라 config.json 을 직접 고쳐서 켠다.
         public const string KeyAllowConsole = "AllowConsole";
         public const string KeyAllowEventScript = "AllowEventScript";
@@ -104,9 +109,10 @@ namespace GodotXOPS
                         new ConfigSetting { name = KeyVsync, type = TypeBool, value = "false", min = 0f, max = 0f },
                         new ConfigSetting { name = KeyLimitFrame, type = TypeBool, value = "true", min = 0f, max = 0f },
                         new ConfigSetting { name = KeyFrameLimit, type = TypeInt, value = "60", min = 60f, max = 480f },
-                        new ConfigSetting { name = "nearClippingPlane", type = TypeFloat, value = "0.1", min = 0.03f, max = 0.1f },
-                        new ConfigSetting { name = "farClippingPlane", type = TypeFloat, value = "80", min = 80f, max = 1000f },
-                        new ConfigSetting { name = "fov", type = TypeInt, value = "65", min = 60f, max = 90f },
+                        new ConfigSetting { name = KeyNearClippingPlane, type = TypeFloat, value = "0.1", min = 0.03f, max = 0.1f },
+                        new ConfigSetting { name = KeyFarClippingPlane, type = TypeFloat, value = "80", min = 80f, max = 1000f },
+                        new ConfigSetting { name = KeyFov, type = TypeInt, value = "65", min = 60f, max = 90f },
+                        new ConfigSetting { name = KeyEnableFog, type = TypeBool, value = "true", min = 0f, max = 0f },
                     },
                 },
                 new ConfigSection

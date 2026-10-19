@@ -30,6 +30,7 @@ namespace GodotXOPS
         private string m_addonObjectDataPath = string.Empty;
         private string m_addonSoundDataPath = string.Empty;
         private string m_addonImageDataPath = string.Empty;
+        private string m_addonInputDataPath = string.Empty;
         private string m_briefingScriptPath = string.Empty;
         private string m_hudScriptPath = string.Empty;
         private string m_resultScriptPath = string.Empty;
@@ -199,12 +200,14 @@ namespace GodotXOPS
             loader.m_addonObjectDataPath = data.addonObjectDataPath ?? string.Empty;
             loader.m_addonSoundDataPath = data.addonSoundDataPath ?? string.Empty;
             loader.m_addonImageDataPath = data.addonImageDataPath ?? string.Empty;
+            loader.m_addonInputDataPath = data.addonInputDataPath ?? string.Empty;
             LoadPackData(DataManager.Instance.FindMapPack(packLookupPath));
             loader.m_briefingScriptPath = data.briefingScriptPath ?? string.Empty;
             loader.m_hudScriptPath = data.hudScriptPath ?? string.Empty;
             loader.m_resultScriptPath = data.resultScriptPath ?? string.Empty;
             loader.m_fontImageOverridePath = data.fontImageOverridePath ?? string.Empty;
             LoadMissionImages();
+            if (InputManager.Loaded) InputManager.Instance.LoadCustomLayer(CustomBindingLayer.Mission, loader.m_addonInputDataPath);
             return true;
         }
 
@@ -306,6 +309,8 @@ namespace GodotXOPS
             loader.m_addonObjectDataPath = string.Empty;
             loader.m_addonSoundDataPath = string.Empty;
             loader.m_addonImageDataPath = string.Empty;
+            loader.m_addonInputDataPath = string.Empty;
+            if (InputManager.Loaded) InputManager.Instance.SetCustomLayer(CustomBindingLayer.Mission, null);
             loader.m_briefingScriptPath = string.Empty;
             loader.m_hudScriptPath = string.Empty;
             loader.m_resultScriptPath = string.Empty;

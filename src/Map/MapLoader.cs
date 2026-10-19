@@ -46,9 +46,9 @@ namespace GodotXOPS
         public static void ApplyCameraSettings(Camera3D camera)
         {
             ConfigManager config = ConfigManager.Instance;
-            camera.Near = config.GetFloat(ConfigManager.SectionGraphic, "nearClippingPlane", camera.Near);
-            camera.Far = config.GetFloat(ConfigManager.SectionGraphic, "farClippingPlane", camera.Far);
-            camera.Fov = config.GetInt(ConfigManager.SectionGraphic, "fov", Mathf.RoundToInt(camera.Fov));
+            camera.Near = config.GetFloat(ConfigManager.SectionGraphic, ConfigManager.KeyNearClippingPlane, camera.Near);
+            camera.Far = config.GetFloat(ConfigManager.SectionGraphic, ConfigManager.KeyFarClippingPlane, camera.Far);
+            camera.Fov = config.GetInt(ConfigManager.SectionGraphic, ConfigManager.KeyFov, Mathf.RoundToInt(camera.Fov));
         }
     }
 }

@@ -76,7 +76,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// Graphic 섹션의 fullscreen/resolution/vsync/프레임 제한 설정을 화면에 적용한다. 부팅 시 1회 호출되며 옵션 UI가 재호출할 수 있다.
+        /// Graphic 섹션의 fullscreen/resolution/vsync/프레임 제한/안개 설정을 화면에 적용한다. 부팅 시 1회 호출되며 옵션 UI가 재호출할 수 있다.
         /// 지정 해상도는 렌더 해상도로 쓰고(루트 뷰포트 크기), 창과 화면비가 다르면 검은 띠를 둔다.
         /// 전체화면은 보더리스(창은 디스플레이 네이티브), 창모드는 지정 해상도를 창 크기로 쓴다.
         /// </summary>
@@ -107,6 +107,9 @@ namespace GodotXOPS
             DisplayServer.WindowSetVsyncMode(vsync ? DisplayServer.VSyncMode.Enabled : DisplayServer.VSyncMode.Disabled);
             bool limitFrame = GetBool(SectionGraphic, KeyLimitFrame);
             Engine.MaxFps = (!vsync && limitFrame) ? GetInt(SectionGraphic, KeyFrameLimit) : 0;
+
+            // 안개 켜기는 떠 있는 맵(메뉴의 배경 포함)에 바로 적용한다. 부팅 때는 MapLoader 가 아직 없다.
+            MapLoader.RefreshFog();
         }
 
         /// <summary>

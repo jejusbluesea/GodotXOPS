@@ -1,6 +1,7 @@
 # GodotXOPS sample screen script: the built-in OPTION screen rewritten as a screen script.
 # To use it, copy option.json into godotdata/ui/.
-# The OPTION screen is laid over another screen (the main menu). ctx: tab (tab to start on, may be empty), sections (names of the config sections).
+# The OPTION screen is laid over another screen (the main menu). ctx: tab (tab to start on, may be empty), sections (names of the config sections),
+# custom (the custom bindings in use: name and label). A Custom tab is added after the sections when there are custom bindings.
 # A value goes into the game the moment it is changed; SAVE writes the file and applies the window mode, resolution and UIScale.
 # BACK and Escape call close(), which undoes everything that was not saved.
 # v["bind_listening"] is the action that waits for a key, v["bind_captured"] is true on the frame the key arrived.
@@ -36,6 +37,14 @@ var resolution_info = {}
 var bind_actions = ["jump", "walk", "drop", "fire", "zoom", "previous", "next", "reload", "first", "second", "interact"]
 var bind_slots = {}
 var bind_paths = {}
+# Custom bindings: [name, label] each, 14 to a page (seven rows of two under the page row).
+var custom = []
+var custom_paths = []
+var custom_page = 0
+var custom_page_cells = {}
+var custom_rows = []
+var custom_cells = []
+var custom_listening = -1
 var back_button = []
 var save_button = []
 var reset_button = []
@@ -161,7 +170,11 @@ func stepper(tab, x, y, label, value_chars, label_gap, section, key, step, decim
 func build(ctx):
 	layer = api["layer"].call(5, false)
 	sections = ctx["sections"]
-	for name in ["General", "Input", "Graphic", "Sound"]:
+	for entry in ctx["custom"]:
+		custom.append([entry["name"], entry["label"]])
+	if custom.size() > 0:
+		sections.append("Custom")
+	for name in ["General", "Input", "Graphic", "Sound", "Custom"]:
 		groups[name] = []
 		checks[name] = []
 		steppers[name] = []
@@ -219,9 +232,22 @@ func build(ctx):
 	stepper("Graphic", left, row_y(4), "Bright", 6, 10.0, "Graphic", "brightness", 0.01, 2)
 	stepper("Graphic", left + selector_width("Bright", 6, 10.0) + 10.0, row_y(4), "Gamma", 5, 10.0, "Graphic", "gamma", 0.1, 1)
 	stepper("Graphic", left, row_y(5), "FOV", 4, 40.0, "Graphic", "fov", 1, -1)
+	checkbox("Graphic", left + selector_width("FOV", 4, 40.0) + 10.0, row_y(5), "Fog", "Graphic", "enableFog")
+	stepper("Graphic", left, row_y(6), "Near", 6, 10.0, "Graphic", "nearClippingPlane", 0.01, 2)
+	stepper("Graphic", left + selector_width("Near", 6, 10.0) + 10.0, row_y(6), "Far", 6, 10.0, "Graphic", "farClippingPlane", 10.0, 0)
 
 	# Sound
 	stepper("Sound", left, row_y(0), "MasterVolume", 6, 40.0, "Sound", "MasterVolume", 0.01, 2)
+
+	# Custom: the page row, then rows of two. Rows and cells are shown by refresh_custom, not by the tab group.
+	var page_bg = row_bg("Custom", left, row_y(0), selector_width("Page", 7, 40.0))
+	custom_page_cells = selector("Custom", page_bg, 0.0, "Page", 7, 40.0)
+	for row in range(7):
+		var y = row_y(1 + row)
+		custom_rows.append(api["rect"].call(layer, {"pivot": 0, "x": left, "y": y, "w": 2.0 * unit_w + 30.0, "h": row_h, "color": 0x000000, "alpha": 0.5}))
+		for column in range(2):
+			var x = column * (unit_w + 30.0)
+			custom_cells.append([cell("", [left, y], x, label_w, "", false), cell("", [left, y], x + label_w + 15.0, key_w, "", true)])
 
 	# SAVE and RESET at the bottom right, BACK at the bottom left.
 	var save_w = 8.0 * font_w
@@ -244,6 +270,10 @@ func show_tab():
 			var visible = i == selected
 			for id in groups[name]:
 				put(id, "visible", visible)
+	# Without custom bindings there is no Custom section to hide its rows with.
+	if custom.size() == 0:
+		for id in groups["Custom"]:
+			put(id, "visible", false)
 	for i in range(3):
 		var index = section_page * 3 + i
 		var exists = index < sections.size()
@@ -265,6 +295,10 @@ func refresh():
 	for i in range(bind_actions.size()):
 		bind_paths[bind_actions[i]] = api["binding"].call({"action": bind_actions[i]})
 		refresh_bind(i)
+	custom_paths = []
+	for entry in custom:
+		custom_paths.append(api["binding"].call({"action": entry[0]}))
+	refresh_custom()
 
 func show_check(check):
 	if api["config_bool"].call(check["section"], check["key"]):
@@ -316,7 +350,9 @@ func refresh_bind(index):
 	if listening == index:
 		set_text(bind_slots[action], "[...]")
 		return
-	var path = bind_paths[action]
+	set_text(bind_slots[action], key_text(bind_paths[action]))
+
+func key_text(path):
 	var key = path.get_slice("/", path.get_slice_count("/") - 1)
 	if key == "":
 		key = "?"
@@ -324,7 +360,33 @@ func refresh_bind(index):
 		key = short_keys[key]
 	else:
 		key = key.to_upper()
-	set_text(bind_slots[action], "[" + key + "]")
+	return "[" + key + "]"
+
+func custom_pages():
+	var pages = int((custom.size() + 13) / 14)
+	if pages < 1:
+		pages = 1
+	return pages
+
+# Fills the cells with the custom bindings of this page. Empty cells and rows are hidden.
+func refresh_custom():
+	var showing = selected < sections.size() and sections[selected] == "Custom"
+	set_text(custom_page_cells["value"], "[" + str(custom_page + 1) + "/" + str(custom_pages()) + "]")
+	for i in range(custom_cells.size()):
+		var index = custom_page * 14 + i
+		var exists = showing and index < custom.size()
+		var label_slot = custom_cells[i][0]
+		var key_slot = custom_cells[i][1]
+		for id in [label_slot[0], label_slot[1], key_slot[0], key_slot[1]]:
+			put(id, "visible", exists)
+		if i % 2 == 0:
+			put(custom_rows[int(i / 2)], "visible", exists)
+		if index < custom.size():
+			set_text(label_slot, custom[index][1].left(8))
+			if custom_listening == index:
+				set_text(key_slot, "[...]")
+			else:
+				set_text(key_slot, key_text(custom_paths[index]))
 
 # ---- input
 
@@ -390,6 +452,8 @@ func frame(v, delta):
 		update_binds(v)
 	elif tab == "Graphic":
 		update_resolution(v)
+	elif tab == "Custom":
+		update_custom(v)
 
 	if click(save_button, v, false):
 		api["config_save"].call()
@@ -502,6 +566,10 @@ func stop_listening():
 		listening = -1
 		api["bind_listen"].call({"action": ""})
 		refresh_bind(was)
+	if custom_listening >= 0:
+		custom_listening = -1
+		api["bind_listen"].call({"action": ""})
+		refresh_custom()
 
 # Key bindings: clicking a cell makes it wait, and the game puts in the first key or mouse button pressed after that.
 func update_binds(v):
@@ -528,3 +596,36 @@ func update_binds(v):
 			listening = i
 			api["bind_listen"].call({"action": bind_actions[i]})
 			refresh_bind(i)
+
+# The Custom tab: the page arrows and the key cells of this page, which work like the Input tab.
+func update_custom(v):
+	if custom_listening >= 0 and v["bind_captured"]:
+		custom_paths[custom_listening] = api["binding"].call({"action": custom[custom_listening][0]})
+		custom_listening = -1
+		refresh_custom()
+		capture = 0
+
+	var direction = arrows(custom_page_cells["prev"], custom_page_cells["next"], custom_page > 0, custom_page < custom_pages() - 1, v)
+	if direction != 0:
+		stop_listening()
+		custom_page += direction
+		refresh_custom()
+
+	for i in range(14):
+		var index = custom_page * 14 + i
+		if index >= custom.size():
+			break
+		var main = custom_cells[i][1][1]
+		var over = hover.has(main)
+		if v["click_pressed"] and over:
+			capture = main
+		if custom_listening == index:
+			put(main, "color", 0x999999)
+		elif over:
+			put(main, "color", 0x00FFFF)
+		else:
+			put(main, "color", 0xFFFFFF)
+		if v["click_released"] and custom_listening < 0 and over and capture == main:
+			custom_listening = index
+			api["bind_listen"].call({"action": custom[index][0]})
+			refresh_custom()
