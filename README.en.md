@@ -8,7 +8,7 @@ A port of the Japanese indie FPS **XOPS** (X operations, 2000) to the Godot engi
 
 - Engine: Godot 4.7.2 (.NET)
 - Platform: Windows
-- Latest release: [1.2.5](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.2.5)
+- Latest release: [1.3.0](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.3.0)
 
 The goal is to reproduce the feel of the original. Movement, collision, and bullet hit detection do not use the engine's physics; the original calculations were ported directly, and the game runs at the same 33.33 ticks per second as the original.
 
@@ -113,7 +113,7 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events, data extensions such as armor and melee weapons, and per-mission screens, 1.2.3 added per-texture materials and UV editing in the editor, 1.2.4 added map packs (manifests) and their screens and fonts, and 1.2.5 fixed UI misalignment on large screens such as 4K. 1.3.0, in progress, adds custom bindings, the fog and draw distance settings, and weather and areas, and 1.4.0 is planned to bring rigged humans and weapons (Human 2.0, Weapon 2.0) and an AI 2.0 to match. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
+The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events, data extensions such as armor and melee weapons, and per-mission screens, 1.2.3 added per-texture materials and UV editing in the editor, 1.2.4 added map packs (manifests) and their screens and fonts, 1.2.5 fixed UI misalignment on large screens such as 4K, and 1.3.0 added custom bindings, the fog and draw distance settings, and weather and areas. 1.4.0 is planned to bring rigged humans and weapons (Human 2.0, Weapon 2.0) and an AI 2.0 to match. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
 
 ## License and notices
 
