@@ -21,6 +21,13 @@
 - 커밋 `fdffa9d` 의 메시지에 취소한 프로젝트의 이름이 남아 있다 (공개 저장소의 기록이라 고치지 않았다).
 
 
+## 1.3.1: 발사와 경계 이벤트 (2026-10-22 릴리즈, 태그 `v1.3.1`. 사용자가 1.3.1 로 정했다. 빌드는 `build/1.3.1/`, 게시는 사용자가 한다. 버전을 1.3.1 로 올렸다: `global.json`, `export_presets.cfg`)
+
+사용자가 "특정 캐릭터가 총을 쐈는지, 특정 구역에서 특정 캐릭터가 경계됨, 특정 캐릭터 강제 경계"가 있는지 물었다. 셋 다 없어서 내 제안(이벤트 28, 29, 36과 API)에 이렇게 답했다:
+- 경계에는 전투도 들어간다 / 강제 경계는 원본 치트와 같은 규칙 (우선적 달리기 중이면 듣지 않는다) / 발사는 사람 식별번호로 가리키고 플레이어도 된다.
+- 내가 정한 것: 발사 수는 탄을 낸 순간에 센다 (수류탄·근접 무기 포함, 산탄 한 번 1. 통계는 원본대로 수류탄을 세지 않는 것과 다르다) / Wait Fire 는 줄이 온 뒤의 발사만 센다 (Wait Input 과 같은 생각) / 이미 전투 중인 AI 에게 Set Caution 은 아무것도 하지 않는다 (경계로 끌어내리지 않는다) / Set Caution 의 사람 -1 은 전원 (30 에서 35 와 같다) / Wait Alert 의 구역은 불 칸 "구역 안에서만"과 함께 둔다 (빈 칸이 0 이라 구역 칸 하나로 "어디서든"을 나타내면 새 이벤트가 구역 0 에 묶인다).
+- 점검: event 228. 화면으로는 보지 않았다 (AI 가 실제로 총성을 듣고 경계해서 넘어가는 것은 헤드리스 점검이 AI 를 끄고 돌아 확인하지 못했다).
+
 ## 1.3 과 1.4 의 범위 (사용자 결정 2026-10-21)
 
 사용자가 1.3 에 네 가지를 더 넣고 싶다고 했고, 내 권고대로 둘로 나눴다: **1.3 은 날씨와 구역만**, 모델 형식과 2.0 시리즈는 1.4 (적어 두기만).
@@ -52,7 +59,7 @@
 - 에디터 (내가 정한 것): 구역 블록을 직접 옮기는 도구는 만들지 않고, 블록을 구역으로(Blocks → area), 구역을 블록으로(Area → blocks) 바꿔 평소의 블록 도구로 모양을 고친다. 블록 패널 아래에 태그 목록과 성질, 적대 규칙은 `1>0 never, 2>0 provoked` 꼴의 글. 반투명 덧그림 (`AreaOverlay`, 태그마다 색). 되돌리기는 `AreaEditCommand`(블록·구역·태그를 통째로).
 - 코드: `src/Data/Block/BlockMapData.cs`(옛 `BlockTextureListData`), `src/IO/BD2File.cs`(`BD2Area`), `src/Map/Area/`(`AreaLoad.cs`, `AreaVolume.cs`, `AreaState.cs`), `src/Map/Human/HumanArea.cs`, `src/Map/Event/EventApiArea.cs`, `src/Editor/XopsEditorAreas.cs`, `AreaOverlay.cs`, `AreaEditCommand.cs`. 블록의 면 평면 계산은 `MapLoader.ComputeFacePlanes` 하나를 블록과 구역이 함께 쓴다.
 - 함께 바꾼 것: `play_test` 에 `--mission-file`, `--map-pack`, `--weather` (하늘의 풍경·해와 날씨를 화면으로 보려고), 목록의 미션도 미션의 날씨를 건다.
-- **눈으로 본 것**: 비, 눈, 해 (`build/weather_demo/`, 공식 미션 0 을 바꾼 것 + 시험용 맵팩의 하늘). 풍경 텍스처는 하늘의 2 × 2 배치에 맞지 않는 시험 그림이라 위쪽에 띠로만 보였다 (기능은 돈다). **확인하지 못한 것**: 번개의 번쩍임과 날씨 소리(소리 파일을 쓰지 않았다), 울림이 실제로 들리는지, 실내 구역에서 비가 사라지는 화면, 에디터의 구역 패널 화면, 거꾸로 된 중력의 조작감.
+- **눈으로 본 것**: 비, 눈, 해 (`build/weather_demo/`, 공식 미션 0 을 바꾼 것 + 시험용 맵팩의 하늘. 2026-10-21 에 지웠다: 다시 보려면 `mif2_check --convert-official 0` 으로 만들고 맵팩을 새로 쓴다). 풍경 텍스처는 하늘의 2 × 2 배치에 맞지 않는 시험 그림이라 위쪽에 띠로만 보였다 (기능은 돈다). **확인하지 못한 것**: 번개의 번쩍임과 날씨 소리(소리 파일을 쓰지 않았다), 울림이 실제로 들리는지, 실내 구역에서 비가 사라지는 화면, 에디터의 구역 패널 화면, 거꾸로 된 중력의 조작감.
 
 **암흑 시야, 맵팩 전용 바인딩, Wait Input** (사용자 요청 2026-10-21, 커밋 전): 사용자가 "안개를 극한으로 줄인 암흑 시야(야간 투시경 연출용), 구역이나 날씨로", "커스텀 바인딩은 MIF2 에서 빼자", "이벤트가 전용 바인딩을 알아보는 방법"을 물었고 내 제안에 이렇게 답했다:
 - 날씨에 `forceFog`(설정에서 안개를 꺼도 그 날씨의 안개를 그린다)와 `hideSky`(하늘·풍경·해를 `fogColor` 로 덮는다. 전역 셰이더 변수 `xops_sky_cover`)를 더한다. 구역 태그에 `weatherIndex`(그 구역 안에서만 보이는 날씨)를 더한다. **암흑 날씨를 기본 목록에 넣지 않는다** (맵팩이 만든다).
@@ -60,7 +67,7 @@
 - 커스텀 바인딩의 MIF2 층(`addonInputDataPath`)을 없앴다 (`CustomBindingLayer.Mission` 도). 위의 1.3.0 메모에서 미션 층을 말한 것은 옛 설명이다.
 - 기본 제공 이벤트 27 Wait Input: 맵팩 등록 파일의 순서 번호(P2)와 누르는 시간(e0, 초). API `input_binding(번호)` 가 이름을 준다 (`InputManager.PackBindingName`, 거절된 항목도 자리를 지킨다). 에디터의 칸 종류 `binding` 은 문서의 맵팩 등록 파일에서 이름을 보여 준다.
 - 내가 정한 것: 보이는 날씨는 `WeatherView` 가 렌더 프레임마다 카메라 자리로 정하고 바뀌면 `RefreshFog` / Wait Input 은 안내를 띄우지 않고 자리와 시선을 보지 않는다 (Wait Interact 와 다르게) / 떼면 처음부터 센다 / **줄이 그 이벤트에 온 뒤에 시작한 입력만 센다** (테스트용 줄을 만들다 찾았다: PD2 는 한 틱에 이어서 처리하므로 Wait Input 둘을 이으면 한 번 누른 것으로 둘 다 넘어갔다. 도착한 틱에 버튼이 올라가 있어야 받기 시작한다. 사용자가 이미 릴리즈된 Wait Interact(26)도 같이 고치자고 했다: 릴리즈 노트에 적는다) / Set Area 의 성질 5 와 API 의 `weather` 키로 구역의 날씨를 바꾼다.
-- 점검: event 215 (Wait Input 의 순간·누르는 시간·다시 세기, `input_binding`, 구역의 날씨 번호, 설정에서 안개를 끈 채 암흑 날씨). **눈으로 본 것**: `build/weather_demo/` 에 맵팩 날씨 `weather.json`(10000 암흑: 검정 안개 0.5 에서 6 m, 10001 야간 투시경: 초록 안개 4 에서 30 m)을 붙이고 `play_test --weather` 로 찍었다. 둘 다 의도대로 보였다. **확인하지 못한 것**: 하늘이 보이는 자리에서의 하늘 가리기(시험 미션이 실내라 하늘이 화면에 없었다), 카메라가 구역을 드나들 때 날씨가 바뀌는 화면 (헤드리스 점검은 `_Process` 를 돌리지 않는다). `build/weather_demo/` 의 MIF2 는 옛 키 `addonInputDataPath` 가 있어 경고가 하나 난다 (빌드 폴더라 그대로 둔다).
+- 점검: event 215 (Wait Input 의 순간·누르는 시간·다시 세기, `input_binding`, 구역의 날씨 번호, 설정에서 안개를 끈 채 암흑 날씨). **눈으로 본 것**: `build/weather_demo/` 에 맵팩 날씨 `weather.json`(10000 암흑: 검정 안개 0.5 에서 6 m, 10001 야간 투시경: 초록 안개 4 에서 30 m)을 붙이고 `play_test --weather` 로 찍었다. 둘 다 의도대로 보였다. **확인하지 못한 것**: 하늘이 보이는 자리에서의 하늘 가리기(시험 미션이 실내라 하늘이 화면에 없었다), 카메라가 구역을 드나들 때 날씨가 바뀌는 화면 (헤드리스 점검은 `_Process` 를 돌리지 않는다). 시험용 맵팩(`build/weather_demo/`)은 2026-10-21 에 지웠다. 다시 만들 때 Wait Input 의 줄은 `event_check --input-sample` 로 더한다.
 
 **1.4 로 미룬 것** (적어 두기만. `CLAUDE.md` 의 "모델은 `.x` 전용, 3D 애니메이션 미사용"을 뒤집는 결정이 함께 필요하다):
 - `.x` 의 스킨·애니메이션과 `.fbx` 지원.
@@ -110,7 +117,7 @@
 ## 1.2.4: 맵팩의 화면과 글꼴, 메뉴 스크립트 (2026-10-14, 구현함, 커밋 `f68d77f`)
 
 - **구현한 것**: Manifest 의 키 다섯, `MapLoader.MissionScreenScript(화면, out fromPack)` 과 `MissionFontImagePath` 의 MIF2 → 맵팩 순서, `GameBridgeMenuPack.cs`(`SetMenuPage`, `MenuPackActive`, `MenuPackName`, `MenuPackImageCount`, `AddMapPack`), `ui/mainmenu.gd` 의 `_set_menu_page` / `_update_pack_script`, 메뉴 스크립트의 `show_page` 와 `v["pack_page"]` / `v["pack_title"]`, 예제 `mainmenu_pack.sgd` 와 `mainmenu.sgd` 의 수정, 개발용 인자 `--map-pack` 과 메뉴의 `--ui-state addon --page 번호`, `ui_check` 의 `CheckMapPackUiScript`, `DataManager.AddMapPackPage` / `RemoveMapPackPage`(점검의 `MIF2Check.RegisterPack` 도 이것을 쓴다), 문서. 점검 씬 전부 통과.
-- **눈으로 본 것** (`build/pack_demo/`, 공식 미션 1 을 바꾼 것 + 시험용 Manifest): 기본 메뉴와 예제 메뉴 스크립트 둘 다 맵팩 페이지에서 기본 타이틀이 감춰지고 맵팩의 로고(이미지 10000)와 버전이 그려진다 / 맵팩 글꼴이 메뉴의 글자 전부에 적용된다 (시험에는 글꼴이 아닌 그림을 넣어 깨져 보인다) / `<<` 로 addon 폴더 페이지로 가면 기본 타이틀과 `char.dds` 로 돌아온다.
+- **눈으로 본 것** (`build/pack_demo/`, 공식 미션 1 을 바꾼 것 + 시험용 Manifest. 2026-10-21 에 지웠다): 기본 메뉴와 예제 메뉴 스크립트 둘 다 맵팩 페이지에서 기본 타이틀이 감춰지고 맵팩의 로고(이미지 10000)와 버전이 그려진다 / 맵팩 글꼴이 메뉴의 글자 전부에 적용된다 (시험에는 글꼴이 아닌 그림을 넣어 깨져 보인다) / `<<` 로 addon 폴더 페이지로 가면 기본 타이틀과 `char.dds` 로 돌아온다.
 - **확인하지 못한 것**: 맵팩 미션을 실제로 플레이해 브리핑·HUD·결과에 맵팩의 스크립트와 글꼴이 쓰이는 화면 (수치로만 확인), OPTION 을 맵팩 페이지에서 열었을 때의 모습, 페이지를 넘길 때 스크립트를 컴파일하느라 멈칫하는 정도.
 
 사용자 결정:

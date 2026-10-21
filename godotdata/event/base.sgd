@@ -196,6 +196,19 @@ func add_helmet(p, state):
 	change_humans(p["human"], 2, true, p["amount"], p["limit"])
 	return 0
 
+# Puts the AI of the human on alert, the same as the console's caution cheat: it does nothing while the AI runs a priority path
+# or is already fighting. The player has no AI running, so it is not affected. A human below 0 means every human there is now.
+func set_caution(p, state):
+	if p["human"] < 0:
+		var count = api["human_count"].call()
+		var i = 0
+		while i < count:
+			api["set_caution"].call(i)
+			i += 1
+		return 0
+	api["set_caution"].call(api["find_human"].call(p["human"]))
+	return 0
+
 # ---- action
 
 func set_var(p, state):
@@ -578,3 +591,32 @@ func wait_input(p, state):
 	if held >= need:
 		return 0
 	return -1
+
+# Waits until the human fires "shots" times (0 or less: once) after the line reaches this point. Grenades and melee weapons count; a shotgun blast is one.
+# Works for the player too. Shots fired before the line got here do not count.
+func wait_fire(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		return -1
+	var shots = api["human"].call(i)["shots"]
+	if state.get("start", -1) < 0:
+		state["start"] = shots
+		return -1
+	var need = p["shots"]
+	if need <= 0:
+		need = 1
+	if shots - state["start"] >= need:
+		return 0
+	return -1
+
+# Waits until the AI of the human is on alert or fighting. With "in_area" on, only while the human is in the area "area".
+func wait_alert(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		return -1
+	var mode = api["human"].call(i)["ai_mode"]
+	if mode < 1:
+		return -1
+	if p["in_area"] and not api["in_area"].call(i, p["area"]):
+		return -1
+	return 0

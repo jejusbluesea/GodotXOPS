@@ -222,6 +222,7 @@ func bump(p, state):
                 CheckStaging();
                 CheckScreenText();
                 CheckChainedInteract();
+                CheckFireAndAlert();
                 CheckScreenImages();
                 CheckCustomInput();
                 CheckAreasAndWeather();
@@ -1567,6 +1568,68 @@ func bump(p, state):
             Expect(events.HudImages().Count == 0, "미션이 끝났는데 화면 이미지가 남아 있음");
             MapLoader.UnloadMissionData();
             Expect(!list.Has(title), "미션 정보를 내렸는데 맵팩의 이미지 목록이 남아 있음");
+        }
+
+        /// <summary>
+        /// 발사와 AI 의 상태: Wait Fire(28)는 그 이벤트에 온 뒤의 발사만 세고, Wait Alert(29)는 경계·전투가 되면 넘어가며 구역을 켜면 그 구역 안에서만,
+        /// Set Caution(36)은 그 AI 를 경계시킨다. API human() 의 shots / ai_mode 와 set_caution 의 반환값도 본다.
+        /// </summary>
+        private void CheckFireAndAlert()
+        {
+            const int waitFire = 28, waitAlert = 29, setCaution = 36, waitTicks = 25, setVar = 40;
+            PD2File file = BaseFile();
+            file.eventEntryIds.AddRange(new[] { 100, 200, 300, 400 });
+            // 줄 0: 적이 2발 쏘기를 기다린다. 줄 1 / 2: 적이 경계하기를 기다린다 (어디서든 / 구역 0 안에서만. 이 맵에는 구역이 없다).
+            file.points.Add(Event(waitFire, 100, k_enemyId, 101, 2));
+            file.points.Add(Event(setVar, 101, 1, 102, 1));
+            file.points.Add(Event(waitAlert, 200, k_enemyId, 201, 0, 0));
+            file.points.Add(Event(setVar, 201, 2, 202, 1));
+            file.points.Add(Event(waitAlert, 300, k_enemyId, 301, 0, 1));
+            file.points.Add(Event(setVar, 301, 3, 302, 1));
+            // 줄 3: 30틱 뒤에 적을 경계시킨다.
+            file.points.Add(Event(waitTicks, 400, 30, 401));
+            file.points.Add(Event(setCaution, 401, k_enemyId, 402));
+            file.points.Add(Event(setVar, 402, 4, 403, 1));
+
+            int errors = Debugger.ErrorCount;
+            if (!WriteAndLoad(BuildPack(), k_script, file))
+            {
+                Expect(false, $"발사·경계 점검의 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+                return;
+            }
+
+            Human enemy = MapLoader.SearchHuman(k_enemyId);
+            enemy.SetWeapon(1, 1);
+            // 한 발이 나갈 때까지 발사를 요청하며 틱을 돌리고, 연속 발사 수가 풀리게 한 틱 쉰다.
+            void FireOnce()
+            {
+                int before = enemy.ShotsFired;
+                for (int tick = 0; tick < 60 && enemy.ShotsFired == before; tick++)
+                {
+                    enemy.ShotWeapon();
+                    SimClock.Step();
+                }
+                SimClock.Step();
+            }
+
+            // 줄이 이벤트에 오기 전에 쏜 것은 세지 않는다.
+            FireOnce();
+            Expect(enemy.ShotsFired == 1, $"쏜 수가 세지지 않음 ({enemy.ShotsFired})");
+            EventManager events = EventManager.Instance;
+            events.BeginMission();
+            SimClock.Step();
+            FireOnce();
+            Expect(events.GetVariable(1) == 0, "Wait Fire 가 이벤트에 오기 전의 발사까지 셈");
+            FireOnce();
+            Expect(events.GetVariable(1) == 1 && enemy.ShotsFired == 3, "Wait Fire 가 정한 발수에서 넘어가지 않음");
+            Expect(events.GetVariable(2) == 0 && enemy.Brain.Mode == AIBattleMode.Normal, "경계하기 전에 Wait Alert 가 넘어감");
+
+            for (int tick = 0; tick < 32 && events.GetVariable(4) == 0; tick++) SimClock.Step();
+            SimClock.Step();
+            Expect(events.GetVariable(4) == 1 && enemy.Brain.Mode == AIBattleMode.Caution, "Set Caution 이 AI 를 경계시키지 않음");
+            Expect(events.GetVariable(2) == 1, "Wait Alert 가 경계를 보지 않음");
+            Expect(events.GetVariable(3) == 0, "구역 안에서만 보게 한 Wait Alert 가 구역 밖에서 넘어감");
+            MapLoader.UnloadPointData();
         }
 
         /// <summary>

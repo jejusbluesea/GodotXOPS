@@ -209,6 +209,59 @@
       ]
     },
     {
+      "type": 28,
+      "name": "Wait Fire",
+      "function": "wait_fire",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "shots",
+          "slot": "e0",
+          "kind": "int"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 29,
+      "name": "Wait Alert",
+      "function": "wait_alert",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "area",
+          "slot": "e0",
+          "kind": "area"
+        },
+        {
+          "name": "in_area",
+          "slot": "e1",
+          "kind": "bool"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
       "type": 30,
       "name": "Set HP",
       "function": "set_hp",
@@ -357,6 +410,25 @@
           "name": "limit",
           "slot": "e1",
           "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 36,
+      "name": "Set Caution",
+      "function": "set_caution",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
         }
       ],
       "exits": [

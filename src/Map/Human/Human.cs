@@ -42,6 +42,8 @@ namespace GodotXOPS
         private bool m_invincible;
         // 쏠 때마다 예비 탄이 한 발씩 채워지는지 (이벤트 Set Infinite Ammo). 원본에 없는 동작이다.
         private bool m_infiniteAmmo;
+        // 스폰한 뒤 실제로 쏜 수 (수류탄, 근접 무기 포함. 산탄 한 번은 1). 이벤트 Wait Fire 가 읽는다. 원본에 없다.
+        private int m_shotsFired;
 
         public float HP => m_hp;
         public float Armor => m_armor;
@@ -68,6 +70,7 @@ namespace GodotXOPS
         public float HitYaw => m_hitYaw;
         public bool Invincible => m_invincible;
         public bool InfiniteAmmo => m_infiniteAmmo;
+        public int ShotsFired => m_shotsFired;
         public float CameraHeight => m_controller.CameraHeight;
 
         // AI 레벨 = HumanData.aiIndex (원본 HumanParameter.AIlevel).

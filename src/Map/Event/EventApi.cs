@@ -106,6 +106,7 @@ namespace GodotXOPS
                 ["pause_world"] = Callable.From((bool paused) => { if (Enter()) SimClock.WorldPaused = paused; }),
                 ["pause_ai"] = Callable.From((bool paused) => { if (Enter()) m_events.SetAiPaused(paused); }),
                 ["lock_player"] = Callable.From((int flags) => { if (Enter()) m_events.SetPlayerLock(flags); }),
+                ["set_caution"] = Callable.From((int index) => Enter() && SetCaution(index)),
                 ["set_invincible"] = Callable.From((int index, bool enabled) => { if (Enter()) MapLoader.GetHuman(index)?.SetInvincible(enabled); }),
                 ["set_infinite_ammo"] = Callable.From((int index, bool enabled) => { if (Enter()) MapLoader.GetHuman(index)?.SetInfiniteAmmo(enabled); }),
                 ["show_hud"] = Callable.From((bool visible) => { if (Enter()) m_events.SetHudVisible(visible); }),
@@ -199,7 +200,44 @@ namespace GodotXOPS
             result["infinite_ammo"] = human.InfiniteAmmo;
             result["directed"] = human.Brain != null && human.Brain.Directed;
             result["shots_left"] = human.Brain != null ? human.Brain.DirectShotsLeft : 0;
+            result["shots"] = human.ShotsFired;
+            result["ai_mode"] = AiMode(human);
             return result;
+        }
+
+        /// <summary>
+        /// 사람의 AI 상태를 스크립트에 주는 수로 바꾼다. 플레이어는 AI 가 돌지 않으므로 평소(0)로 남는다.
+        /// </summary>
+        /// <param name="human">사람.</param>
+        /// <returns>-1 죽음, 0 평소, 1 경계, 2 전투.</returns>
+        private static int AiMode(Human human)
+        {
+            if (!human.Alive) return -1;
+            if (human.Brain == null) return 0;
+
+            return human.Brain.Mode switch
+            {
+                AIBattleMode.Caution => 1,
+                AIBattleMode.Action => 2,
+                AIBattleMode.Dead => -1,
+                _ => 0,
+            };
+        }
+
+        /// <summary>
+        /// 사람 하나의 AI 를 강제로 경계시킨다. 원본 치트와 같은 규칙이다 (AIBrain.SetCautionMode: 경로의 우선적 달리기 중이면 듣지 않는다).
+        /// 이미 전투 중이면 그대로 둔다 (경계로 끌어내리지 않는다).
+        /// </summary>
+        /// <param name="index">사람의 인덱스.</param>
+        /// <returns>경계가 됐거나 이미 경계·전투 중이면 true. 없거나 죽은 사람, 듣지 않았으면 false.</returns>
+        private static bool SetCaution(int index)
+        {
+            Human human = MapLoader.GetHuman(index);
+            if (human == null || !human.Alive || human.Brain == null) return false;
+            if (human.Brain.Mode == AIBattleMode.Action) return true;
+
+            human.Brain.SetCautionMode();
+            return human.Brain.Mode == AIBattleMode.Caution;
         }
 
         /// <summary>

@@ -211,6 +211,7 @@ namespace GodotXOPS
 
             Vector3 muzzle = MuzzlePosition(weapon, shotPosition);
             SpawnBullets(data, parameter.bulletData[data.bulletIndex], shotPosition, muzzle, yaw, pitch, errorRange);
+            m_shotsFired++;
 
             // 발사 통계는 총만 센다 (원본 gamemain.cpp:2240 — 수류탄은 세지 않는다).
             if (weapon.WeaponIndex != parameter.weaponGeneralData.grenadeWeaponIndex) MapLoader.RecordFire(this);
