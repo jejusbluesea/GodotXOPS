@@ -27,7 +27,7 @@ namespace GodotXOPS.Editor
         // 블록 데이터. 아직 열지 않았으면 블록이 없는 빈 내용이다.
         public BD2File Blocks = new BD2File();
         // 블록 텍스처 목록 (BD2 가 가리키는 JSON 의 내용). 블록과 함께 열고 저장한다.
-        public BlockTextureListData Textures = new BlockTextureListData();
+        public BlockMapData Textures = new BlockMapData();
         // 포인트 데이터와 같은 이름의 .msg 파일의 줄들.
         public List<string> Messages = new List<string>();
 
@@ -48,11 +48,11 @@ namespace GodotXOPS.Editor
             if (!BD2File.Read(fullPath, out BD2File file, out error)) return false;
 
             // 텍스처 목록이 없거나 깨졌으면 빈 목록으로 연다 (면이 그려지지 않는다. 에디터에서 다시 채울 수 있다).
-            var textures = new BlockTextureListData();
-            string texturePath = GamePath.Resolve(file.textureListPath);
+            var textures = new BlockMapData();
+            string texturePath = GamePath.Resolve(file.mapDataPath);
             if (texturePath != null && File.Exists(texturePath))
             {
-                JsonData.Overwrite(EncodingHelper.ReadAllText(texturePath), textures, file.textureListPath);
+                JsonData.Overwrite(EncodingHelper.ReadAllText(texturePath), textures, file.mapDataPath);
             }
 
             Blocks = file;

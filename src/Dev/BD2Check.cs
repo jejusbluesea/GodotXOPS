@@ -10,7 +10,7 @@ namespace GodotXOPS.Dev
     /// 개발용 점검 씬 스크립트. 모든 미션의 BD1 을 BD2 로 바꿔 저장하고 다시 읽어, 두 형식의 블록·판정 결과가 같은지 대조한다.
     /// 이어서 블록 플래그(판정별 통과), 그리지 않는 면, 재질(착탄 이펙트·소리, 발소리), 깨진 파일을 확인한다. 변환한 파일은 build/bd2_check/ 에 쓰고 끝나면 지운다.
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/bd2_check.tscn
-    /// 명령행 인자("--" 뒤): --convert 입력.bd1 출력.bd2 는 점검 대신 파일 하나를 변환하고 종료한다 (경로는 exe 폴더 기준. 텍스처 목록은 출력 옆에 _textures.json 으로 쓴다).
+    /// 명령행 인자("--" 뒤): --convert 입력.bd1 출력.bd2 는 점검 대신 파일 하나를 변환하고 종료한다 (경로는 exe 폴더 기준. 텍스처 목록은 출력 옆에 _map.json 으로 쓴다).
     /// </summary>
     public partial class BD2Check : Node
     {
@@ -64,6 +64,7 @@ namespace GodotXOPS.Dev
             CheckRayFilterFuzz(workFolder);
             CheckMaterials(workFolder);
             CheckBrokenFiles(workFolder);
+            CheckAreas(workFolder);
 
             Directory.Delete(workFolder, true);
 
@@ -110,8 +111,8 @@ namespace GodotXOPS.Dev
             string outputPath = GamePath.Resolve(output);
             if (inputPath == null || outputPath == null) return false;
 
-            string listRelative = Path.ChangeExtension(output, null).Replace('\\', '/') + "_textures.json";
-            if (!MapLoader.ConvertBD1(inputPath, listRelative, out BD2File file, out BlockTextureListData textures))
+            string listRelative = Path.ChangeExtension(output, null).Replace('\\', '/') + "_map.json";
+            if (!MapLoader.ConvertBD1(inputPath, listRelative, out BD2File file, out BlockMapData textures))
             {
                 GD.Print($"BD1 을 읽지 못했습니다: {input}");
                 return false;
@@ -152,7 +153,7 @@ namespace GodotXOPS.Dev
 
             string bd2Path = Path.Combine(workFolder, "map.bd2");
             string copyPath = Path.Combine(workFolder, "copy.bd2");
-            string listRelative = $"{k_workFolder}/map_textures.json";
+            string listRelative = $"{k_workFolder}/map_map.json";
             int maps = 0;
 
             foreach ((bool mif, int page, int index, string label) in entries)
@@ -169,7 +170,7 @@ namespace GodotXOPS.Dev
                 string filterDifference = CompareRayFilter(index, k_filterRaysPerMap, out _);
                 Expect(filterDifference == null, $"{label}: 레이 범위 거르기의 결과가 전부 훑은 결과와 다름 — {filterDifference}");
 
-                if (!MapLoader.ConvertBD1(bd1Path, listRelative, out BD2File file, out BlockTextureListData textures)
+                if (!MapLoader.ConvertBD1(bd1Path, listRelative, out BD2File file, out BlockMapData textures)
                     || !file.Write(bd2Path, out _))
                 {
                     Expect(false, $"{label}: BD2 변환 실패");
@@ -179,10 +180,10 @@ namespace GodotXOPS.Dev
 
                 // 쓴 파일을 읽어 다시 쓰면 바이트가 같아야 한다.
                 bool reread = BD2File.Read(bd2Path, out BD2File copy, out _) && copy.Write(copyPath, out _);
-                Expect(reread && copy.textureListPath == listRelative && copy.blocks.Count == file.blocks.Count
+                Expect(reread && copy.mapDataPath == listRelative && copy.blocks.Count == file.blocks.Count
                     && File.ReadAllBytes(bd2Path).AsSpan().SequenceEqual(File.ReadAllBytes(copyPath)),
                     $"{label}: BD2 를 읽어 다시 쓴 파일이 다름");
-                Expect(new FileInfo(bd2Path).Length == 8 + 4 + System.Text.Encoding.UTF8.GetByteCount(listRelative) + 4 + 316L * file.blocks.Count,
+                Expect(new FileInfo(bd2Path).Length == 8 + 4 + System.Text.Encoding.UTF8.GetByteCount(listRelative) + 4 + 316L * file.blocks.Count + 4 + 100L * file.areas.Count,
                     $"{label}: BD2 파일 크기가 레이아웃과 다름");
 
                 if (!MapLoader.LoadBlockData(bd2Path))
@@ -369,7 +370,7 @@ namespace GodotXOPS.Dev
         private void CheckRayFilterFuzz(string workFolder)
         {
             var random = new Random(7);
-            var file = new BD2File { textureListPath = string.Empty };
+            var file = new BD2File { mapDataPath = string.Empty };
             for (int i = 0; i < k_fuzzBlocks; i++)
             {
                 var center = new Vector3(Lerp(-40f, 40f, random), Lerp(-10f, 10f, random), Lerp(-40f, 40f, random));
@@ -512,11 +513,11 @@ namespace GodotXOPS.Dev
         private void CheckFlags(string workFolder)
         {
             string bd2Path = Path.Combine(workFolder, "flags.bd2");
-            string listRelative = $"{k_workFolder}/flags_textures.json";
+            string listRelative = $"{k_workFolder}/flags_map.json";
             // 마지막 블록은 예약 비트가 켜져 있다. 판정은 아래 세 비트만 보므로 전부 충돌해야 한다.
             int[] flags = { 0, BD2File.PassHuman, BD2File.PassBullet, BD2File.PassSight, 0x7FFFFFF8 };
 
-            var file = new BD2File { textureListPath = listRelative };
+            var file = new BD2File { mapDataPath = listRelative };
             for (int i = 0; i < flags.Length; i++)
             {
                 file.blocks.Add(MakeBox(new Vector3(i * 10f, 0f, 0f), Vector3.One, flags[i]));
@@ -527,9 +528,9 @@ namespace GodotXOPS.Dev
             file.blocks[0].textureIndices[1] = 99;
             file.blocks[0].textureIndices[2] = 1;
 
-            var textures = new BlockTextureListData();
-            textures.blockTextureData.Add(new BlockTextureData());
-            textures.blockTextureData.Add(new BlockTextureData { materialIndex = textureMaterial });
+            var textures = new BlockMapData();
+            textures.textureData.Add(new BlockTextureData());
+            textures.textureData.Add(new BlockTextureData { materialIndex = textureMaterial });
             File.WriteAllText(GamePath.Resolve(listRelative), JsonData.ToJson(textures));
 
             if (!file.Write(bd2Path, out _) || !MapLoader.LoadBlockData(bd2Path))
@@ -577,7 +578,7 @@ namespace GodotXOPS.Dev
                 "텍스처의 재질 번호가 그 텍스처를 쓰는 면에 전달되지 않음 (그리지 않는 면과 목록 밖의 번호는 기본 재질)");
 
             // 텍스처 목록 파일이 없어도 블록과 판정은 로드된다. 면은 그릴 텍스처가 없어 전부 빠진다.
-            file.textureListPath = $"{k_workFolder}/missing.json";
+            file.mapDataPath = $"{k_workFolder}/missing.json";
             bool loaded = file.Write(bd2Path, out _) && MapLoader.LoadBlockData(bd2Path);
             Expect(loaded && MapLoader.Blocks.Count == flags.Length && MapLoader.Blocks[0].mesh == null
                 && MapLoader.GetBlockColliders(BlockLayer.Human).Count == 4, "텍스처 목록이 없을 때의 로드 결과가 다름");
@@ -623,8 +624,8 @@ namespace GodotXOPS.Dev
             materials.Add(new BlockMaterialData { name = "CheckPass", hitEffect = smoke, hitSounds = new List<string> { passSound } });
 
             string bd2Path = Path.Combine(workFolder, "material.bd2");
-            string listRelative = $"{k_workFolder}/material_textures.json";
-            var file = new BD2File { textureListPath = listRelative };
+            string listRelative = $"{k_workFolder}/material_map.json";
+            var file = new BD2File { mapDataPath = listRelative };
             file.blocks.Add(MakeBox(new Vector3(0f, -1f, 0f), new Vector3(50f, 1f, 50f), 0));
             file.blocks.Add(MakeBox(new Vector3(0f, 10f, 0f), Vector3.One, BD2File.PassBullet));
             file.blocks.Add(MakeBox(new Vector3(80f, 0f, 0f), Vector3.One, 0));
@@ -638,10 +639,10 @@ namespace GodotXOPS.Dev
             }
             file.blocks[2].textureIndices[1] = 3;
 
-            var textures = new BlockTextureListData();
+            var textures = new BlockMapData();
             foreach (int material in textureMaterials)
             {
-                textures.blockTextureData.Add(new BlockTextureData { materialIndex = material });
+                textures.textureData.Add(new BlockTextureData { materialIndex = material });
             }
             File.WriteAllText(GamePath.Resolve(listRelative), JsonData.ToJson(textures));
 
@@ -757,6 +758,55 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
+        /// 구역 블록: 쓰고 읽은 결과가 같은지, 구역 부분이 잘린 파일을 거절하는지, 로드하면 점이 어느 구역에 있는지 바르게 알려 주는지,
+        /// 겹친 구역에서 번호가 큰 태그를 고르는지, 태그 목록에 없는 번호의 구역 블록을 빼는지, 블록 데이터를 내리면 구역도 없어지는지.
+        /// </summary>
+        /// <param name="workFolder">파일을 쓸 폴더 전체 경로.</param>
+        private void CheckAreas(string workFolder)
+        {
+            string path = Path.Combine(workFolder, "areas.bd2");
+            string mapData = $"{k_workFolder}/areas_map.json";
+            var data = new BlockMapData();
+            data.textureData.Add(new BlockTextureData());
+            data.areaTagData.Add(new AreaTagData { name = "room", blockWeather = true, soundReverb = 0.5f });
+            data.areaTagData.Add(new AreaTagData { name = "pool", gravityScale = -0.5f });
+            File.WriteAllText(GamePath.Resolve(mapData), JsonData.ToJson(data));
+
+            var file = new BD2File { mapDataPath = mapData };
+            file.blocks.Add(MakeBox(new Vector3(0f, -1f, 0f), new Vector3(20f, 1f, 20f), 0));
+            // 태그 0 은 블록 둘로 된 구역, 태그 1 은 그 한쪽과 겹친다, 태그 7 은 목록에 없다.
+            file.areas.Add(new BD2Area { vertices = MakeBox(new Vector3(-5f, 2f, 0f), new Vector3(2f, 2f, 2f), 0).vertices, tag = 0 });
+            file.areas.Add(new BD2Area { vertices = MakeBox(new Vector3(5f, 2f, 0f), new Vector3(2f, 2f, 2f), 0).vertices, tag = 0 });
+            file.areas.Add(new BD2Area { vertices = MakeBox(new Vector3(6f, 2f, 0f), new Vector3(1f, 1f, 1f), 0).vertices, tag = 1 });
+            file.areas.Add(new BD2Area { vertices = MakeBox(new Vector3(0f, 10f, 0f), new Vector3(1f, 1f, 1f), 0).vertices, tag = 7 });
+            Expect(file.Write(path, out _), "구역이 있는 BD2 를 쓰지 못함");
+
+            bool read = BD2File.Read(path, out BD2File copy, out _);
+            Expect(read && copy.areas.Count == 4 && copy.areas[2].tag == 1 && copy.areas[1].vertices[6].IsEqualApprox(file.areas[1].vertices[6]),
+                "구역 블록을 쓰고 읽은 결과가 다름");
+
+            byte[] bytes = File.ReadAllBytes(path);
+            string badPath = Path.Combine(workFolder, "areas_bad.bd2");
+            File.WriteAllBytes(badPath, bytes.AsSpan(0, bytes.Length - 10).ToArray());
+            Expect(!BD2File.Read(badPath, out _, out _), "구역 부분이 잘린 BD2 를 읽음");
+
+            Expect(MapLoader.LoadBlockData(path), "구역이 있는 BD2 를 로드하지 못함");
+            Expect(MapLoader.AreaTagCount == 2 && MapLoader.AreaVolumeCount == 3, "목록에 없는 태그의 구역 블록을 빼지 않았거나 태그 수가 다름");
+            Expect(MapLoader.TopAreaAt(new Vector3(-5f, 1f, 0f)) == 0 && MapLoader.TopAreaAt(new Vector3(4f, 1f, 0f)) == 0,
+                "같은 태그의 두 구역 블록이 한 구역이 되지 않음");
+            Expect(MapLoader.TopAreaAt(new Vector3(6f, 2f, 0f)) == 1 && MapLoader.TopAreaAt(new Vector3(0f, 1f, 0f)) == -1
+                && MapLoader.TopAreaAt(new Vector3(0f, 10f, 0f)) == -1, "겹친 구역에서 번호가 큰 태그를 고르지 않거나, 구역 밖을 구역으로 봄");
+            Expect(MapLoader.WeatherBlockedAt(new Vector3(-5f, 1f, 0f)) && !MapLoader.WeatherBlockedAt(new Vector3(6f, 2f, 0f))
+                && Mathf.IsEqualApprox(MapLoader.ReverbAt(new Vector3(-5f, 1f, 0f)), 0.5f) && MapLoader.FindAreaTag("POOL") == 1,
+                "구역의 날씨 막기·울림·이름 찾기가 다름");
+            Expect(!MapLoader.IsInsideBlock(BlockLayer.Human, new Vector3(-5f, 1f, 0f)) && !MapLoader.IsInsideBlock(BlockLayer.Bullet, new Vector3(-5f, 1f, 0f)),
+                "구역 블록이 판정에 걸림");
+
+            MapLoader.UnloadBlockData();
+            Expect(MapLoader.AreaTagCount == 0 && MapLoader.TopAreaAt(new Vector3(-5f, 1f, 0f)) == -1, "블록 데이터를 내렸는데 구역이 남음");
+        }
+
+        /// <summary>
         /// 깨진 파일을 읽지 않는지 확인한다.
         /// </summary>
         /// <param name="workFolder">파일을 쓸 폴더 전체 경로.</param>
@@ -765,7 +815,7 @@ namespace GodotXOPS.Dev
             string goodPath = Path.Combine(workFolder, "good.bd2");
             string badPath = Path.Combine(workFolder, "bad.bd2");
 
-            var file = new BD2File { textureListPath = "a.json" };
+            var file = new BD2File { mapDataPath = "a.json" };
             file.blocks.Add(MakeBox(Vector3.Zero, Vector3.One, 0));
             file.Write(goodPath, out _);
             byte[] bytes = File.ReadAllBytes(goodPath);
@@ -782,18 +832,27 @@ namespace GodotXOPS.Dev
             Expect(!BD2File.Read(badPath, out _, out _), "머리말이 잘린 파일을 읽음");
 
             Expect(!MapLoader.LoadBlockData(badPath) && MapLoader.Blocks.Count == 0, "깨진 BD2 를 로드함");
-            Expect(BD2File.Read(goodPath, out BD2File good, out _) && good.blocks.Count == 1 && good.textureListPath == "a.json" && !good.droppedFaceMaterials, "정상 파일을 읽지 못함");
+            Expect(BD2File.Read(goodPath, out BD2File good, out _) && good.blocks.Count == 1 && good.mapDataPath == "a.json" && !good.droppedFaceMaterials, "정상 파일을 읽지 못함");
+
+            // 1.2.3 에서 1.2.5 까지의 형식(매직 GDXOPSB2): 구역이 없고 블록에서 끝난다. 구역 0 개로 읽는다.
+            const int areaCountBytes = sizeof(uint);
+            byte[] noAreas = bytes.AsSpan(0, bytes.Length - areaCountBytes).ToArray();
+            byte[] noAreaMagic = System.Text.Encoding.ASCII.GetBytes("GDXOPSB2");
+            for (int i = 0; i < noAreaMagic.Length; i++) noAreas[i] = noAreaMagic[i];
+            File.WriteAllBytes(badPath, noAreas);
+            Expect(BD2File.Read(badPath, out BD2File b2, out _) && b2.blocks.Count == 1 && b2.areas.Count == 0
+                && b2.blocks[0].vertices[7].IsEqualApprox(good.blocks[0].vertices[7]), "1.2.5 까지의 BD2(구역 없음)를 읽지 못함");
 
             // 1.2.2 까지의 형식(매직 GDXOPSBD, 블록 340바이트): 텍스처 번호 뒤의 면 재질 번호 6개를 건너뛰고 같은 블록으로 읽는다.
             const int legacyMaterialBytes = BD2Block.FaceCount * sizeof(int);
             const int flagBytes = sizeof(int);
             const int legacyFlags = BD2File.PassBullet;
-            var legacy = new List<byte>(bytes.AsSpan(0, bytes.Length - flagBytes).ToArray());
+            var legacy = new List<byte>(bytes.AsSpan(0, bytes.Length - areaCountBytes - flagBytes).ToArray());
             byte[] legacyMagic = System.Text.Encoding.ASCII.GetBytes("GDXOPSBD");
             for (int i = 0; i < legacyMagic.Length; i++) legacy[i] = legacyMagic[i];
             for (int f = 0; f < BD2Block.FaceCount; f++) legacy.AddRange(BitConverter.GetBytes(f == 0 ? 3 : -1));
             legacy.AddRange(BitConverter.GetBytes(legacyFlags));
-            Expect(legacy.Count == bytes.Length + legacyMaterialBytes, "옛 형식의 점검용 파일 크기가 다름");
+            Expect(legacy.Count == bytes.Length - areaCountBytes + legacyMaterialBytes, "옛 형식의 점검용 파일 크기가 다름");
             File.WriteAllBytes(badPath, legacy.ToArray());
             bool legacyRead = BD2File.Read(badPath, out BD2File old, out _);
             Expect(legacyRead && old.blocks.Count == 1 && old.droppedFaceMaterials && old.blocks[0].flags == legacyFlags

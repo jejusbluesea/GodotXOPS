@@ -16,6 +16,8 @@ namespace GodotXOPS.Dev
     /// --look yaw,pitch 는 스크린샷 동안 시선을 고정한다, --pos x,y,z 는 플레이어를 그 자리로 옮긴다, --drop 은 시작할 때 현재 무기를 버린다,
     /// --probe x,y,z,yaw,틱수 는 플레이어를 그 자리에 놓고 전진시킨 결과를 출력하고 종료한다, --noai 는 AI 를 끈 채 시작한다,
     /// --invincible 은 플레이어 무적을 켠 채 시작한다, --notext 는 디버그 텍스트를 끈 채 시작한다.
+    /// --mission-file 경로 는 목록 대신 미션 파일 하나(MIF, MIF2. exe 폴더 기준)를 로드하고, --map-pack 경로 는 그 전에 맵팩 Manifest 하나를 등록한다
+    /// (addon.json 을 고치지 않는다). --weather 번호 는 시작한 뒤 날씨를 바꾼다.
     /// </summary>
     public partial class PlayTest : Node3D
     {
@@ -90,7 +92,16 @@ namespace GodotXOPS.Dev
                 start = Mathf.Max(0, m_entries.FindIndex(entry => entry.mif == addon && entry.index == missionIndex));
             }
             m_missionSelect.Select(start);
-            LoadEntry(start);
+            int packArg = Array.IndexOf(args, "--map-pack");
+            if (packArg >= 0 && packArg + 1 < args.Length && DataManager.ReadMapPack(args[packArg + 1]) is MapPackManifestData pack)
+            {
+                DataManager.Instance.AddMapPackPage(pack);
+            }
+            int fileArg = Array.IndexOf(args, "--mission-file");
+            if (fileArg >= 0 && fileArg + 1 < args.Length) LoadMissionFile(args[fileArg + 1]);
+            else LoadEntry(start);
+            int weatherArg = Array.IndexOf(args, "--weather");
+            if (weatherArg >= 0 && weatherArg + 1 < args.Length && int.TryParse(args[weatherArg + 1], out int weather)) MapLoader.SetWeather(weather);
             SimClock.TickEnabled = true;
 
             int probeArg = Array.IndexOf(args, "--probe");
@@ -410,10 +421,31 @@ namespace GodotXOPS.Dev
                 return false;
             }
 
+            return LoadCurrentMap();
+        }
+
+        /// <summary>
+        /// 미션 파일 하나를 로드한다 (목록에 없는 MIF2 를 볼 때). 맵팩에 든 미션이면 그 맵팩의 데이터를 쓴다.
+        /// </summary>
+        /// <param name="relativePath">미션 파일 경로 (exe 폴더 기준).</param>
+        /// <returns>블록과 포인트 로드까지 성공했으면 true.</returns>
+        private bool LoadMissionFile(string relativePath)
+        {
+            string fullPath = GamePath.Resolve(relativePath);
+            return fullPath != null && MapLoader.LoadMissionFile(fullPath) && LoadCurrentMap();
+        }
+
+        /// <summary>
+        /// 읽어 둔 미션 정보대로 블록, 하늘, 날씨, 포인트를 로드하고 미션을 시작한다 (게임과 같은 순서).
+        /// </summary>
+        /// <returns>블록과 포인트 로드까지 성공했으면 true.</returns>
+        private bool LoadCurrentMap()
+        {
             MapLoader loader = MapLoader.Instance;
             GameRandom.ReseedEntropy();
             bool blocks = MapLoader.LoadBlockData(loader.MissionBD1Path);
             MapLoader.LoadSkyData(loader.SkyIndex);
+            MapLoader.SetWeather(loader.MissionWeatherIndex);
             bool points = MapLoader.LoadPointData(loader.MissionPD1Path);
             m_noFight = false;
             if (blocks && points) EventManager.Instance.BeginMission();

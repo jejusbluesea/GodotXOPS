@@ -25,7 +25,7 @@ namespace GodotXOPS.Editor
         private const int k_noTexture = -1;
         private const int k_defaultMaterial = -1;
         private const string k_imageFilter = "*.bmp, *.dds, *.png, *.jpg, *.jpeg ; Images";
-        private const string k_textureListSuffix = "_textures.json";
+        private const string k_textureListSuffix = "_map.json";
         private const string k_textureListExtension = ".json";
         private const float k_textureListHeight = 110f;
         // 텍스처 목록에서 지울 수 없는 앞쪽 자리의 수. 원본(BD1)의 텍스처 슬롯 10개에 해당하는 자리이고, 그 뒤에 더한 것만 지울 수 있다.
@@ -182,6 +182,8 @@ namespace GodotXOPS.Editor
             var delete = new Button { Text = "Delete", FocusMode = Control.FocusModeEnum.None, TooltipText = "Delete the texture selected in the list. Only textures after the first 10 can be deleted. Faces using it are no longer drawn, and the numbers after it move up by one" };
             delete.Pressed += () => DeleteTexture(m_textureSelected);
             textureButtons.AddChild(delete);
+
+            BuildAreaInspector(box);
         }
 
         /// <summary>
@@ -232,9 +234,10 @@ namespace GodotXOPS.Editor
             m_blockBox.Visible = m_editMode == EditMode.Block;
             RefreshUVEditor(false);
             if (!m_blockBox.Visible) return;
+            RefreshAreaInspector();
 
             List<BD2Block> blocks = m_document.Blocks.blocks;
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             m_fillingInspector = true;
 
             // 플래그: 선택한 블록이 전부 켜져 있을 때만 체크로 보인다.
@@ -389,7 +392,7 @@ namespace GodotXOPS.Editor
         /// </summary>
         private void SyncTextureMaterial()
         {
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             bool filling = m_fillingInspector;
             m_fillingInspector = true;
 
@@ -434,7 +437,7 @@ namespace GodotXOPS.Editor
         private bool SetTextureMaterial(int textureIndex, int materialIndex)
         {
             if (Transforming) CancelTransform();
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             if (textureIndex < 0 || textureIndex >= textures.Count) return Fail("Select a texture in the list first");
             if (textures[textureIndex].materialIndex == materialIndex) return false;
 
@@ -521,7 +524,7 @@ namespace GodotXOPS.Editor
         private bool SetTexture(string relativePath, int replaceIndex)
         {
             if (Transforming) CancelTransform();
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             if (replaceIndex >= textures.Count) return Fail($"There is no texture {replaceIndex}");
             if (!string.IsNullOrEmpty(relativePath))
             {
@@ -549,7 +552,7 @@ namespace GodotXOPS.Editor
         private bool DeleteTexture(int index)
         {
             if (Transforming) CancelTransform();
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             if (index < 0 || index >= textures.Count) return Fail("Select a texture in the list first");
             if (index < k_fixedTextureSlots) return Fail($"Textures [0] to [{k_fixedTextureSlots - 1}] cannot be deleted (use Replace). Only textures added after them can");
 
@@ -590,7 +593,7 @@ namespace GodotXOPS.Editor
         {
             if (Transforming) CancelTransform();
             m_document.Blocks = new BD2File();
-            m_document.Textures = new BlockTextureListData();
+            m_document.Textures = new BlockMapData();
             m_document.Points = new PD2File();
             m_document.Messages.Clear();
             m_document.BlockPath = string.Empty;
@@ -613,7 +616,7 @@ namespace GodotXOPS.Editor
         }
 
         /// <summary>
-        /// 블록 파일 옆에 두는 텍스처 목록 파일의 경로를 만든다 (같은 이름 + _textures.json. 변환 도구가 쓰는 이름과 같다).
+        /// 블록 파일 옆에 두는 텍스처 목록 파일의 경로를 만든다 (같은 이름 + _map.json. 변환 도구가 쓰는 이름과 같다).
         /// </summary>
         /// <param name="blockPath">BD2 경로 (exe 폴더 기준).</param>
         /// <returns>텍스처 목록 경로 (exe 폴더 기준).</returns>

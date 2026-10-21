@@ -136,7 +136,7 @@ namespace GodotXOPS
         /// <returns>닿으면 true.</returns>
         private bool CheckZombieAttack(Human victim, float reach)
         {
-            if (!victim.Alive || victim.Team == m_self.Team) return false;
+            if (!victim.Alive || victim.Team == m_self.Team || !m_self.IsHostileTo(victim)) return false;
 
             Vector3 attackPoint = m_controller.Position + Coord.YawForward(m_controller.Yaw) * k_zombieAttackOffset;
             Vector3 victimPosition = victim.Controller.Position;
@@ -172,6 +172,7 @@ namespace GodotXOPS
             if (!m_self.CurrentWeapon.IsNone) damage += (int)m_self.CurrentWeapon.Data.damage;
 
             victim.HitZombieAttack(damage);
+            MapLoader.NotifyAttacked(victim, m_self);
             victim.SetHitYaw(YawTo(victim.Controller.Position - m_controller.Position));
 
             Vector3 point = victim.Controller.Position + Vector3.Up * victim.Controller.CameraHeight;

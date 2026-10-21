@@ -108,6 +108,7 @@ namespace GodotXOPS.Editor
 
             m_blockOverlay.Visible = m_editMode == EditMode.Block;
             if (m_blockOverlay.Visible) m_blockOverlay.Redraw(m_document.Blocks.blocks, m_blockElement, m_blockSelection);
+            RedrawAreas();
         }
 
         /// <summary>
@@ -634,7 +635,7 @@ namespace GodotXOPS.Editor
 
         /// <summary>
         /// 블록 데이터를 BD2 파일로, 텍스처 목록을 그 JSON 파일로 쓴다. 덮어쓰는 파일은 먼저 .bak 으로 남긴다.
-        /// 다른 이름으로 저장하거나 텍스처 목록의 경로가 아직 없으면, 텍스처 목록은 블록 파일 옆의 "이름_textures.json" 이 된다 (원래 맵과 목록을 함께 쓰지 않게).
+        /// 다른 이름으로 저장하거나 텍스처 목록의 경로가 아직 없으면, 텍스처 목록은 블록 파일 옆의 "이름_map.json" 이 된다 (원래 맵과 목록을 함께 쓰지 않게).
         /// </summary>
         /// <param name="relativePath">BD2 경로 (exe 폴더 기준).</param>
         /// <returns>저장했으면 true.</returns>
@@ -645,12 +646,12 @@ namespace GodotXOPS.Editor
             if (fullPath == null) return Fail(pathError);
 
             // 텍스처 목록의 경로는 블록 파일에 적혀 있던 값이다. 받은 파일이 다른 파일을 가리킬 수 있으므로 쓰기 전에 확인한다.
-            string textureListPath = m_document.Blocks.textureListPath;
-            if (string.IsNullOrEmpty(textureListPath) || !string.Equals(relativePath, m_document.BlockPath, StringComparison.OrdinalIgnoreCase))
+            string mapDataPath = m_document.Blocks.mapDataPath;
+            if (string.IsNullOrEmpty(mapDataPath) || !string.Equals(relativePath, m_document.BlockPath, StringComparison.OrdinalIgnoreCase))
             {
-                textureListPath = TextureListPathFor(relativePath);
+                mapDataPath = TextureListPathFor(relativePath);
             }
-            string textureListFull = GamePath.ResolveForWrite(textureListPath, k_textureListExtension, out pathError);
+            string textureListFull = GamePath.ResolveForWrite(mapDataPath, k_textureListExtension, out pathError);
             if (textureListFull == null) return Fail($"Texture list: {pathError} (use Save As to write a new one)");
 
             try
@@ -660,7 +661,7 @@ namespace GodotXOPS.Editor
                 if (File.Exists(textureListFull)) File.Copy(textureListFull, textureListFull + k_backupExtension, true);
 
                 File.WriteAllText(textureListFull, JsonData.ToJson(m_document.Textures));
-                m_document.Blocks.textureListPath = textureListPath;
+                m_document.Blocks.mapDataPath = mapDataPath;
                 if (!m_document.Blocks.Write(fullPath, out string error)) return Fail($"Block file write failed: {relativePath} ({error})");
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)

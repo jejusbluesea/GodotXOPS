@@ -503,3 +503,47 @@ func tween_block(p, state):
 func set_player(p, state):
 	api["set_player"].call(api["find_human"].call(p["human"]))
 	return 0
+
+# Waits until the human (the player when the id is missing) stands in the area. The area is the number of an area tag of the map;
+# a human is in it when the feet are inside any of the area blocks with that tag.
+func wait_area_enter(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		i = api["player"].call()
+	if api["in_area"].call(i, p["area"]):
+		return 0
+	return -1
+
+# Waits until the human (the player when the id is missing) is out of the area.
+func wait_area_leave(p, state):
+	var i = api["find_human"].call(p["human"])
+	if i < 0:
+		i = api["player"].call()
+	if i >= 0 and not api["in_area"].call(i, p["area"]):
+		return 0
+	return -1
+
+# Changes one property of an area until the map is loaded again: 0 damage (HP per second), 1 gravity (scale, may be negative),
+# 2 AI sight (scale), 3 reverb (0 to 1), 4 weather blocked (0 or 1).
+func set_area(p, state):
+	var keys = ["damage", "gravity", "ai_sight", "reverb", "block_weather"]
+	var k = p["property"]
+	if k >= 0 and k < keys.size():
+		api["set_area"].call(p["area"], keys[k], p["value"])
+	return 0
+
+# Inside the area, AIs of the team treat the target team: 0 always hostile, 1 never hostile, 2 hostile once they see one holding a weapon
+# or are attacked by that team (forgotten when they leave the area). It changes what the AI decides only; damage is dealt as usual.
+func set_area_hostility(p, state):
+	api["set_area_hostility"].call(p["area"], p["team"], p["target"], p["mode"])
+	return 0
+
+# Changes the weather at once. Use a fade before it when the change should not be seen.
+func set_weather(p, state):
+	api["set_weather"].call(p["weather"])
+	return 0
+
+# Changes the sky at once (the fog color follows the new sky unless the weather overrides the fog).
+func set_sky(p, state):
+	api["set_sky"].call(p["sky"])
+	return 0

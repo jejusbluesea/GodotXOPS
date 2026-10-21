@@ -27,6 +27,8 @@ namespace GodotXOPS
         public string effectDataPath = string.Empty;
         // 커스텀 바인딩 등록 파일. 이 맵팩의 미션을 하는 동안과 메뉴가 이 맵팩의 페이지에 있는 동안 OPTION 의 Custom 탭에 나온다. 비워 두면 없다.
         public string inputDataPath = string.Empty;
+        // 날씨 목록 (weather_data.json 과 같은 키). 날씨 번호 10000 에서 19999 가 이 파일의 항목이다. 비워 두면 없다.
+        public string weatherDataPath = string.Empty;
         // 맵팩의 미션에서 기본 화면 대신 그리는 화면 스크립트(.sgd)와 스프라이트 글꼴 그림. 미션(MIF2)이 같은 것을 적었으면 그것이 먼저다. 비워 두면 없다.
         public string briefingScriptPath = string.Empty;
         public string hudScriptPath = string.Empty;

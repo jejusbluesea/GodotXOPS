@@ -66,6 +66,7 @@ namespace GodotXOPS.Editor
             AddMissionText(grid, "Name", "Shown in the mission list", m => m.name, (m, v) => m.name = v);
             AddMissionText(grid, "Full name", "Title of the briefing", m => m.fullname, (m, v) => m.fullname = v);
             AddMissionNumber(grid, "Sky", "Sky number (0: none)", m => m.skyIndex, (m, v) => m.skyIndex = v);
+            AddMissionNumber(grid, "Weather", "Weather number at the start (0: clear)", m => m.weatherIndex, (m, v) => m.weatherIndex = v);
             AddMissionCheck(grid, "Additional collision", "Extra collision checks for characters (the original screen flag bit 1)", m => m.adjustCollision, (m, v) => m.adjustCollision = v);
             AddMissionCheck(grid, "Dark screen", "Darker blocks, sky and models (the original screen flag bit 2)", m => m.darkScreen, (m, v) => m.darkScreen = v);
             AddMissionNumber(grid, "Default block material", "Material used by faces whose material is \"mission default\"", m => m.defaultBlockMaterial, (m, v) => m.defaultBlockMaterial = v);
@@ -91,6 +92,7 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Addon sound data", "*.json", m => m.addonSoundDataPath, (m, v) => m.addonSoundDataPath = v);
             AddMissionPath(grid, "Addon image data", "*.json", m => m.addonImageDataPath, (m, v) => m.addonImageDataPath = v);
             AddMissionPath(grid, "Addon input data", "*.json", m => m.addonInputDataPath, (m, v) => m.addonInputDataPath = v);
+            AddMissionPath(grid, "Addon weather data", "*.json", m => m.addonWeatherDataPath, (m, v) => m.addonWeatherDataPath = v);
             AddMissionPath(grid, "Briefing script", "*.sgd", m => m.briefingScriptPath, (m, v) => m.briefingScriptPath = v);
             AddMissionPath(grid, "HUD script", "*.sgd", m => m.hudScriptPath, (m, v) => m.hudScriptPath = v);
             AddMissionPath(grid, "Result script", "*.sgd", m => m.resultScriptPath, (m, v) => m.resultScriptPath = v);

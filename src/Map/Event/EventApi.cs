@@ -9,7 +9,7 @@ namespace GodotXOPS
     /// 파일 경로를 받는 함수를 두지 않는다. 사람은 MapLoader.Humans 의 인덱스로, 포인트·소물은 식별번호로, 데이터는 번호로 가리킨다.
     /// 좌표는 Godot 공간의 미터(디버그 콘솔의 info 와 같다), 각도는 사람 기준 yaw(도)다.
     /// </summary>
-    public sealed class EventApi
+    public sealed partial class EventApi
     {
         // 이벤트 함수 한 번이 부를 수 있는 API 호출 수. 넘으면 그 이벤트는 실패로 친다 (호스트 쪽 일을 끝없이 시키는 것을 막는다).
         private const int k_maxCallsPerEvent = 1000;
@@ -85,6 +85,21 @@ namespace GodotXOPS
                 ["play_sound"] = Callable.From((int slot, int sound, float volume, bool loop, bool everywhere, float x, float y, float z) =>
                     Enter() && PlaySound(slot, sound, volume, loop, everywhere, new Vector3(x, y, z))),
                 ["stop_sound"] = Callable.From((int slot) => { if (Enter() && SoundManager.Loaded) SoundManager.Instance.StopSlot(slot); }),
+
+                // 구역
+                ["in_area"] = Callable.From((int index, int tag) => Enter() && InArea(index, tag)),
+                ["area_of"] = Callable.From((int index) => Enter() ? MapLoader.GetHuman(index)?.TopArea ?? -1 : -1),
+                ["area_count"] = Callable.From((int tag, int team) => Enter() ? AreaCount(tag, team) : 0),
+                ["area_find"] = Callable.From((string name) => Enter() ? MapLoader.FindAreaTag(name ?? string.Empty) : -1),
+                ["area_info"] = Callable.From((int tag) => Enter() ? AreaInfo(tag) : new Godot.Collections.Dictionary()),
+                ["set_area"] = Callable.From((int tag, string key, float value) => Enter() && SetArea(tag, key, value)),
+                ["set_area_hostility"] = Callable.From((int tag, int team, int targetTeam, int mode) => Enter() && SetAreaHostility(tag, team, targetTeam, mode)),
+
+                // 날씨와 하늘
+                ["weather"] = Callable.From(() => Enter() ? MapLoader.WeatherIndex : -1),
+                ["set_weather"] = Callable.From((int index) => Enter() && MapLoader.SetWeather(index)),
+                ["sky"] = Callable.From(() => Enter() ? MapLoader.LoadedSkyIndex : -1),
+                ["set_sky"] = Callable.From((int index) => { if (Enter()) MapLoader.LoadSkyData(index); }),
 
                 // 연출
                 ["stage"] = Callable.From(() => Enter() ? m_events.StageInfo() : new Godot.Collections.Dictionary()),

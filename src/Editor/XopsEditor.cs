@@ -87,6 +87,8 @@ namespace GodotXOPS.Editor
             AddChild(m_markers);
             m_blockOverlay = new BlockOverlay { Name = "BlockOverlay", Visible = false };
             AddChild(m_blockOverlay);
+            m_areaOverlay = new AreaOverlay { Name = "AreaOverlay" };
+            AddChild(m_areaOverlay);
             m_links = new LinkOverlay { Name = "Links" };
             AddChild(m_links);
             m_grid = new EditorGrid { Name = "Grid" };

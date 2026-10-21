@@ -31,6 +31,8 @@ namespace GodotXOPS
         private string m_addonSoundDataPath = string.Empty;
         private string m_addonImageDataPath = string.Empty;
         private string m_addonInputDataPath = string.Empty;
+        private string m_addonWeatherDataPath = string.Empty;
+        private int m_missionWeatherIndex;
         private string m_briefingScriptPath = string.Empty;
         private string m_hudScriptPath = string.Empty;
         private string m_resultScriptPath = string.Empty;
@@ -46,6 +48,8 @@ namespace GodotXOPS
         public string MissionImage1 => m_missionImage1;
         public string MissionBriefing => m_missionBriefing;
         public int SkyIndex => m_skyIndex;
+        // 미션을 시작할 때의 날씨 번호 (MIF2 의 weatherIndex. MIF 는 0, 맑음).
+        public int MissionWeatherIndex => m_missionWeatherIndex;
         public bool AdjustCollision => m_adjustCollision;
         public bool DarkScreen => m_darkScreen;
         // 지금 미션이 스프라이트 글꼴 대신 쓰라고 적어 둔 그림의 경로 (exe 폴더 기준). MIF2 에 없으면 미션이 속한 맵팩의 것이다. 둘 다 없으면 빈 문자열.
@@ -201,6 +205,8 @@ namespace GodotXOPS
             loader.m_addonSoundDataPath = data.addonSoundDataPath ?? string.Empty;
             loader.m_addonImageDataPath = data.addonImageDataPath ?? string.Empty;
             loader.m_addonInputDataPath = data.addonInputDataPath ?? string.Empty;
+            loader.m_addonWeatherDataPath = data.addonWeatherDataPath ?? string.Empty;
+            loader.m_missionWeatherIndex = data.weatherIndex;
             LoadPackData(DataManager.Instance.FindMapPack(packLookupPath));
             loader.m_briefingScriptPath = data.briefingScriptPath ?? string.Empty;
             loader.m_hudScriptPath = data.hudScriptPath ?? string.Empty;
@@ -253,6 +259,12 @@ namespace GodotXOPS
             list.ClearMission();
             ImageParameterData image = LoadAddonFile<ImageParameterData>(Instance.m_addonImageDataPath);
             if (image != null) list.SetMission(image.imageData);
+
+            // 날씨 목록도 미션 정보와 함께 붙인다 (맵을 다시 로드해도 다시 읽지 않는다).
+            DataList<WeatherData> weathers = DataManager.Instance.WeatherParameterData.weatherData;
+            weathers.ClearMission();
+            WeatherParameterData weather = LoadAddonFile<WeatherParameterData>(Instance.m_addonWeatherDataPath);
+            if (weather != null) weathers.SetMission(weather.weatherData);
         }
 
         /// <summary>
@@ -310,12 +322,18 @@ namespace GodotXOPS
             loader.m_addonSoundDataPath = string.Empty;
             loader.m_addonImageDataPath = string.Empty;
             loader.m_addonInputDataPath = string.Empty;
+            loader.m_addonWeatherDataPath = string.Empty;
+            loader.m_missionWeatherIndex = 0;
             if (InputManager.Loaded) InputManager.Instance.SetCustomLayer(CustomBindingLayer.Mission, null);
             loader.m_briefingScriptPath = string.Empty;
             loader.m_hudScriptPath = string.Empty;
             loader.m_resultScriptPath = string.Empty;
             loader.m_fontImageOverridePath = string.Empty;
-            if (DataManager.Loaded) DataManager.Instance.ImageParameterData.imageData.ClearMission();
+            if (DataManager.Loaded)
+            {
+                DataManager.Instance.ImageParameterData.imageData.ClearMission();
+                DataManager.Instance.WeatherParameterData.weatherData.ClearMission();
+            }
             UnloadPackData();
         }
 

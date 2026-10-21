@@ -164,6 +164,7 @@ namespace GodotXOPS
                     },
                 },
                 new InputActionDefinition { name = InputManager.Jump, type = "Button", bindings = new[] { "<Keyboard>/space" } },
+                new InputActionDefinition { name = InputManager.Crouch, type = "Button", bindings = new[] { "<Keyboard>/leftCtrl" } },
                 new InputActionDefinition { name = InputManager.Walk, type = "Button", bindings = new[] { "<Keyboard>/tab" } },
                 new InputActionDefinition { name = InputManager.Drop, type = "Button", bindings = new[] { "<Keyboard>/g" } },
                 new InputActionDefinition { name = InputManager.Fire, type = "Button", bindings = new[] { "<Mouse>/leftButton" } },

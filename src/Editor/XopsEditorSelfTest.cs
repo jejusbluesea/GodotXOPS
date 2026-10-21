@@ -575,7 +575,7 @@ namespace GodotXOPS.Editor
             Expect(SaveBlocksTo(saved) && !m_blockDirty && m_document.BlockPath == saved, "블록을 저장한 뒤에 경로나 바뀜 표시가 맞지 않음");
             bool read = BD2File.Read(savedFull, out BD2File reread, out _);
             Expect(read && reread.blocks.Count == blocks.Count && reread.blocks[added].vertices[0].DistanceTo(blocks[added].vertices[0]) < tolerance
-                && reread.textureListPath == m_document.Blocks.textureListPath, "저장한 블록 파일을 다시 읽은 내용이 다름");
+                && reread.mapDataPath == m_document.Blocks.mapDataPath, "저장한 블록 파일을 다시 읽은 내용이 다름");
             AddBlock(center);
             SaveAll();
             Expect(File.Exists(savedFull + k_backupExtension) && !m_blockDirty && blocks.Count == count + 2, "블록을 덮어쓰면서 전의 파일을 .bak 으로 남기지 않음");
@@ -598,7 +598,7 @@ namespace GodotXOPS.Editor
             const float tolerance = 1e-4f;
             const int topFace = 0;
             List<BD2Block> blocks = m_document.Blocks.blocks;
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             int textureCount = textures.Count;
 
             SetEditMode(EditMode.Block);
@@ -679,25 +679,26 @@ namespace GodotXOPS.Editor
             CheckBlockUV(added);
             CheckBlockSnap(added);
             CheckTextureDelete(added);
+            CheckAreaEditing(added);
 
             // 저장: 다른 이름으로 저장하면 텍스처 목록도 그 옆에 따로 쓰인다.
             string saved = $"{k_selfTestFolder}/values.bd2";
-            string savedTextures = $"{k_selfTestFolder}/values_textures.json";
-            Expect(SaveBlocksTo(saved) && m_document.Blocks.textureListPath == savedTextures && File.Exists(GamePath.Resolve(savedTextures)),
+            string savedTextures = $"{k_selfTestFolder}/values_map.json";
+            Expect(SaveBlocksTo(saved) && m_document.Blocks.mapDataPath == savedTextures && File.Exists(GamePath.Resolve(savedTextures)),
                 "다른 이름으로 저장했는데 텍스처 목록이 블록 파일 옆에 쓰이지 않음");
-            Expect(OpenBlock(saved) && m_document.Textures.blockTextureData.Count == textureCount + 1 && m_document.Blocks.blocks.Count == added + 1
-                && m_document.Textures.blockTextureData[textureCount].diffusePath == secondTexture && m_document.Textures.blockTextureData[1].materialIndex == 0,
+            Expect(OpenBlock(saved) && m_document.Textures.textureData.Count == textureCount + 1 && m_document.Blocks.blocks.Count == added + 1
+                && m_document.Textures.textureData[textureCount].diffusePath == secondTexture && m_document.Textures.textureData[1].materialIndex == 0,
                 "저장한 블록과 텍스처 목록(재질 포함)을 다시 연 내용이 다름");
 
             // 블록 파일에 적힌 텍스처 목록의 경로가 다른 파일을 가리키면 쓰지 않는다 (받은 파일이 설정이나 기본 데이터를 덮어쓰지 못하게).
             string configFull = GamePath.Resolve("godotdata/config.json");
             DateTime configTime = File.GetLastWriteTimeUtc(configFull);
-            m_document.Blocks.textureListPath = "godotdata/config.json";
+            m_document.Blocks.mapDataPath = "godotdata/config.json";
             Expect(!SaveBlocksTo(saved) && File.GetLastWriteTimeUtc(configFull) == configTime && !File.Exists(configFull + k_backupExtension),
                 "블록 파일에 적힌 경로대로 기본 데이터 폴더의 파일을 덮어씀");
-            m_document.Blocks.textureListPath = saved;
+            m_document.Blocks.mapDataPath = saved;
             Expect(!SaveBlocksTo(saved), "텍스처 목록을 JSON 이 아닌 파일에 씀");
-            m_document.Blocks.textureListPath = savedTextures;
+            m_document.Blocks.mapDataPath = savedTextures;
             Expect(SaveBlocksTo(saved), "경로를 되돌린 뒤에 블록을 저장하지 못함");
 
             // 빈 맵에서 시작: 텍스처를 더하고, 블록을 놓고, 저장한 뒤 다시 열면 그려지는 블록 하나가 있다.
@@ -708,7 +709,7 @@ namespace GodotXOPS.Editor
             AddBlock(ViewportCenter());
             string fresh = $"{k_selfTestFolder}/fresh/new.bd2";
             Expect(m_document.Blocks.blocks.Count == 1 && SaveBlocksTo(fresh), "새 맵에 블록을 놓고 저장하지 못함");
-            Expect(OpenBlock(fresh) && m_document.Blocks.blocks.Count == 1 && m_document.Textures.blockTextureData.Count == 1 && MapLoader.Blocks.Count == 1
+            Expect(OpenBlock(fresh) && m_document.Blocks.blocks.Count == 1 && m_document.Textures.textureData.Count == 1 && MapLoader.Blocks.Count == 1
                 && MapLoader.Blocks[0].mesh != null && MapLoader.Blocks[0].mesh.GetSurfaceCount() == 1, "새로 만든 맵을 다시 열었는데 그려지는 블록이 없음");
             // 게임의 로더도 같은 파일을 그대로 읽는다.
             Expect(MapLoader.LoadBlockData(GamePath.Resolve(fresh)) && MapLoader.Blocks.Count == 1 && MapLoader.Blocks[0].mesh != null, "에디터가 쓴 블록 파일을 게임의 로더가 읽지 못함");
@@ -725,7 +726,7 @@ namespace GodotXOPS.Editor
             OfficialMissionData official = DataManager.Instance.MissionData.officialMissions[k_selfTestMission];
 
             Expect(ImportBlock(official.bd1Path) && m_document.Blocks.blocks.Count > 0 && MapLoader.Blocks.Count == m_document.Blocks.blocks.Count
-                && m_document.BlockPath.Length == 0 && m_blockDirty && m_document.Textures.blockTextureData.Count > 0, "원본 블록 데이터를 이름 없는 내용으로 가져오지 못함");
+                && m_document.BlockPath.Length == 0 && m_blockDirty && m_document.Textures.textureData.Count > 0, "원본 블록 데이터를 이름 없는 내용으로 가져오지 못함");
             Expect(ImportPoints(official.pd1Path) && m_document.Points.points.Count > 0 && m_markers.GetChildCount() == m_document.Points.points.Count
                 && m_document.PointPath.Length == 0 && m_dirty && m_document.Points.eventEntryIds.Count == 3, "원본 포인트 데이터를 이름 없는 내용으로 가져오지 못함");
             Expect(!ImportBlock($"{k_selfTestFolder}/no_such.bd1") && m_messageIsError && m_document.Blocks.blocks.Count > 0, "없는 원본 블록 파일을 가져왔거나 실패했는데 내용이 바뀜");
@@ -748,9 +749,9 @@ namespace GodotXOPS.Editor
             SetEditMode(EditMode.Point);
             int blockCount = m_document.Blocks.blocks.Count;
             string blockPath = m_document.BlockPath;
-            string textureListPath = m_document.Blocks.textureListPath;
+            string mapDataPath = m_document.Blocks.mapDataPath;
             string playMission = WritePlayFiles(out string error);
-            Expect(playMission != null && error == null && m_document.BlockPath == blockPath && m_document.Blocks.textureListPath == textureListPath && m_blockDirty && !m_dirty,
+            Expect(playMission != null && error == null && m_document.BlockPath == blockPath && m_document.Blocks.mapDataPath == mapDataPath && m_blockDirty && !m_dirty,
                 $"플레이 테스트용 파일을 쓰지 못했거나 쓰면서 문서의 경로나 바뀜 표시를 건드림 ({error})");
             GameBridge game = GameBridge.Instance;
             Expect(playMission != null && game.LoadMissionFile(GamePath.Resolve(playMission)) && MapLoader.Player != null && MapLoader.HumanCount > 1
@@ -1669,9 +1670,54 @@ namespace GodotXOPS.Editor
         /// 뒤의 번호를 쓰던 면은 하나씩 당겨지며, 한 번에 되돌려진다. 끝나면 목록과 블록을 처음대로 돌려놓는다.
         /// </summary>
         /// <param name="added">시험에 쓸 블록의 번호.</param>
+        private void CheckAreaEditing(int added)
+        {
+            List<BD2Block> blocks = m_document.Blocks.blocks;
+            List<BD2Area> areas = m_document.Blocks.areas;
+            List<AreaTagData> tags = m_document.Textures.areaTagData;
+            int blockCount = blocks.Count;
+            int areaCount = areas.Count;
+            int tagCount = tags.Count;
+            Vector3[] original = (Vector3[])blocks[added].vertices.Clone();
+            Vector3 center = Vector3.Zero;
+            foreach (Vector3 vertex in original) center += vertex / original.Length;
+
+            AddAreaTag();
+            int tag = tags.Count - 1;
+            Expect(tags.Count == tagCount + 1 && m_areaTagSelected == tag && m_areaTagList.ItemCount == tags.Count, "구역 태그를 더하지 못함");
+
+            SetBlockElement(BlockElement.Block);
+            m_blockSelection.Add(added * ElementStride);
+            BlocksToArea();
+            Expect(blocks.Count == blockCount - 1 && areas.Count == areaCount + 1 && areas[areaCount].tag == tag && MapLoader.TopAreaAt(center) == tag,
+                "고른 블록을 구역 블록으로 바꾸지 못했거나 게임의 구역에 반영되지 않음");
+
+            SetAreaTag("Area damage", t => t.damagePerSecond = 5f);
+            Expect(tags[tag].damagePerSecond == 5f && MapLoader.GetAreaState(tag)?.damagePerSecond == 5f, "구역의 성질을 바꾸지 못함");
+            SetAreaHostility("1>0 never, 2>0 provoked");
+            Expect(tags[tag].hostility.Count == 2 && tags[tag].hostility[1].mode == AreaHostility.Provoked && FormatHostility(tags[tag].hostility) == "1>0 never, 2>0 provoked",
+                "적대 규칙의 글을 읽지 못함");
+            SetAreaHostility("nonsense");
+            Expect(tags[tag].hostility.Count == 2, "읽지 못하는 적대 규칙으로 규칙을 바꿈");
+
+            DeleteAreaTag();
+            Expect(tags.Count == tagCount + 1, "구역 블록이 쓰는 태그를 지움");
+
+            AreaToBlocks();
+            BD2Block back = blocks[blocks.Count - 1];
+            Expect(blocks.Count == blockCount && areas.Count == areaCount && back.flags == (BD2File.PassHuman | BD2File.PassBullet | BD2File.PassSight)
+                && back.vertices[6].IsEqualApprox(original[6]) && m_blockSelection.Contains((blocks.Count - 1) * ElementStride),
+                "구역 블록을 블록으로 되돌리지 못함");
+
+            for (int i = 0; i < 5; i++) Undo();
+            Expect(blocks.Count == blockCount && areas.Count == areaCount && tags.Count == tagCount && blocks[added].vertices[6].IsEqualApprox(original[6]),
+                "구역 편집을 되돌린 뒤의 블록·구역·태그가 처음과 다름");
+            m_blockSelection.Clear();
+        }
+
         private void CheckTextureDelete(int added)
         {
-            List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+            List<BlockTextureData> textures = m_document.Textures.textureData;
             BD2Block block = m_document.Blocks.blocks[added];
             int count = textures.Count;
             int savedFirst = block.textureIndices[0];

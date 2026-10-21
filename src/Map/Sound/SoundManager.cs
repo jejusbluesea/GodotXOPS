@@ -61,16 +61,21 @@ namespace GodotXOPS
                 m_slotPlayers[i] = new AudioStreamPlayer { Name = $"Slot_{i}" };
                 AddChild(m_slotPlayers[i]);
             }
+            ReadyAmbient();
         }
 
         public override void _Process(double delta)
         {
             Vector3 listener = ListenerPosition;
             float master = ConfigManager.Instance.MasterVolume;
+            // 듣는 자리가 들어 있는 구역의 울림 (구역 밖이면 없다).
+            SetReverb(MapLoader.ReverbAt(listener));
             for (int i = 0; i < k_poolSize; i++)
             {
                 if (m_players[i].Playing) m_players[i].VolumeLinear = m_volumes[i] * master * Attenuation(m_positions[i], listener);
             }
+
+            ProcessAmbient(master);
 
             // 헤드리스에서는 실제로 재생하지 않으므로 칸의 상태만 남겨 둔다.
             if (m_headless) return;
@@ -120,6 +125,8 @@ namespace GodotXOPS
             if (m_headless) return true;
 
             AudioStreamPlayer player = m_slotPlayers[slot];
+            // 거리와 무관한 소리(배경음, 방송)는 울림을 받지 않는다.
+            player.Bus = everywhere ? "Master" : k_worldBus;
             player.Stream = stream;
             player.VolumeLinear = volume * ConfigManager.Instance.MasterVolume * (everywhere ? 1f : Attenuation(position, ListenerPosition));
             player.Play();

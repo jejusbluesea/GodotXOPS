@@ -114,7 +114,7 @@ namespace GodotXOPS.Editor
             mission.pointPath = pointPath;
 
             // BD2 는 자기 텍스처 목록의 경로를 담는다. 임시 파일에만 임시 경로를 적고 문서의 값은 되돌린다.
-            string keptTextureList = m_document.Blocks.textureListPath;
+            string keptTextureList = m_document.Blocks.mapDataPath;
             try
             {
                 string folder = GamePath.Resolve(k_playFolder);
@@ -123,7 +123,7 @@ namespace GodotXOPS.Editor
                 string ignore = Path.Combine(folder, k_ignoreFile);
                 if (!File.Exists(ignore)) File.WriteAllText(ignore, string.Empty);
 
-                m_document.Blocks.textureListPath = texturePath;
+                m_document.Blocks.mapDataPath = texturePath;
                 if (!m_document.Blocks.Write(GamePath.Resolve(blockPath), out error)) return null;
                 File.WriteAllText(GamePath.Resolve(texturePath), JsonData.ToJson(m_document.Textures));
                 if (!m_document.Points.Write(GamePath.Resolve(pointPath), out error)) return null;
@@ -141,7 +141,7 @@ namespace GodotXOPS.Editor
             }
             finally
             {
-                m_document.Blocks.textureListPath = keptTextureList;
+                m_document.Blocks.mapDataPath = keptTextureList;
             }
 
             error = null;
@@ -156,7 +156,7 @@ namespace GodotXOPS.Editor
         private bool ImportBlock(string relativePath)
         {
             string fullPath = GamePath.Resolve(relativePath);
-            if (fullPath == null || !MapLoader.ConvertBD1(fullPath, string.Empty, out BD2File file, out BlockTextureListData textures))
+            if (fullPath == null || !MapLoader.ConvertBD1(fullPath, string.Empty, out BD2File file, out BlockMapData textures))
             {
                 return Fail($"Block file import failed: {relativePath}");
             }

@@ -478,6 +478,8 @@ namespace GodotXOPS
             // 4. 낙하와 접지 판정 (프레임당 3회 나눠서)
             bool landed = false;
             bool alive = m_human.Alive;
+            // 구역이 거는 중력의 배율 (구역 밖이면 1 이고 원본과 같다).
+            float gravityScale = m_human.AreaGravityScale;
             for (int ycnt = 0; ycnt < 3; ycnt++)
             {
                 float ang = Mathf.Atan2(m_moveVelocity.Z, m_moveVelocity.X);
@@ -487,7 +489,11 @@ namespace GodotXOPS
                 pos.Y += m_moveVelocity.Y * dt * k_fallSubstep;
                 float gy = pos.Y + k_groundHeight;
 
-                if (!alive)
+                if (gravityScale < 0f)
+                {
+                    // 중력이 거꾸로인 구역: 바닥에 서지 않는다 (위로 떠오르고 천장은 머리 판정이 막는다). 원본에 없다.
+                }
+                else if (!alive)
                 {
                     // 시체: 발 한 점만 본다 (원본 deadstate 2, object.cpp:1320-1326).
                     if (AnyBlockContains(blocks, pos.X, gy, pos.Z))
@@ -516,8 +522,10 @@ namespace GodotXOPS
                     }
                 }
 
-                m_moveVelocity.Y -= ctrl.gravityAcceleration * dt * (1f / 3f);
+                m_moveVelocity.Y -= ctrl.gravityAcceleration * gravityScale * dt * (1f / 3f);
                 if (m_moveVelocity.Y < ctrl.fallMaxSpeed) m_moveVelocity.Y = ctrl.fallMaxSpeed;
+                // 거꾸로 떨어질 때의 최대 속도는 낙하와 같은 크기다.
+                if (m_moveVelocity.Y > -ctrl.fallMaxSpeed) m_moveVelocity.Y = -ctrl.fallMaxSpeed;
             }
 
             m_grounded = landed;
@@ -888,14 +896,14 @@ namespace GodotXOPS
 
         /// <summary>
         /// 비행 모드의 한 틱 (디버그 콘솔의 flight, 원본에 없는 기능).
-        /// 전진·후진은 시선 방향(위아래 포함)으로, 좌우는 수평 옆으로 움직인다. 점프 입력은 버린다. 블록을 통과하고 중력을 받지 않는다.
+        /// 전진·후진은 시선 방향(위아래 포함)으로, 좌우는 수평 옆으로, 점프는 위·앉기는 아래로 곧게 움직인다. 블록을 통과하고 중력을 받지 않는다.
         /// 속도는 평지에서 달릴 때 수렴하는 속도와 같고, 걷기 입력을 함께 주면 걷는 속도가 된다.
         /// </summary>
         /// <param name="type">인간 종류 데이터 (가속도와 감쇠).</param>
         /// <param name="dt">틱 시간.</param>
         private void TickFlight(HumanTypeData type, float dt)
         {
-            m_moveFlagLt = m_moveFlag & ~HumanMoveFlag.Jump;
+            m_moveFlagLt = m_moveFlag;
             m_moveFlag = HumanMoveFlag.None;
             m_moveVelocity = Vector3.Zero;
             m_moveYUpper = 0;
@@ -905,7 +913,9 @@ namespace GodotXOPS
 
             float forward = ((m_moveFlagLt & HumanMoveFlag.Forward) != 0 ? 1f : 0f) - ((m_moveFlagLt & HumanMoveFlag.Back) != 0 ? 1f : 0f);
             float right = ((m_moveFlagLt & HumanMoveFlag.Right) != 0 ? 1f : 0f) - ((m_moveFlagLt & HumanMoveFlag.Left) != 0 ? 1f : 0f);
-            Vector3 direction = Coord.AimDirection(m_rotationX, m_armRotationY) * forward + Coord.YawRight(m_rotationX) * right;
+            // 점프는 위, 앉기는 아래로 곧게 움직인다 (시선과 무관하다).
+            float up = ((m_moveFlagLt & HumanMoveFlag.Jump) != 0 ? 1f : 0f) - ((m_moveFlagLt & HumanMoveFlag.Crouch) != 0 ? 1f : 0f);
+            Vector3 direction = Coord.AimDirection(m_rotationX, m_armRotationY) * forward + Coord.YawRight(m_rotationX) * right + Vector3.Up * up;
             if (direction.LengthSquared() < 1e-6f) return;
 
             // 평소 이동은 틱마다 가속을 더하고 감쇠하므로 속도가 "가속 × dt ÷ (1 − 감쇠)"로 수렴한다. 그 값을 바로 쓴다.

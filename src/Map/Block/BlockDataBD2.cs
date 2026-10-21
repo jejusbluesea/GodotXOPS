@@ -33,20 +33,21 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// BD2 의 내용과 그것이 가리키는 텍스처 목록을 블록 원시 데이터로 바꾼다. 배열(정점, UV, 번호)은 BD2 의 것을 그대로 가리킨다.
+        /// BD2 의 내용과 그것이 가리키는 맵 데이터(텍스처 목록)를 블록 원시 데이터로 바꾸고, 구역 블록과 구역 태그로 구역을 만든다. 배열(정점, UV, 번호)은 BD2 의 것을 그대로 가리킨다.
         /// 면의 재질 번호는 그 면의 텍스처가 정한다 (텍스처 목록의 materialIndex). 그리지 않는 면과 목록에 없는 번호의 면은 미션의 기본 재질(-1)이다.
         /// </summary>
         /// <param name="file">BD2 의 내용.</param>
-        /// <param name="textures">텍스처 목록. null 이면 BD2 가 가리키는 텍스처 목록 파일을 읽는다.</param>
+        /// <param name="textures">맵 데이터. null 이면 BD2 가 가리키는 맵 데이터 파일을 읽는다.</param>
         /// <param name="texturePaths">텍스처 전체 경로. 목록의 항목 수만큼이고, 경로가 비었거나 exe 폴더를 벗어나면 빈 문자열.</param>
         /// <param name="rawBlocks">블록 원시 데이터.</param>
-        private static void ConvertBD2(BD2File file, BlockTextureListData textures, out string[] texturePaths, out RawBlockData[] rawBlocks)
+        private static void ConvertBD2(BD2File file, BlockMapData textures, out string[] texturePaths, out RawBlockData[] rawBlocks)
         {
-            BlockTextureListData list = textures ?? LoadBlockTextureList(file.textureListPath);
-            texturePaths = new string[list.blockTextureData.Count];
+            BlockMapData list = textures ?? LoadBlockTextureList(file.mapDataPath);
+            LoadAreas(file, list);
+            texturePaths = new string[list.textureData.Count];
             for (int i = 0; i < texturePaths.Length; i++)
             {
-                texturePaths[i] = GamePath.Resolve(list.blockTextureData[i].diffusePath) ?? string.Empty;
+                texturePaths[i] = GamePath.Resolve(list.textureData[i].diffusePath) ?? string.Empty;
             }
 
             rawBlocks = new RawBlockData[file.blocks.Count];
@@ -57,7 +58,7 @@ namespace GodotXOPS
                 for (int f = 0; f < materialIndices.Length; f++)
                 {
                     int texture = block.textureIndices[f];
-                    materialIndices[f] = texture >= 0 && texture < list.blockTextureData.Count ? list.blockTextureData[texture].materialIndex : -1;
+                    materialIndices[f] = texture >= 0 && texture < list.textureData.Count ? list.textureData[texture].materialIndex : -1;
                 }
                 rawBlocks[i] = new RawBlockData
                 {
@@ -76,11 +77,11 @@ namespace GodotXOPS
         /// 판형 블록(충돌 없음)은 세 판정을 모두 끈 플래그가 된다. 텍스처의 재질은 전부 기본 재질(-1)이다.
         /// </summary>
         /// <param name="bd1Path">BD1 파일 전체 경로. exe 폴더 안에 있어야 텍스처 경로를 적을 수 있다.</param>
-        /// <param name="textureListPath">BD2 에 적을 텍스처 목록 파일 경로 (exe 폴더 기준).</param>
+        /// <param name="mapDataPath">BD2 에 적을 텍스처 목록 파일 경로 (exe 폴더 기준).</param>
         /// <param name="file">만든 BD2. 실패하면 null.</param>
         /// <param name="textures">만든 텍스처 목록. 실패하면 null.</param>
         /// <returns>변환에 성공했으면 true.</returns>
-        public static bool ConvertBD1(string bd1Path, string textureListPath, out BD2File file, out BlockTextureListData textures)
+        public static bool ConvertBD1(string bd1Path, string mapDataPath, out BD2File file, out BlockMapData textures)
         {
             file = null;
             textures = null;
@@ -90,16 +91,16 @@ namespace GodotXOPS
                 return false;
             }
 
-            textures = new BlockTextureListData();
+            textures = new BlockMapData();
             foreach (string texturePath in texturePaths)
             {
                 string relative = string.IsNullOrEmpty(texturePath)
                     ? string.Empty
                     : Path.GetRelativePath(GamePath.Root, texturePath).Replace('\\', '/');
-                textures.blockTextureData.Add(new BlockTextureData { diffusePath = relative });
+                textures.textureData.Add(new BlockTextureData { diffusePath = relative });
             }
 
-            file = new BD2File { textureListPath = textureListPath };
+            file = new BD2File { mapDataPath = mapDataPath };
             for (int i = 0; i < rawBlocks.Length; i++)
             {
                 RawBlockData raw = rawBlocks[i];
@@ -128,9 +129,9 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="relativePath">exe 폴더 기준 경로.</param>
         /// <returns>읽은 목록. 파일이 없거나 깨졌으면 빈 목록.</returns>
-        private static BlockTextureListData LoadBlockTextureList(string relativePath)
+        private static BlockMapData LoadBlockTextureList(string relativePath)
         {
-            var list = new BlockTextureListData();
+            var list = new BlockMapData();
 
             string fullPath = GamePath.Resolve(relativePath);
             if (fullPath == null || !File.Exists(fullPath))

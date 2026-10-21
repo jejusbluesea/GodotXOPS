@@ -47,9 +47,9 @@ namespace GodotXOPS.Dev
             foreach (int extra in s_extraCounts)
             {
                 string bd2Relative = $"{k_workFolder}/bench.bd2";
-                if (!MapLoader.ConvertBD1(bd1Path, $"{k_workFolder}/bench_textures.json", out BD2File file, out BlockTextureListData textures)) break;
+                if (!MapLoader.ConvertBD1(bd1Path, $"{k_workFolder}/bench_map.json", out BD2File file, out BlockMapData textures)) break;
                 AddExtraBlocks(file, extra);
-                File.WriteAllText(GamePath.Resolve(file.textureListPath), JsonData.ToJson(textures));
+                File.WriteAllText(GamePath.Resolve(file.mapDataPath), JsonData.ToJson(textures));
                 file.Write(GamePath.Resolve(bd2Relative), out _);
 
                 GameRandom.Reseed(1u);

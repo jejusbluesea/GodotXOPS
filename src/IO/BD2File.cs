@@ -25,11 +25,24 @@ namespace GodotXOPS.IO
     }
 
     /// <summary>
+    /// BD2 파일의 구역 블록 하나. 모양은 블록과 같은 꼭짓점 8개(Godot 축의 미터 좌표)이고 그리지도 판정하지도 않는다.
+    /// 같은 태그의 구역 블록들이 구역 하나다.
+    /// </summary>
+    public class BD2Area
+    {
+        public Vector3[] vertices = new Vector3[BD2Block.VertexCount];
+        // 맵 데이터 파일의 구역 태그(areaTagData) 번호.
+        public int tag;
+    }
+
+    /// <summary>
     /// 확장 블록 데이터(BD2) 파일의 읽기와 쓰기. 게임 싱글톤과 무관해서 에디터 같은 다른 도구에서도 쓸 수 있다.
-    /// 구조 (정수는 리틀 엔디안): 매직 8바이트 → 텍스처 목록 경로 길이(uint32) → 경로(UTF-8) → 블록 개수(uint32) → 블록 × 316바이트.
+    /// 구조 (정수는 리틀 엔디안): 매직 8바이트(GDXOPSB3) → 맵 데이터 경로 길이(uint32) → 경로(UTF-8) → 블록 개수(uint32) → 블록 × 316바이트
+    /// → 구역 블록 개수(uint32) → 구역 블록 × 100바이트.
     /// 블록: 정점 8개(x, y, z float32) → UV 24개(u, v float32) → 면 텍스처 번호 6개(int32) → 플래그(int32).
-    /// 1.2.2 까지의 파일(매직 GDXOPSBD)은 블록이 340바이트이고 텍스처 번호 뒤에 면 재질 번호 6개(int32)가 있었다. 읽을 수는 있고, 그 번호는 버린다
-    /// (재질은 1.2.3 부터 텍스처 목록의 항목이 정한다). 쓰는 것은 늘 지금의 형식이다.
+    /// 구역 블록: 정점 8개(x, y, z float32) → 구역 태그 번호(int32).
+    /// 1.2.5 까지의 파일(매직 GDXOPSB2)은 구역이 없고 블록에서 끝난다. 1.2.2 까지의 파일(매직 GDXOPSBD)은 블록이 340바이트이고
+    /// 텍스처 번호 뒤에 면 재질 번호 6개(int32)가 있었다. 둘 다 읽을 수 있고 (면 재질 번호는 버린다), 쓰는 것은 늘 지금의 형식이다.
     /// </summary>
     public class BD2File
     {
@@ -41,18 +54,22 @@ namespace GodotXOPS.IO
         public const int PassSight = 1 << 2;
 
         private const int k_blockSize = 316;
+        private const int k_areaSize = BD2Block.VertexCount * 3 * sizeof(float) + sizeof(int);
         // 1.2.2 까지의 블록 크기와, 그 안에 있던 면 재질 번호의 바이트 수.
         private const int k_legacyBlockSize = 340;
         private const int k_legacyMaterialBytes = BD2Block.FaceCount * sizeof(int);
         // 깨진 파일이 경로 길이로 큰 값을 줘도 메모리를 잡지 않게 하는 한계 (바이트).
         private const int k_maxPathLength = 4096;
 
-        private static readonly byte[] s_magic = Encoding.ASCII.GetBytes("GDXOPSB2");
+        private static readonly byte[] s_magic = Encoding.ASCII.GetBytes("GDXOPSB3");
+        // 1.2.3 에서 1.2.5 까지의 형식 (구역이 없다).
+        private static readonly byte[] s_noAreaMagic = Encoding.ASCII.GetBytes("GDXOPSB2");
         private static readonly byte[] s_legacyMagic = Encoding.ASCII.GetBytes("GDXOPSBD");
 
-        // 텍스처 목록 JSON 의 경로 (exe 폴더 기준).
-        public string textureListPath = string.Empty;
+        // 맵 데이터 JSON(텍스처 목록과 구역 태그)의 경로 (exe 폴더 기준).
+        public string mapDataPath = string.Empty;
         public List<BD2Block> blocks = new List<BD2Block>();
+        public List<BD2Area> areas = new List<BD2Area>();
         // 읽은 파일이 1.2.2 까지의 형식이었고, 지금은 쓰지 않는 면 재질 번호에 기본값(-1)이 아닌 것이 있었는지. 쓸 때는 보지 않는다.
         public bool droppedFaceMaterials;
 
@@ -74,7 +91,8 @@ namespace GodotXOPS.IO
 
                 byte[] magic = reader.ReadBytes(s_magic.Length);
                 bool legacy = magic.AsSpan().SequenceEqual(s_legacyMagic);
-                if (!legacy && !magic.AsSpan().SequenceEqual(s_magic))
+                bool noAreas = legacy || magic.AsSpan().SequenceEqual(s_noAreaMagic);
+                if (!noAreas && !magic.AsSpan().SequenceEqual(s_magic))
                 {
                     error = "not a BD2 file (magic mismatch)";
                     return false;
@@ -83,14 +101,14 @@ namespace GodotXOPS.IO
                 uint pathLength = reader.ReadUInt32();
                 if (pathLength > k_maxPathLength)
                 {
-                    error = $"texture list path is too long ({pathLength} bytes)";
+                    error = $"map data path is too long ({pathLength} bytes)";
                     return false;
                 }
 
                 byte[] pathBytes = reader.ReadBytes((int)pathLength);
                 if (pathBytes.Length != pathLength)
                 {
-                    error = "file ends inside the texture list path";
+                    error = "file ends inside the map data path";
                     return false;
                 }
 
@@ -102,7 +120,7 @@ namespace GodotXOPS.IO
                     return false;
                 }
 
-                var result = new BD2File { textureListPath = Encoding.UTF8.GetString(pathBytes) };
+                var result = new BD2File { mapDataPath = Encoding.UTF8.GetString(pathBytes) };
                 for (uint b = 0; b < blockCount; b++)
                 {
                     var block = new BD2Block();
@@ -128,6 +146,34 @@ namespace GodotXOPS.IO
                     result.blocks.Add(block);
                 }
 
+                if (!noAreas)
+                {
+                    if (reader.BaseStream.Length - reader.BaseStream.Position < sizeof(uint))
+                    {
+                        error = "file ends before the area count";
+                        return false;
+                    }
+                    uint areaCount = reader.ReadUInt32();
+                    if ((long)areaCount * k_areaSize > reader.BaseStream.Length - reader.BaseStream.Position)
+                    {
+                        error = $"file is too short for {areaCount} areas";
+                        return false;
+                    }
+                    for (uint a = 0; a < areaCount; a++)
+                    {
+                        var area = new BD2Area();
+                        for (int i = 0; i < area.vertices.Length; i++)
+                        {
+                            float x = reader.ReadSingle();
+                            float y = reader.ReadSingle();
+                            float z = reader.ReadSingle();
+                            area.vertices[i] = new Vector3(x, y, z);
+                        }
+                        area.tag = reader.ReadInt32();
+                        result.areas.Add(area);
+                    }
+                }
+
                 file = result;
                 return true;
             }
@@ -148,10 +194,10 @@ namespace GodotXOPS.IO
         {
             error = null;
 
-            byte[] pathBytes = Encoding.UTF8.GetBytes(textureListPath ?? string.Empty);
+            byte[] pathBytes = Encoding.UTF8.GetBytes(mapDataPath ?? string.Empty);
             if (pathBytes.Length > k_maxPathLength)
             {
-                error = $"texture list path is too long ({pathBytes.Length} bytes)";
+                error = $"map data path is too long ({pathBytes.Length} bytes)";
                 return false;
             }
 
@@ -179,6 +225,18 @@ namespace GodotXOPS.IO
                     }
                     foreach (int index in block.textureIndices) writer.Write(index);
                     writer.Write(block.flags);
+                }
+
+                writer.Write((uint)areas.Count);
+                foreach (BD2Area area in areas)
+                {
+                    foreach (Vector3 vertex in area.vertices)
+                    {
+                        writer.Write(vertex.X);
+                        writer.Write(vertex.Y);
+                        writer.Write(vertex.Z);
+                    }
+                    writer.Write(area.tag);
                 }
 
                 return true;

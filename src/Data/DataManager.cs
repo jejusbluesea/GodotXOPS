@@ -16,6 +16,7 @@ namespace GodotXOPS
         public EffectParameterData EffectParameterData { get; private set; } = new EffectParameterData();
         public BlockMaterialParameterData BlockMaterialParameterData { get; private set; } = new BlockMaterialParameterData();
         public SoundParameterData SoundParameterData { get; private set; } = new SoundParameterData();
+        public WeatherParameterData WeatherParameterData { get; private set; } = new WeatherParameterData();
         public ImageParameterData ImageParameterData { get; private set; } = new ImageParameterData();
         public SkyData SkyData { get; private set; } = new SkyData();
         public MissionData MissionData { get; private set; } = new MissionData();
@@ -42,6 +43,7 @@ namespace GodotXOPS
             LoadBlockMaterialParameterData();
             LoadSoundParameterData();
             LoadImageParameterData();
+            LoadWeatherParameterData();
             LoadSkyData();
             LoadMissionData();
             LoadGlobalData();
@@ -70,6 +72,7 @@ namespace GodotXOPS
             CheckListSize(BlockMaterialParameterData.blockMaterialData, nameof(BlockMaterialParameterData.blockMaterialData));
             CheckListSize(SoundParameterData.soundData, nameof(SoundParameterData.soundData));
             CheckListSize(ImageParameterData.imageData, nameof(ImageParameterData.imageData));
+            CheckListSize(WeatherParameterData.weatherData, nameof(WeatherParameterData.weatherData));
         }
 
         /// <summary>
@@ -180,6 +183,11 @@ namespace GodotXOPS
         private void LoadImageParameterData()
         {
             ImageParameterData = LoadOrDefault<ImageParameterData>(k_imageDataPath);
+        }
+
+        private void LoadWeatherParameterData()
+        {
+            WeatherParameterData = LoadOrDefault<WeatherParameterData>(k_weatherDataPath);
         }
 
         private void LoadSkyData()

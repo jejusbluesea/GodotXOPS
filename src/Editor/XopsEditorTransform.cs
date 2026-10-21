@@ -497,10 +497,11 @@ namespace GodotXOPS.Editor
                 return;
             }
 
-            if (command is BlockChangeCommand or BlockListCommand or TextureListCommand or TextureDeleteCommand)
+            if (command is BlockChangeCommand or BlockListCommand or TextureListCommand or TextureDeleteCommand or AreaEditCommand)
             {
                 m_blockDirty = true;
                 RebuildBlocks();
+                RefreshAreaInspector();
             }
             else if (command is ActionCommand { Changed: ActionCommand.Target.Asset })
             {

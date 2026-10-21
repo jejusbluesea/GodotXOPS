@@ -15,6 +15,8 @@ namespace GodotXOPS
         Right = 1 << 3,
         Walk = 1 << 4,
         Jump = 1 << 5,
+        // 앉기 (원본에 없다). 평소의 이동은 보지 않고, 비행 모드에서 아래로 내려간다.
+        Crouch = 1 << 6,
     }
 
     /// <summary>

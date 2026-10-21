@@ -40,6 +40,9 @@ namespace GodotXOPS.Editor
         private const int k_listNoPoint = -1;
 
         private static readonly string[] s_compareNames = { "==", "!=", "<", "<=", ">", ">=" };
+        // 구역의 성질 (base.sgd 의 set_area 와 같은 순서)과 적대 방식 (AreaHostility).
+        private static readonly string[] s_areaPropertyNames = { "Damage (HP/s)", "Gravity (scale)", "AI sight (scale)", "Reverb (0-1)", "Block weather (0/1)" };
+        private static readonly string[] s_hostilityNames = { "Always hostile", "Never hostile", "Hostile when provoked" };
         private static readonly string[] s_fontNames = { "OS font", "char.dds" };
         private static readonly string[] s_anchorNames =
         {
@@ -432,6 +435,11 @@ namespace GodotXOPS.Editor
                 case "effect":
                 case "sound":
                 case "image":
+                case "area":
+                case "areaproperty":
+                case "hostility":
+                case "weather":
+                case "sky":
                 case k_kindMessage:
                 case k_kindLine:
                     return true;
@@ -516,6 +524,21 @@ namespace GodotXOPS.Editor
                 case "image":
                     for (int i = 0; i < data.ImageParameterData.imageData.Count; i++) names.Add(data.ImageParameterData.imageData[i].name);
                     break;
+                case "area":
+                    foreach (AreaTagData tag in m_document.Textures.areaTagData) names.Add(tag.name);
+                    break;
+                case "areaproperty": names.AddRange(s_areaPropertyNames); break;
+                case "hostility": names.AddRange(s_hostilityNames); break;
+                case "weather":
+                    for (int i = 0; i < data.WeatherParameterData.weatherData.Count; i++) names.Add(data.WeatherParameterData.weatherData[i].name);
+                    break;
+                case "sky":
+                    for (int i = 0; i < data.SkyData.skyTexturePath.Count; i++)
+                    {
+                        string path = data.SkyData.skyTexturePath[i];
+                        names.Add(string.IsNullOrEmpty(path) ? "(none)" : System.IO.Path.GetFileName(path));
+                    }
+                    break;
                 case k_kindMessage:
                     foreach (string message in m_document.Messages) names.Add(Shorten(message));
                     break;
@@ -540,11 +563,17 @@ namespace GodotXOPS.Editor
             {
                 m_choiceMenu.AddItem($"{i}  {names[i]}", i);
             }
-            // 이미지는 기본 목록이 비어 있고 맵팩(10000 부터)과 미션(20000 부터)의 목록을 주로 쓰므로 그것도 함께 보여 준다.
+            // 이미지와 날씨는 맵팩(10000 부터)과 미션(20000 부터)의 목록도 함께 보여 준다 (이미지는 기본 목록이 비어 있다).
             int extra = 0;
             foreach (bool pack in new[] { true, false })
             {
-                if (slot.kind != "image" || AddonListOf(typeof(ImageParameterData), nameof(ImageParameterData.imageData), pack) is not System.Collections.IList addon) continue;
+                System.Collections.IList addon = slot.kind switch
+                {
+                    "image" => AddonListOf(typeof(ImageParameterData), nameof(ImageParameterData.imageData), pack),
+                    "weather" => AddonListOf(typeof(WeatherParameterData), nameof(WeatherParameterData.weatherData), pack),
+                    _ => null,
+                };
+                if (addon == null) continue;
 
                 int offset = pack ? DataList<ImageData>.PackBase : DataList<ImageData>.MissionBase;
                 for (int i = 0; i < addon.Count; i++, extra++)

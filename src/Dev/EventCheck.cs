@@ -212,6 +212,7 @@ func bump(p, state):
                 CheckScreenText();
                 CheckScreenImages();
                 CheckCustomInput();
+                CheckAreasAndWeather();
                 CheckDocumentExample();
             }
 
@@ -666,7 +667,7 @@ func bump(p, state):
             }
 
             // 블록 둘: 0 번은 가로 4 × 높이 1 × 세로 2 m 의 상자, 1 번은 한 변 1 m 의 상자. 사람들이 있는 높이(500 m)와 떨어진 곳에 둔다.
-            var blockFile = new BD2File { textureListPath = string.Empty };
+            var blockFile = new BD2File { mapDataPath = string.Empty };
             blockFile.blocks.Add(CheckBox(new Vector3(0f, 0f, 0f), new Vector3(2f, 0.5f, 1f)));
             blockFile.blocks.Add(CheckBox(new Vector3(20f, 0f, 0f), new Vector3(0.5f, 0.5f, 0.5f)));
             MapLoader.LoadBlockData(blockFile);
@@ -892,7 +893,7 @@ func bump(p, state):
                 return;
             }
 
-            var blockFile = new BD2File { textureListPath = string.Empty };
+            var blockFile = new BD2File { mapDataPath = string.Empty };
             blockFile.blocks.Add(CheckBox(new Vector3(0f, 0f, 0f), new Vector3(2f, 0.5f, 1f)));
             MapLoader.LoadBlockData(blockFile);
 
@@ -1561,6 +1562,115 @@ func keys(p, state):
             MapLoader.UnloadPointData();
             MapLoader.UnloadMissionData();
             Expect(!input.IsCustomAction("check_key") && !input.HasAction("check_key"), "미션 정보를 내렸는데 미션의 커스텀 바인딩이 남아 있음");
+        }
+
+        /// <summary>
+        /// 구역과 날씨: 구역 블록이 있는 블록 데이터를 붙이고, 구역의 데미지(정수로 쌓기)·거꾸로 된 중력·AI 시야 배율·적대 규칙,
+        /// 기본 묶음의 Wait Area Enter / Set Area / Set Weather / Set Sky, API(in_area, area_count, area_find, area_info, set_area, set_area_hostility,
+        /// weather, set_weather, sky, set_sky)를 본다. 미션 정보를 다시 읽으면 구역의 성질이 처음 값으로 돌아오는지도 본다.
+        /// </summary>
+        private void CheckAreasAndWeather()
+        {
+            const string script = @"var api
+
+func init(a):
+	api = a
+
+func area_probe(p, state):
+	var hurt = api[""area_find""].call(""HURT"")
+	api[""set_var""].call(90, hurt)
+	api[""set_var""].call(91, api[""area_count""].call(hurt, -1))
+	if api[""in_area""].call(api[""player""].call(), hurt):
+		api[""set_var""].call(92, 1)
+	var info = api[""area_info""].call(1)
+	if info[""exists""] and info[""gravity""] < 0.0:
+		api[""set_var""].call(93, 1)
+	if not api[""set_area""].call(1, ""nope"", 1.0) and api[""set_area""].call(1, ""ai_sight"", 0.5):
+		api[""set_var""].call(94, 1)
+	if api[""set_area_hostility""].call(1, 1, 0, 1) and not api[""set_area_hostility""].call(1, 1, 0, 7):
+		api[""set_var""].call(95, 1)
+	if api[""weather""].call() == 0 and not api[""set_weather""].call(9999):
+		api[""set_var""].call(96, 1)
+	return 0
+";
+            var pack = new EventPackData { scriptPath = $"{k_workFolder}/pack.sgd" };
+            pack.events.Add(Define(10000, "area_probe"));
+
+            const int waitAreaEnter = 100, setArea = 102, setWeather = 120, setSky = 121, setVar = 40;
+            PD2File file = BaseFile();
+            file.eventEntryIds.AddRange(new[] { 100, 200 });
+            // 줄 0: 조회와 바꾸기.
+            file.points.Add(Event(10000, 100, 0, 101));
+            file.points.Add(Event((int)EventType.WaitTime, 101, 100000, 102));
+            // 줄 1: 플레이어가 구역 2(처음에는 멀리 있다)에 들어오면 변수 97 → 구역 0 의 데미지를 0 으로 → 날씨 1 → 하늘 2.
+            file.points.Add(Event(waitAreaEnter, 200, 0, 201, 2));
+            file.points.Add(Event(setVar, 201, 97, 202, 1));
+            file.points.Add(Event(setArea, 202, 0, 203, 0, PD2File.FloatCell(0f)));
+            file.points.Add(Event(setWeather, 203, 1, 204));
+            file.points.Add(Event(setSky, 204, 2, 205));
+            file.points.Add(Event((int)EventType.WaitTime, 205, 100000, 206));
+
+            int errors = Debugger.ErrorCount;
+            if (!WriteAndLoad(pack, script, file))
+            {
+                Expect(false, $"구역 점검의 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+                return;
+            }
+
+            // 구역 셋: 0 은 플레이어 자리(초당 100 데미지), 1 은 적의 자리(중력 거꾸로), 2 는 멀리 있는 빈 구역. 사람들은 블록이 없는 500 m 높이에 있다.
+            var data = new BlockMapData();
+            data.areaTagData.Add(new AreaTagData { name = "hurt", damagePerSecond = 100f });
+            data.areaTagData.Add(new AreaTagData { name = "float", gravityScale = -1f });
+            data.areaTagData.Add(new AreaTagData { name = "goal" });
+            var blockFile = new BD2File();
+            blockFile.blocks.Add(CheckBox(new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f)));
+            blockFile.areas.Add(new BD2Area { vertices = CheckBox(new Vector3(0f, 500f, 0f), new Vector3(3f, 3f, 3f)).vertices, tag = 0 });
+            blockFile.areas.Add(new BD2Area { vertices = CheckBox(new Vector3(100f, 500f, 0f), new Vector3(3f, 30f, 3f)).vertices, tag = 1 });
+            blockFile.areas.Add(new BD2Area { vertices = CheckBox(new Vector3(-50f, 500f, 0f), new Vector3(3f, 30f, 3f)).vertices, tag = 2 });
+            MapLoader.LoadBlockData(blockFile, data);
+            // 게임은 맵을 로드할 때 미션의 처음 날씨를 건다 (GameBridge). 여기서는 직접 건다.
+            MapLoader.SetWeather(MapLoader.Instance.MissionWeatherIndex);
+
+            EventManager events = EventManager.Instance;
+            Human player = MapLoader.Player;
+            Human enemy = MapLoader.SearchHuman(k_enemyId);
+            float hp = player.HP;
+            float enemyY = enemy.Controller.Position.Y;
+            events.BeginMission();
+            for (int i = 0; i < 10; i++) SimClock.Step();
+
+            Expect(events.GetVariable(90) == 0 && events.GetVariable(91) == 1 && events.GetVariable(92) == 1, "in_area / area_count / area_find 가 다름");
+            Expect(events.GetVariable(93) == 1 && events.GetVariable(94) == 1 && events.GetVariable(95) == 1 && events.GetVariable(96) == 1,
+                "area_info / set_area / set_area_hostility / weather 의 결과나 값 확인이 다름");
+            Expect(Mathf.IsEqualApprox(hp - player.HP, 30f), $"구역의 데미지가 초당 100 이 아님 (10틱에 {hp - player.HP})");
+            Expect(enemy.Controller.Position.Y > enemyY, "중력이 거꾸로인 구역에서 위로 떠오르지 않음");
+            Expect(Mathf.IsEqualApprox(enemy.AreaSightScale, 0.5f) && enemy.TopArea == 1 && player.TopArea == 0, "구역의 시야 배율이나 사람의 구역이 다름");
+            Expect(!enemy.IsHostileTo(player) && player.IsHostileTo(enemy), "적대 안 함 규칙이 듣지 않거나 규칙이 없는 쪽까지 바뀜");
+
+            MapLoader.GetAreaState(1).SetHostility(1, 0, AreaHostility.Provoked);
+            bool armed = !player.CurrentWeapon.IsNone;
+            Expect(enemy.IsHostileTo(player) == armed, "공격받으면 적대: 무기를 든 상대를 보는 것으로 적대하지 않음");
+            MapLoader.NotifyAttacked(enemy, player);
+            Expect(enemy.IsHostileTo(player), "공격받으면 적대: 공격받았는데 적대하지 않음");
+            Expect(MapLoader.WeatherIndex == 0 && events.GetVariable(97) == 0, "플레이어가 들어오기 전에 Wait Area Enter 가 넘어감");
+
+            // 플레이어를 구역 2 로 옮기면 줄 1 이 넘어가 데미지를 끄고 날씨와 하늘을 바꾼다.
+            player.Controller.Teleport(new Vector3(-50f, 500f, 0f));
+            SimClock.Step();
+            SimClock.Step();
+            Expect(events.GetVariable(97) == 1 && player.TopArea == 2, "Wait Area Enter 가 플레이어를 보지 않음");
+            Expect(MapLoader.GetAreaState(0).damagePerSecond == 0f, "Set Area 가 구역의 데미지를 바꾸지 않음");
+            Expect(MapLoader.WeatherIndex == 1 && MapLoader.CurrentWeather?.precipitation == WeatherPrecipitation.Rain && MapLoader.WeatherView.Data != null,
+                "Set Weather 가 날씨를 바꾸지 않음");
+            Expect(MapLoader.LoadedSkyIndex == 2 && MapLoader.WeatherIndex == 1, "Set Sky 가 하늘을 바꾸지 않았거나 날씨가 지워짐");
+
+            // 블록 데이터를 다시 붙이면 구역의 성질이 처음 값이다. 맵을 내리면 날씨도 지워진다.
+            MapLoader.LoadBlockData(blockFile, data);
+            Expect(MapLoader.GetAreaState(0).damagePerSecond == 100f && MapLoader.GetAreaState(1).hostility.Count == 0, "다시 로드한 구역의 성질이 처음 값이 아님");
+            MapLoader.UnloadSkyData();
+            Expect(MapLoader.WeatherIndex == -1 && MapLoader.WeatherView.Data == null, "하늘을 내렸는데 날씨가 남음");
+            MapLoader.UnloadBlockData();
+            Expect(Debugger.ErrorCount == errors, $"구역 점검 중 에러: {Debugger.FirstErrorSince(errors)}");
         }
 
         /// <summary>

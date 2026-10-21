@@ -349,7 +349,7 @@ namespace GodotXOPS.Editor
             Texture2D texture = null;
             if (keys.Count > 0)
             {
-                List<BlockTextureData> textures = m_document.Textures.blockTextureData;
+                List<BlockTextureData> textures = m_document.Textures.textureData;
                 int index = blocks[keys[0] / ElementStride].textureIndices[keys[0] % ElementStride];
                 string path = index >= 0 && index < textures.Count ? GamePath.Resolve(textures[index].diffusePath) : null;
                 if (!string.IsNullOrEmpty(path) && File.Exists(path)) texture = ImageLoader.LoadTexture(path);

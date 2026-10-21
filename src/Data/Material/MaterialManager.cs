@@ -9,6 +9,8 @@ namespace GodotXOPS
     {
         private const string k_alphaClipBlendPath = "res://shaders/alpha_clip_blend.gdshader";
         private const string k_skyMeshPath = "res://shaders/sky_mesh.gdshader";
+        private const string k_skyLayerPath = "res://shaders/sky_layer.gdshader";
+        private const string k_skySunPath = "res://shaders/sky_sun.gdshader";
         private const string k_effectBlendPath = "res://shaders/effect_blend.gdshader";
         private const string k_effectBlendAddPath = "res://shaders/effect_blend_add.gdshader";
 
@@ -20,9 +22,13 @@ namespace GodotXOPS
 
         private static readonly StringName s_mainTexture = "main_texture";
         private static readonly StringName s_darkApply = "dark_apply";
+        private static readonly StringName s_sunDirection = "sun_direction";
+        private static readonly StringName s_sunHalfSize = "sun_half_size";
 
         private Shader m_alphaClipBlend;
         private Shader m_skyMesh;
+        private Shader m_skyLayer;
+        private Shader m_skySun;
         private Shader m_effectBlend;
         private Shader m_effectBlendAdd;
 
@@ -30,6 +36,8 @@ namespace GodotXOPS
         {
             m_alphaClipBlend = GD.Load<Shader>(k_alphaClipBlendPath);
             m_skyMesh = GD.Load<Shader>(k_skyMeshPath);
+            m_skyLayer = GD.Load<Shader>(k_skyLayerPath);
+            m_skySun = GD.Load<Shader>(k_skySunPath);
             m_effectBlend = GD.Load<Shader>(k_effectBlendPath);
             m_effectBlendAdd = GD.Load<Shader>(k_effectBlendAddPath);
         }
@@ -77,6 +85,31 @@ namespace GodotXOPS
         {
             // 깊이 테스트를 끈 머티리얼은 반투명 패스에서 그려지므로, 가장 낮은 우선순위로 다른 모든 것보다 먼저 그리게 한다.
             return Create(m_skyMesh, texture, (int)Material.RenderPriorityMin);
+        }
+
+        /// <summary>
+        /// 하늘 위에 겹치는 풍경(도시, 산)용 머티리얼을 만든다. 하늘과 해·달 다음에 그려진다.
+        /// </summary>
+        /// <param name="texture">입힐 텍스처. 알파로 하늘과 섞는다.</param>
+        /// <returns>새 머티리얼.</returns>
+        public ShaderMaterial CreateSkyLayerMaterial(Texture2D texture)
+        {
+            return Create(m_skyLayer, texture, (int)Material.RenderPriorityMin + 2);
+        }
+
+        /// <summary>
+        /// 해·달용 머티리얼을 만든다. 하늘 다음, 풍경 전에 그려진다.
+        /// </summary>
+        /// <param name="texture">입힐 텍스처.</param>
+        /// <param name="direction">해가 있는 방향 (Godot 공간).</param>
+        /// <param name="sizeDegrees">겉보기 크기 (도).</param>
+        /// <returns>새 머티리얼.</returns>
+        public ShaderMaterial CreateSunMaterial(Texture2D texture, Vector3 direction, float sizeDegrees)
+        {
+            ShaderMaterial material = Create(m_skySun, texture, (int)Material.RenderPriorityMin + 1);
+            material.SetShaderParameter(s_sunDirection, direction.Normalized());
+            material.SetShaderParameter(s_sunHalfSize, Mathf.Tan(Mathf.DegToRad(Mathf.Clamp(sizeDegrees, 0.1f, 170f)) * 0.5f));
+            return material;
         }
 
         private static ShaderMaterial Create(Shader shader, Texture2D texture, int renderPriority)

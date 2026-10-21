@@ -384,11 +384,11 @@ namespace GodotXOPS.Dev
             WriteJson($"{k_workFolder}/pack_sky.json", sky);
 
             // --- 블록: 넓은 바닥. 재질은 전부 -1 이고 미션의 기본 재질이 맵팩의 재질이다 ---
-            var blocks = new BD2File { textureListPath = $"{k_workFolder}/addon_textures.json" };
+            var blocks = new BD2File { mapDataPath = $"{k_workFolder}/addon_map.json" };
             blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
-            var textures = new BlockTextureListData();
-            textures.blockTextureData.Add(new BlockTextureData());
-            WriteJson(blocks.textureListPath, textures);
+            var textures = new BlockMapData();
+            textures.textureData.Add(new BlockTextureData());
+            WriteJson(blocks.mapDataPath, textures);
             blocks.Write(GamePath.Resolve($"{k_workFolder}/addon.bd2"), out _);
 
             // --- 포인트: 에드온 사람(플레이어), 기본 사람(다른 팀), 에드온 무기와 오브젝트, 그리고 없는 에드온 번호 셋 ---
@@ -623,12 +623,12 @@ namespace GodotXOPS.Dev
             WriteJson($"{k_workFolder}/body_human.json", human);
 
             // 블록: 넓은 바닥(윗면 y 0)과, 그 위 1 m 에서 시작하는 두께 1 m 의 장벽.
-            var blocks = new BD2File { textureListPath = $"{k_workFolder}/body_textures.json" };
+            var blocks = new BD2File { mapDataPath = $"{k_workFolder}/body_map.json" };
             blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
             blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, gap + 1.5f, barrierZ), new Vector3(10f, 1.5f, 0.5f), 0));
-            var textures = new BlockTextureListData();
-            textures.blockTextureData.Add(new BlockTextureData());
-            WriteJson(blocks.textureListPath, textures);
+            var textures = new BlockMapData();
+            textures.textureData.Add(new BlockTextureData());
+            WriteJson(blocks.mapDataPath, textures);
             blocks.Write(GamePath.Resolve($"{k_workFolder}/body.bd2"), out _);
 
             // 포인트: 작은 몸(플레이어)과 기본 몸은 장벽을 보고 서고, 히트박스가 작은 사람과 기본 사람은 장벽에서 떨어진 곳에 다른 팀으로 선다.
@@ -774,11 +774,11 @@ namespace GodotXOPS.Dev
             human.humanData.Add(victimData);
             WriteJson($"{k_workFolder}/melee_human.json", human);
 
-            var blocks = new BD2File { textureListPath = $"{k_workFolder}/melee_textures.json" };
+            var blocks = new BD2File { mapDataPath = $"{k_workFolder}/melee_map.json" };
             blocks.blocks.Add(BD2Check.MakeBox(new Vector3(0f, -1f, 0f), new Vector3(80f, 1f, 80f), 0));
-            var textures = new BlockTextureListData();
-            textures.blockTextureData.Add(new BlockTextureData());
-            WriteJson(blocks.textureListPath, textures);
+            var textures = new BlockMapData();
+            textures.textureData.Add(new BlockTextureData());
+            WriteJson(blocks.mapDataPath, textures);
             blocks.Write(GamePath.Resolve($"{k_workFolder}/melee.bd2"), out _);
 
             // 맞는 사람(플레이어라 AI 가 돌지 않는다)은 원점에, 근접 무기를 든 사람은 그 뒤 12 m 에서 그쪽(-Z)을 보고 선다.

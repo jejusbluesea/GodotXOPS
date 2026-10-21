@@ -60,7 +60,7 @@ const COLOR_PRESETS := [
 const SENSITIVITY := {"label": "Sensitivity", "chars": 6, "step": 0.01, "format": "%.2f"}
 const INVERT_LABEL := "Invert Mouse"
 # 바꿀 수 있는 액션 (버튼 하나짜리만). 한 줄에 둘씩 놓는다.
-const BIND_ACTIONS := ["jump", "walk", "drop", "fire", "zoom", "previous", "next", "reload", "first", "second", "interact"]
+const BIND_ACTIONS := ["jump", "crouch", "walk", "drop", "fire", "zoom", "previous", "next", "reload", "first", "second", "interact"]
 const BIND_PER_ROW := 2
 const BIND_LABEL_CHARS := 8
 const BIND_KEY_CHARS := 7

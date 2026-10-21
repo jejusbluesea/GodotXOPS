@@ -21,7 +21,49 @@
 - 커밋 `fdffa9d` 의 메시지에 취소한 프로젝트의 이름이 남아 있다 (공개 저장소의 기록이라 고치지 않았다).
 
 
-## 1.3.0: Graphic 칸과 커스텀 바인딩 (2026-10-20, 구현함, 커밋 전)
+## 1.3 과 1.4 의 범위 (사용자 결정 2026-10-21)
+
+사용자가 1.3 에 네 가지를 더 넣고 싶다고 했고, 내 권고대로 둘로 나눴다: **1.3 은 날씨와 구역만**, 모델 형식과 2.0 시리즈는 1.4 (적어 두기만).
+
+**앉기 키** (사용자 요청 2026-10-21, 권고안 그대로): 기본 액션 `crouch`(왼쪽 Ctrl)를 OPTION 의 Input 에 더했다 (기본 화면과 예제 `option.sgd`). 지금은 비행 모드에서 아래로만 쓰이고, 비행 중 점프는 위로 (둘 다 누르고 있는 동안). 조작 잠금은 점프 칸이 함께 막는다. 스크립트에는 내주지 않는다. 점검: config 108, ui 172.
+
+**1.3 날씨와 구역은 구현했다 (2026-10-21, 커밋 전)**. 아래는 정한 것과 구현 메모. 점검: bd2 306, event 207, editor 351 등 전부 통과 (마지막에 다시 돌린 결과는 아래 "확인").
+
+**1.3 날씨** (사용자가 정한 것):
+- 확장된 하늘: 텍스처 셋. `skyTexture`(지금의 하늘), `billboardTexture`(도시·산 같은 풍경. 이름과 달리 빌보드가 아니라 하늘과 같은 모델 파일의 육면체), `sunTexture`(해·달. 늘 카메라를 보는 빌보드이고 방향 x, y, z 로 자리를 정한다). 그림자는 없다.
+- `weather_data.json` 을 더하고 기본은 맑음 (XOPS 그대로). 이벤트로 바꾼다.
+- 이벤트: 날씨 바꾸기, 하늘 바꾸기.
+- 게임에 영향을 주는 것은 따로 한다 (날씨는 연출만. AI 의 시야는 구역이 맡는다).
+- 구역과 엮는다 (실내 같은 것).
+- 두 번째 질문의 답 (2026-10-21): 다른 것은 권고대로, **날씨는 서서히 바뀌지 않고 바로 바뀐다** (유저가 원하면 FadeOut 뒤에 바꾼다).
+- 권고대로 정한 것: `sky_data.json` 에 하늘 번호마다 객체 하나인 새 목록 `skyLayerData`(`billboardTexturePath`, `sunTexturePath`, `sunDirection`, `sunSize`)를 더하고 옛 나란한 목록은 그대로 / 그리는 순서 하늘 → 해 → 풍경 (렌더 우선순위 Min, Min+1, Min+2) / `weather_data.json` 의 항목(내리는 것, 안개 덮어쓰기, 하늘 바꾸기, 반복 소리, 번개) / 번호 층(맵팩 `weatherDataPath` 10000, 미션 `addonWeatherDataPath` 20000) / MIF2 `weatherIndex` / 카메라가 "날씨 막기" 구역 안이면 비·눈을 감추고 소리를 줄인다.
+- **내가 정한 것**: 기본 목록은 0 맑음, 1 비, 2 눈, 3 폭풍우 (원본 미션은 전부 0) / 풍경 텍스처는 하늘 모델의 UV 를 그대로 쓴다 (`sky.x` 는 2 × 2 칸 배치라 그 배치에 맞춰 그려야 한다) / 해는 거리 1 의 자리에 펼친 사각형이고 카메라 뒤면 그리지 않는다 / 비는 `FixedY` 빌보드, 눈은 빌보드인 GPU 입자이고 월드 공간에 남는다 (상자만 카메라를 따라간다) / 번개는 캔버스 층 -1 의 색 사각형이 사라지는 것과 늦게 나는 소리 / 실내에서 날씨 소리 0.35 배 / 날씨의 하늘 번호가 -1 이 아니면 하늘도 바꾼다 / 날씨 상태는 맵에 붙고 `UnloadSkyData` 가 지운다 (하늘만 바꾸는 `LoadSkyData` 는 지우지 않는다) / 게임 정지 중에는 비·눈·번개가 멈춘다 / 미션의 날씨 목록은 이미지처럼 미션 정보와 함께 붙는다.
+- 코드: `src/Data/Parameter/WeatherParameterData.cs`, `Weather/WeatherData.cs`, `src/Map/Sky/WeatherLoad.cs`(`MapLoader.SetWeather`, `WeatherIndex`, `CurrentWeather`), `WeatherView.cs`, `SkyLoad.cs`(`AddSkyLayers`, `TryGetSkyLayer`, 날씨의 안개), `shaders/sky_layer.gdshader`, `sky_sun.gdshader`, `SoundManagerAmbient.cs`(날씨 소리, 울림 버스 `XopsWorld`).
+
+**1.3 구역** (사용자가 정한 것):
+- 블록 모양을 쓴다. 블록 여러 개를 태그로 묶어 구역 하나로 친다. 태그는 미리 정해 두고 번호로 가리킨다.
+- BD2: 블록 개수 × 블록 다음에 구역 개수 × 구역 블록을 읽는다.
+- BD2 옆의 텍스처 목록 JSON 을 "직렬화 데이터" 같은 이름으로 바꾸고 그 안에 텍스처 목록과 구역 태그를 나눠 넣는다 (아직 BD2 로 만든 맵이 없어 바꾸는 비용이 싸다).
+- 구역에서 하는 것: 들어감·나감 확인, 구역 안에서 받는 데미지(틱이나 초 단위), 중력 배율(실수, 음수 포함), AI 의 시야 거리, 소리의 울림(실내 효과), 팀끼리의 적대(적대 안 함 / 무기를 든 적을 보거나 공격받으면 적대 / 늘 적대).
+- 판정은 발 위치로 한다.
+- 두 번째 질문의 답: 권고대로 (BD2 매직 `GDXOPSB3`, B2 도 읽음 / BD2 키 `mapDataPath`, 파일 `이름_map.json`, 키 `textureData` · `areaTagData` / 구역의 성질은 태그 데이터에 처음 값을 두고 이벤트가 바꾼다 / 데미지는 초당 HP 를 정수로 쌓아 빼고 무적은 막고 방어구는 거치지 않는다 / 중력은 사람에게만 / AI 시야는 보는 AI 가 구역 안일 때 / 울림은 듣는 자리(카메라) / 이벤트 번호 100 대 구역, 120 대 날씨·하늘). 이벤트는 몇 개만 넣으면 된다고 했다 (수영도 생각했다고). **팀 적대 규칙은 "구역 안"에서만, AI 의 판단만 막는다.**
+- **내가 정한 것**: 겹친 구역은 번호가 가장 큰 태그의 성질을 쓰고 데미지만 더한다 / 중력이 음수면 바닥에 서지 않는다 (착지 판정을 건너뛴다. 천장은 머리 판정이 막는다. 위로의 최대 속도는 낙하와 같은 크기) / 적대 규칙은 보는 AI 가 들어 있는 구역(번호가 가장 큰 태그)의 것이고, 규칙이 없는 팀끼리는 늘 적대 / "공격받으면 적대"는 무기를 든 상대를 **본** 순간(시야·사선을 통과한 뒤)이나 그 팀에게 맞은 순간(총알, 폭발, 좀비 공격) 기억하고, 사람의 구역(가장 큰 태그)이 바뀌면 잊는다 / 적대 확인은 `CheckLookEnemy` 의 시야·사선 판정 뒤에 둔다 (난수 소비는 원본과 같다) / 좀비의 공격 대상도 적대 규칙을 본다 / 구역 블록이 태그 목록 밖의 번호면 경고하고 뺀다 / 구역은 BD2 에만 있다 / 구역 틱은 `SimOrder` 7 (사람 10 보다 먼저) / 구역의 성질은 맵을 다시 로드하면(블록 데이터를 다시 읽으면) 처음 값.
+- 기본 제공 이벤트: 100 Wait Area Enter, 101 Wait Area Leave, 102 Set Area, 103 Set Area Hostility, 120 Set Weather, 121 Set Sky. API: `in_area`, `area_of`, `area_count`, `area_find`, `area_info`, `set_area`, `set_area_hostility`, `weather`, `set_weather`, `sky`, `set_sky`. 에디터의 칸 종류 `area`, `areaproperty`, `hostility`, `weather`, `sky`.
+- 에디터 (내가 정한 것): 구역 블록을 직접 옮기는 도구는 만들지 않고, 블록을 구역으로(Blocks → area), 구역을 블록으로(Area → blocks) 바꿔 평소의 블록 도구로 모양을 고친다. 블록 패널 아래에 태그 목록과 성질, 적대 규칙은 `1>0 never, 2>0 provoked` 꼴의 글. 반투명 덧그림 (`AreaOverlay`, 태그마다 색). 되돌리기는 `AreaEditCommand`(블록·구역·태그를 통째로).
+- 코드: `src/Data/Block/BlockMapData.cs`(옛 `BlockTextureListData`), `src/IO/BD2File.cs`(`BD2Area`), `src/Map/Area/`(`AreaLoad.cs`, `AreaVolume.cs`, `AreaState.cs`), `src/Map/Human/HumanArea.cs`, `src/Map/Event/EventApiArea.cs`, `src/Editor/XopsEditorAreas.cs`, `AreaOverlay.cs`, `AreaEditCommand.cs`. 블록의 면 평면 계산은 `MapLoader.ComputeFacePlanes` 하나를 블록과 구역이 함께 쓴다.
+- 함께 바꾼 것: `play_test` 에 `--mission-file`, `--map-pack`, `--weather` (하늘의 풍경·해와 날씨를 화면으로 보려고), 목록의 미션도 미션의 날씨를 건다.
+- **눈으로 본 것**: 비, 눈, 해 (`build/weather_demo/`, 공식 미션 0 을 바꾼 것 + 시험용 맵팩의 하늘). 풍경 텍스처는 하늘의 2 × 2 배치에 맞지 않는 시험 그림이라 위쪽에 띠로만 보였다 (기능은 돈다). **확인하지 못한 것**: 번개의 번쩍임과 날씨 소리(소리 파일을 쓰지 않았다), 울림이 실제로 들리는지, 실내 구역에서 비가 사라지는 화면, 에디터의 구역 패널 화면, 거꾸로 된 중력의 조작감.
+
+**1.4 로 미룬 것** (적어 두기만. `CLAUDE.md` 의 "모델은 `.x` 전용, 3D 애니메이션 미사용"을 뒤집는 결정이 함께 필요하다):
+- `.x` 의 스킨·애니메이션과 `.fbx` 지원.
+- Human 2.0, Weapon 2.0 은 지금의 겉모습을 대체하지 않는다. 레거시도 지원하고 bool 로 어느 쪽을 쓸지 고른다.
+- Human 2.0: 리깅으로 움직이는 동작, 죽는 동작 (래그돌은 고민 중), 앉기·엎드리기 같은 자세 (HumanController 의 크기도 함께), 이벤트로 사다리와 수영.
+- Weapon 2.0: 리깅으로 발사·재장전 동작, IK 로 사람에게 무기를 붙이기, 들지 않은 무기가 보이는 것 (등에 메기), 부착물.
+- AI 2.0: Human 2.0 에 맞춘 엄폐, NavMesh 로 경로 이동, 적을 보면 엄폐하는 것 같은 판단.
+
+## 1.3.0: Graphic 칸과 커스텀 바인딩 (2026-10-20, 커밋 `0648e04`)
+
+**1.3.0 은 아직 릴리즈하지 않는다** (사용자 2026-10-21: 1.3 에 몇 가지를 더 넣고 싶다. 무엇을 넣을지는 아직 듣지 않았다). `0648e04` 를 익스포트한 빌드만 `build/1.3.0/GodotXOPS/` 에 있다 (익스포트 결과물, git 이 추적하는 `godotdata/` 46개, `addon.json`, `dist/` 의 두 파일, `LICENSE.txt`. 헤드리스로 메뉴와 `script_probe` 가 종료 코드 0). 릴리즈 노트 초안은 `build/1.3.0/release_note.md` 이고, 더 넣으면 함께 고친다. 태그와 게시는 하지 않았다.
 
 버전을 1.3.0 으로 올렸다 (`global.json`, `export_presets.cfg`. README 의 "최신 릴리즈"는 1.2.5 그대로, `ROADMAP.md` 는 "작업 중"). 점검 씬 전부 통과 (config 105, event 191, ui 170, editor 343 등).
 

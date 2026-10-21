@@ -476,6 +476,7 @@ namespace GodotXOPS
             int baseDamage = human.HitBullet(part, m_attacks, m_armorPointDecay, m_helmetPointDecay, m_armorIgnore, m_helmetIgnore, out bool armored);
             human.Controller.AddKnockback(m_yaw, 0f, k_hitKnockbackSpeed);
             human.SetHitYaw(m_yaw);
+            MapLoader.NotifyAttacked(human, m_owner);
 
             MapLoader.RecordHit(m_owner, part == HumanHitPart.Head, m_onTargetWeight);
             if (hpBefore > 0f && human.HP <= 0f) MapLoader.RecordKill(m_owner);
@@ -675,6 +676,7 @@ namespace GodotXOPS
 
                     float hpBefore = human.HP;
                     human.HitGrenadeExplosion(damage);
+                    MapLoader.NotifyAttacked(human, m_owner);
                     PushByExplosion(human, origin, feet, radius);
 
                     // 수류탄은 킬만 통계에 넣는다 (원본 objectmanager.cpp:1113-1115). 혈흔은 튀지 않는 한 덩이만 낸다.

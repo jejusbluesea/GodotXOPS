@@ -70,6 +70,8 @@ namespace GodotXOPS.Editor
             [(typeof(BlockMaterialData), nameof(BlockMaterialData.hitEffect))] = new AssetReference(s_effect, k_effects),
             [(typeof(BlockMaterialData), nameof(BlockMaterialData.bulletHoleEffect))] = new AssetReference(s_effect, k_effects),
             [(typeof(BlockTextureData), nameof(BlockTextureData.materialIndex))] = new AssetReference(typeof(BlockMaterialParameterData), nameof(BlockMaterialParameterData.blockMaterialData)),
+            [(typeof(WeatherData), nameof(WeatherData.soundIndex))] = new AssetReference(typeof(SoundParameterData), nameof(SoundParameterData.soundData)),
+            [(typeof(WeatherData), nameof(WeatherData.lightningSoundIndex))] = new AssetReference(typeof(SoundParameterData), nameof(SoundParameterData.soundData)),
         };
 
         /// <summary>

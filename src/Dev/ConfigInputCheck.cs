@@ -36,6 +36,7 @@ namespace GodotXOPS.Dev
 
             Expect("없는 설정은 fallback", config.GetInt("Nope", "nope", 7), 7);
 
+            Expect("crouch 기본 키는 왼쪽 Ctrl", input.GetActionBinding(InputManager.Crouch), "<Keyboard>/leftCtrl");
             Expect("리바인드 성공", input.SetActionBinding(InputManager.Jump, "<Keyboard>/k"), true);
             Expect("잘못된 경로 리바인드 거부", input.SetActionBinding(InputManager.Jump, "<Keyboard>/nope"), false);
             Expect("리바인드 뒤 현재 바인딩 조회", input.GetActionBinding(InputManager.Jump), "<Keyboard>/k");

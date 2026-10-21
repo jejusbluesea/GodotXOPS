@@ -87,6 +87,9 @@ namespace GodotXOPS
             ImageParameterData image = LoadAddonFile<ImageParameterData>(pack.imageDataPath);
             if (image != null) data.ImageParameterData.imageData.SetPack(image.imageData);
 
+            WeatherParameterData weather = LoadAddonFile<WeatherParameterData>(pack.weatherDataPath);
+            if (weather != null) data.WeatherParameterData.weatherData.SetPack(weather.weatherData);
+
             LoadPackSky(pack.skyDataPath);
             if (InputManager.Loaded) InputManager.Instance.LoadCustomLayer(CustomBindingLayer.Pack, pack.inputDataPath);
         }
@@ -111,6 +114,7 @@ namespace GodotXOPS
             data.BlockMaterialParameterData.blockMaterialData.ClearPack();
             data.SoundParameterData.soundData.ClearPack();
             data.ImageParameterData.imageData.ClearPack();
+            data.WeatherParameterData.weatherData.ClearPack();
 
             if (EffectManager.Loaded) EffectManager.Instance.ClearAddonMaterials();
         }

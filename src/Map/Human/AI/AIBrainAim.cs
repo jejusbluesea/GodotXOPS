@@ -256,6 +256,7 @@ namespace GodotXOPS
         /// <summary>
         /// 한 사람이 적이고 시야 안에 보이는지 판정한다. 보이면 그 사람을 표적으로 기억한다. 원본 AIcontrol::CheckLookEnemy (ai.cpp:1398-1444).
         /// 거리와 각도는 발 위치끼리 재고, 세로 시야는 팔 각도와 무관하게 수평을 기준으로 한다. 가리는 것은 블록만 본다 (사람과 소물은 가리지 않는다).
+        /// 구역 안이면 그 구역의 시야 배율과 적대 규칙을 쓴다 (원본에 없다).
         /// </summary>
         /// <param name="target">볼 사람. null 이면 false.</param>
         /// <param name="fovH">가로 시야각 전체 (도).</param>
@@ -267,6 +268,8 @@ namespace GodotXOPS
             if (!IsValidHuman(target) || !target.Alive) return false;
             if (target.Team == m_self.Team) return false;
 
+            // 구역이 시야 거리를 줄이거나 늘린다 (구역 밖이면 1).
+            maxDistance *= m_self.AreaSightScale;
             Vector3 position = m_controller.Position;
             Vector3 toTarget = target.Controller.Position - position;
             float distanceSquared = toTarget.LengthSquared();
@@ -282,6 +285,9 @@ namespace GodotXOPS
                 Vector3 eye = position + Vector3.Up * m_controller.CameraHeight;
                 if (MapLoader.RaycastBlock(BlockLayer.Sight, eye, toTarget / distance, distance, out _)) return false;
             }
+
+            // 보이는 상대라도 구역의 적대 규칙이 막으면 적으로 삼지 않는다 (구역 밖이면 늘 적).
+            if (!m_self.IsHostileTo(target)) return false;
 
             m_enemy = target;
             return true;

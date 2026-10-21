@@ -1724,6 +1724,155 @@
           "kind": "event"
         }
       ]
+    },
+    {
+      "type": 100,
+      "name": "Wait Area Enter",
+      "function": "wait_area_enter",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "area",
+          "slot": "e0",
+          "kind": "area"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 101,
+      "name": "Wait Area Leave",
+      "function": "wait_area_leave",
+      "parameters": [
+        {
+          "name": "human",
+          "slot": "p2",
+          "kind": "human"
+        },
+        {
+          "name": "area",
+          "slot": "e0",
+          "kind": "area"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 102,
+      "name": "Set Area",
+      "function": "set_area",
+      "parameters": [
+        {
+          "name": "area",
+          "slot": "p2",
+          "kind": "area"
+        },
+        {
+          "name": "property",
+          "slot": "e0",
+          "kind": "areaproperty"
+        },
+        {
+          "name": "value",
+          "slot": "e1",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 103,
+      "name": "Set Area Hostility",
+      "function": "set_area_hostility",
+      "parameters": [
+        {
+          "name": "area",
+          "slot": "p2",
+          "kind": "area"
+        },
+        {
+          "name": "team",
+          "slot": "e0",
+          "kind": "team"
+        },
+        {
+          "name": "target",
+          "slot": "e1",
+          "kind": "team"
+        },
+        {
+          "name": "mode",
+          "slot": "e2",
+          "kind": "hostility"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 120,
+      "name": "Set Weather",
+      "function": "set_weather",
+      "parameters": [
+        {
+          "name": "weather",
+          "slot": "p2",
+          "kind": "weather"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
+      "type": 121,
+      "name": "Set Sky",
+      "function": "set_sky",
+      "parameters": [
+        {
+          "name": "sky",
+          "slot": "p2",
+          "kind": "sky"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
     }
   ]
 }

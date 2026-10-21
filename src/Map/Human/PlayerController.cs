@@ -216,7 +216,13 @@ namespace GodotXOPS
                 if (move.X > 0f) moveFlag |= HumanMoveFlag.Right;
                 if (input.IsPressed(InputManager.Walk)) moveFlag |= HumanMoveFlag.Walk;
             }
-            if (input.WasPressed(InputManager.Jump) && (locks & EventManager.LockJump) == 0) moveFlag |= HumanMoveFlag.Jump;
+            if ((locks & EventManager.LockJump) == 0)
+            {
+                // 비행 중에는 점프(위)와 앉기(아래)를 누르고 있는 동안 움직인다. 평소의 점프는 누른 순간 한 번이다.
+                bool flying = m_controller.Flight;
+                if (flying ? input.IsPressed(InputManager.Jump) : input.WasPressed(InputManager.Jump)) moveFlag |= HumanMoveFlag.Jump;
+                if (input.IsPressed(InputManager.Crouch)) moveFlag |= HumanMoveFlag.Crouch;
+            }
 
             HumanWeaponAction weapon = ReadWeaponInput(input, locks);
 

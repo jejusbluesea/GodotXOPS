@@ -16,6 +16,8 @@ namespace GodotXOPS
         public string pointPath = string.Empty;
         // 하늘 번호. 10000 에서 19999 는 이 미션이 속한 맵팩의 하늘이다.
         public int skyIndex;
+        // 미션을 시작할 때의 날씨 번호 (weather_data.json 은 0 부터, 맵팩 10000, 미션 20000). 0 은 맑음이다.
+        public int weatherIndex;
         // 추가 충돌 검사와 어두운 화면 (MIF 의 화면 플래그 두 비트).
         public bool adjustCollision;
         public bool darkScreen;
@@ -35,6 +37,8 @@ namespace GodotXOPS
         public string addonImageDataPath = string.Empty;
         // 이 미션에서만 쓰는 커스텀 바인딩 등록 파일. 메뉴에는 미션 정보가 없어서 이 미션을 하는 동안만 액션이 있다. 비워 두면 없다.
         public string addonInputDataPath = string.Empty;
+        // 이 미션이 들고 오는 날씨 목록. 날씨 번호 20000 부터가 이 파일의 항목이다. 비워 두면 없다.
+        public string addonWeatherDataPath = string.Empty;
         // 이 미션에서만 기본 화면 대신 그리는 화면 스크립트(.sgd). 비워 두면 평소의 화면이다. 이미지는 이미지 목록(맵팩 10000 부터, 미션 20000 부터)을 번호로 그린다.
         public string briefingScriptPath = string.Empty;
         public string hudScriptPath = string.Empty;

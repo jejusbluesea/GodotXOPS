@@ -14,6 +14,8 @@ namespace GodotXOPS
         public const string Look = "look";
         public const string Move = "move";
         public const string Jump = "jump";
+        // 앉기 (원본에 없다). 지금은 비행 모드(콘솔의 flight)에서 아래로 내려가는 데만 쓴다. 자세는 Human 2.0 에서 붙인다.
+        public const string Crouch = "crouch";
         public const string Walk = "walk";
         public const string Drop = "drop";
         public const string Fire = "fire";

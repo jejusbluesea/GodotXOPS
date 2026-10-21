@@ -34,7 +34,7 @@ var steppers = {}
 var color_cells = {}
 var resolution_cells = {}
 var resolution_info = {}
-var bind_actions = ["jump", "walk", "drop", "fire", "zoom", "previous", "next", "reload", "first", "second", "interact"]
+var bind_actions = ["jump", "crouch", "walk", "drop", "fire", "zoom", "previous", "next", "reload", "first", "second", "interact"]
 var bind_slots = {}
 var bind_paths = {}
 # Custom bindings: [name, label] each, 14 to a page (seven rows of two under the page row).

@@ -402,7 +402,7 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
-        /// 비행 모드: 입력이 없으면 공중에 그대로 떠 있고, 전진하면 시선 방향(위아래 포함)으로 블록을 뚫고 나아가며, 점프는 무시되고, 사람에게 밀리지 않고, 끄면 다시 떨어진다.
+        /// 비행 모드: 입력이 없으면 공중에 그대로 떠 있고, 전진하면 시선 방향(위아래 포함)으로 블록을 뚫고 나아가며, 점프는 곧게 위로·앉기는 곧게 아래로 움직이고, 사람에게 밀리지 않고, 끄면 다시 떨어진다.
         /// </summary>
         /// <param name="game">창구.</param>
         /// <param name="player">플레이어.</param>
@@ -424,12 +424,27 @@ namespace GodotXOPS.Dev
             int airbornePenalty = DataManager.Instance.WeaponParameterData.weaponAccuracyData.airborneAccuracyPenalty;
             Expect(controller.Grounded && (airbornePenalty <= 0 || player.GunsightErrorRange < airbornePenalty), $"비행 중인데 공중 상태로 판정됨 (조준 오차 {player.GunsightErrorRange})");
 
-            // 30° 내려다보며 전진 + 점프: 시선 방향으로만 움직인다.
+            // 점프는 곧게 위로, 앉기는 곧게 아래로 (시선과 무관하다).
+            foreach ((HumanMoveFlag flag, float sign) in new[] { (HumanMoveFlag.Jump, 1f), (HumanMoveFlag.Crouch, -1f) })
+            {
+                controller.Teleport(start);
+                for (int i = 0; i < 5; i++)
+                {
+                    var vertical = new HumanInput { moveFlag = flag, yaw = 40f, pitch = 30f };
+                    controller.SetInput(in vertical);
+                    SimClock.Step();
+                }
+                Vector3 delta = controller.Position - start;
+                Expect(delta.Y * sign > 0.3f && Mathf.Abs(delta.X) < 1e-4f && Mathf.Abs(delta.Z) < 1e-4f, $"비행 중 {flag} 가 곧게 위아래로 움직이지 않음 ({delta})");
+            }
+            controller.Teleport(start);
+
+            // 30° 내려다보며 전진: 시선 방향으로만 움직인다.
             const float yaw = 40f;
             const float pitch = 30f;
             for (int i = 0; i < 10; i++)
             {
-                var input = new HumanInput { moveFlag = HumanMoveFlag.Forward | HumanMoveFlag.Jump, yaw = yaw, pitch = pitch };
+                var input = new HumanInput { moveFlag = HumanMoveFlag.Forward, yaw = yaw, pitch = pitch };
                 controller.SetInput(in input);
                 SimClock.Step();
             }

@@ -48,12 +48,12 @@ namespace GodotXOPS
 
             string prefix = $"{outputFolder.Replace('\\', '/').TrimEnd('/')}/{baseName}";
             string blockRelative = prefix + BD2File.Extension;
-            string texturesRelative = prefix + "_textures.json";
+            string texturesRelative = prefix + "_map.json";
             string pointRelative = prefix + PD2File.Extension;
             string objectsRelative = prefix + "_objects.json";
             string missionRelative = prefix + MIF2File.Extension;
 
-            if (!ConvertBD1(loader.m_missionBD1Path, texturesRelative, out BD2File blocks, out BlockTextureListData textures))
+            if (!ConvertBD1(loader.m_missionBD1Path, texturesRelative, out BD2File blocks, out BlockMapData textures))
             {
                 error = $"block data open failed: {loader.m_missionBD1Path}";
                 return null;

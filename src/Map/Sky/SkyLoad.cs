@@ -17,6 +17,9 @@ namespace GodotXOPS
 
         // 지금 떠 있는 하늘의 번호. 하늘이 없으면 -1. 안개 설정을 바꾼 뒤 다시 적용할 때 쓴다 (RefreshFog).
         private int m_loadedSkyIndex = -1;
+
+        // 지금 떠 있는 하늘의 번호. 하늘이 없으면 -1.
+        public static int LoadedSkyIndex => Loaded ? Instance.m_loadedSkyIndex : -1;
         // 안개를 그리고 있는지 (셰이더의 전역 값은 헤드리스에서 읽을 수 없어서 따로 든다).
         private bool m_fogActive;
 
@@ -63,6 +66,78 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 하늘 번호에 겹쳐 그리는 풍경과 해·달을 찾는다. 10000 미만은 sky_data.json, 10000 에서 19999 는 맵팩의 하늘이다.
+        /// </summary>
+        /// <param name="skyIndex">하늘 번호.</param>
+        /// <param name="layer">찾은 것.</param>
+        /// <returns>그 번호에 겹쳐 그리는 것이 적혀 있으면 true.</returns>
+        public static bool TryGetSkyLayer(int skyIndex, out SkyLayerData layer)
+        {
+            layer = null;
+            SkyData source = DataManager.Instance.SkyData;
+            int index = skyIndex;
+            if (skyIndex >= DataList<int>.MissionBase) return false;
+            if (skyIndex >= DataList<int>.PackBase)
+            {
+                source = Instance.m_packSky;
+                index = skyIndex - DataList<int>.PackBase;
+            }
+            if (source == null || index < 0 || index >= source.skyLayerData.Count) return false;
+
+            layer = source.skyLayerData[index];
+            return layer != null;
+        }
+
+        /// <summary>
+        /// 하늘 위에 풍경과 해·달을 더한다. 그 하늘 번호에 적힌 것이 없거나 텍스처를 읽지 못하면 그것만 빼고 그린다.
+        /// </summary>
+        /// <param name="skyIndex">하늘 번호.</param>
+        /// <param name="skyMesh">하늘 모델 (풍경도 같은 모델에 입힌다).</param>
+        private static void AddSkyLayers(int skyIndex, ArrayMesh skyMesh)
+        {
+            if (!TryGetSkyLayer(skyIndex, out SkyLayerData layer)) return;
+
+            Texture2D sun = LoadSkyTexture(layer.sunTexturePath);
+            if (sun != null)
+            {
+                Instance.m_skyRoot.AddChild(new MeshInstance3D
+                {
+                    Name = "Sun",
+                    Mesh = new QuadMesh { Size = new Vector2(2f, 2f) },
+                    MaterialOverride = MaterialManager.Instance.CreateSunMaterial(sun, Coord.FromUnity(layer.sunDirection), layer.sunSize),
+                    ExtraCullMargin = 16384f,
+                });
+            }
+
+            Texture2D billboard = LoadSkyTexture(layer.billboardTexturePath);
+            if (billboard != null)
+            {
+                Instance.m_skyRoot.AddChild(new MeshInstance3D
+                {
+                    Name = "SkyLayer",
+                    Mesh = skyMesh,
+                    MaterialOverride = MaterialManager.Instance.CreateSkyLayerMaterial(billboard),
+                    ExtraCullMargin = 16384f,
+                });
+            }
+        }
+
+        /// <summary>
+        /// 하늘에 쓰는 텍스처 하나를 읽는다.
+        /// </summary>
+        /// <param name="relativePath">exe 폴더 기준 경로. 비었으면 없다.</param>
+        /// <returns>텍스처. 비었거나 읽지 못했으면 null (읽지 못했으면 경고).</returns>
+        private static Texture2D LoadSkyTexture(string relativePath)
+        {
+            if (string.IsNullOrEmpty(relativePath)) return null;
+
+            string fullPath = GamePath.Resolve(relativePath);
+            Texture2D texture = fullPath != null ? ImageLoader.LoadTexture(fullPath) : null;
+            if (texture == null) Debugger.LogWarning($"Sky texture open failed: {relativePath}", nameof(MapLoader));
+            return texture;
+        }
+
+        /// <summary>
         /// 스카이 메시와 텍스처를 로드해 스카이 노드를 생성한다. 이전 스카이는 먼저 제거한다.
         /// 스카이는 셰이더가 카메라 위치에 붙여 그리므로 노드 위치와 무관하게 항상 배경으로 보인다.
         /// 어두운 화면 미션이면 스카이와 모델의 밝기도 여기서 낮춘다 (미션 정보를 먼저 로드해야 한다).
@@ -70,7 +145,7 @@ namespace GodotXOPS
         /// <param name="textureIndex">하늘 번호. 10000 에서 19999 는 맵팩의 하늘이다. 텍스처가 없는 번호(0, 범위 밖)면 텍스처 없이 검정.</param>
         public static void LoadSkyData(int textureIndex)
         {
-            UnloadSkyData();
+            RemoveSkyNodes();
 
             SkyData skyData = DataManager.Instance.SkyData;
             if (string.IsNullOrEmpty(skyData.skyMeshPath))
@@ -111,15 +186,25 @@ namespace GodotXOPS
             };
             Instance.m_skyRoot.AddChild(sky);
             Instance.m_loadedSkyIndex = textureIndex;
+            AddSkyLayers(textureIndex, skyMesh);
 
             ApplySkyFog(textureIndex);
             RenderingServer.GlobalShaderParameterSet(s_modelBrightnessGlobal, Instance.m_darkScreen ? k_darkModelBrightness : 1f);
         }
 
         /// <summary>
-        /// 스카이 노드를 모두 제거하고 안개를 끈다.
+        /// 스카이 노드를 모두 제거하고 안개와 날씨를 끈다 (맵을 내릴 때).
         /// </summary>
         public static void UnloadSkyData()
+        {
+            RemoveSkyNodes();
+            ClearWeather();
+        }
+
+        /// <summary>
+        /// 스카이 노드를 모두 제거하고 안개를 끈다. 날씨는 남긴다 (하늘을 바꿀 때 날씨가 지워지지 않게).
+        /// </summary>
+        private static void RemoveSkyNodes()
         {
             Node3D skyRoot = Instance.m_skyRoot;
             foreach (Node child in skyRoot.GetChildren())
@@ -135,23 +220,38 @@ namespace GodotXOPS
 
         /// <summary>
         /// 원본 SetFog(true, skynumber) 대응. 선형 안개를 SkyData 의 fogStart ~ fogEnd 범위, 하늘 번호별 색으로 적용한다.
-        /// SkyData.fog 가 false 이거나 설정의 enableFog 가 꺼져 있으면 안개를 끈다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)와 이펙트 셰이더만 받는다.
+        /// SkyData.fog 가 false 이거나(날씨가 안개를 덮어쓰지 않을 때) 설정의 enableFog 가 꺼져 있으면 안개를 끈다. 날씨가 안개를 덮어쓰면 그 색과 거리를 쓴다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)와 이펙트 셰이더만 받는다.
         /// </summary>
         /// <param name="skyIndex">하늘 번호. 10000 에서 19999 는 맵팩의 하늘이다. 색이 없는 번호면 검정(원본 default).</param>
         public static void ApplySkyFog(int skyIndex)
         {
             SkyData skyData = DataManager.Instance.SkyData;
-            if (!skyData.fog || !ConfigManager.Instance.GetBool(ConfigManager.SectionGraphic, ConfigManager.KeyEnableFog, true))
+            WeatherData weather = CurrentWeather;
+            bool weatherFog = weather != null && weather.fogOverride;
+            if ((!skyData.fog && !weatherFog) || !ConfigManager.Instance.GetBool(ConfigManager.SectionGraphic, ConfigManager.KeyEnableFog, true))
             {
                 ClearFog();
                 return;
             }
 
-            TryGetSky(skyIndex, out _, out Color color);
+            Color color;
+            float start = skyData.fogStart;
+            float end = skyData.fogEnd;
+            if (weatherFog)
+            {
+                // 날씨가 안개를 덮어쓰면 하늘의 안개 대신 그것을 쓴다.
+                color = weather.fogColor.ToColor();
+                start = weather.fogStart;
+                end = weather.fogEnd;
+            }
+            else
+            {
+                TryGetSky(skyIndex, out _, out color);
+            }
 
             // 셰이더가 sRGB 값 그대로 섞으므로 색을 선형으로 바꾸지 않고 넘긴다. w = 1 은 안개 사용.
             RenderingServer.GlobalShaderParameterSet(s_fogColorGlobal, new Vector4(color.R, color.G, color.B, 1f));
-            RenderingServer.GlobalShaderParameterSet(s_fogRangeGlobal, new Vector2(skyData.fogStart, skyData.fogEnd));
+            RenderingServer.GlobalShaderParameterSet(s_fogRangeGlobal, new Vector2(start, end));
             Instance.m_fogActive = true;
         }
 

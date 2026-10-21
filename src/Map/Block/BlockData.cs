@@ -96,7 +96,7 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="file">BD2 의 내용.</param>
         /// <param name="textures">텍스처 목록. null 이면 BD2 가 가리키는 텍스처 목록 파일을 읽는다.</param>
-        public static void LoadBlockData(BD2File file, BlockTextureListData textures = null)
+        public static void LoadBlockData(BD2File file, BlockMapData textures = null)
         {
             UnloadBlockData();
             ConvertBD2(file, textures, out string[] texturePaths, out RawBlockData[] rawBlocks);
@@ -170,6 +170,7 @@ namespace GodotXOPS
             loader.UpdateBlockMover();
             foreach (List<Block> colliders in loader.m_layerColliders) colliders.Clear();
             loader.m_blockMaterials.Clear();
+            loader.ClearAreas();
         }
 
         /// <summary>
@@ -363,6 +364,36 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 꼭짓점 8개로 여섯 면의 법선과 중심을 구한다. 블록과 구역 블록이 같은 계산을 쓴다 (안쪽 판정이 같아야 한다).
+        /// 원본의 COLLISION_ADDSIZE는 AABB fast-reject에만 쓰이고 면 중심은 실제 값을 그대로 쓴다. 확장 금지.
+        /// </summary>
+        /// <param name="vertices">꼭짓점 8개 (BD1 의 순서).</param>
+        /// <param name="faceNormals">면 법선을 받을 배열 (길이 6).</param>
+        /// <param name="faceCenters">면 중심을 받을 배열 (길이 6).</param>
+        private static void ComputeFacePlanes(Vector3[] vertices, Vector3[] faceNormals, Vector3[] faceCenters)
+        {
+            for (int f = 0; f < 6; f++)
+            {
+                int[] fi = s_faceVertexIndices[f];
+                Vector3 v0 = vertices[fi[0]];
+                Vector3 v1 = vertices[fi[1]];
+                Vector3 v2 = vertices[fi[2]];
+                Vector3 v3 = vertices[fi[3]];
+
+                // 원본 datafile.cpp:222-245: 두 삼각형 각각의 법선 계산 후 더 긴 쪽(비퇴화) 선택.
+                // 경사 블록의 면이 비평면 quad여도 유효한 법선을 얻을 수 있다.
+                // 원본(왼손 좌표계)과 거울상인 Godot(오른손)에서 같은 바깥 방향을 얻으려면 외적의 피연산자 순서가 반대여야 한다.
+                Vector3 c1 = (v0 - v2).Cross(v3 - v2);
+                Vector3 c2 = (v2 - v0).Cross(v1 - v0);
+
+                // 원본과 동일하게 winding 으로 구한 법선을 그대로 쓴다. 중심 바깥쪽으로 강제 보정하면
+                // 함몰/뒤집힌 형태의 통과벽(원본 BoardBlock) 판정이 깨져 통과 불가가 된다.
+                faceNormals[f] = (c1.LengthSquared() > c2.LengthSquared() ? c1 : c2).Normalized();
+                faceCenters[f] = (v0 + v1 + v2 + v3) * 0.25f;
+            }
+        }
+
+        /// <summary>
         /// 블록 하나의 원시 데이터로 메시와 충돌 정보를 만든다.
         /// </summary>
         /// <param name="raw">블록 원시 데이터.</param>
@@ -377,28 +408,9 @@ namespace GodotXOPS
             center /= 8f;
 
             // --- 면 법선 (셰이딩 + 충돌 공용) ---
-            // 원본의 COLLISION_ADDSIZE는 AABB fast-reject에만 쓰이고 면 중심은 실제 값을 그대로 쓴다. 확장 금지.
             var faceNormals = new Vector3[6];
             var faceCenters = new Vector3[6];
-            for (int f = 0; f < 6; f++)
-            {
-                int[] fi = s_faceVertexIndices[f];
-                Vector3 v0 = raw.vertices[fi[0]];
-                Vector3 v1 = raw.vertices[fi[1]];
-                Vector3 v2 = raw.vertices[fi[2]];
-                Vector3 v3 = raw.vertices[fi[3]];
-
-                // 원본 datafile.cpp:222-245: 두 삼각형 각각의 법선 계산 후 더 긴 쪽(비퇴화) 선택.
-                // 경사 블록의 면이 비평면 quad여도 유효한 법선을 얻을 수 있다.
-                // 원본(왼손 좌표계)과 거울상인 Godot(오른손)에서 같은 바깥 방향을 얻으려면 외적의 피연산자 순서가 반대여야 한다.
-                Vector3 c1 = (v0 - v2).Cross(v3 - v2);
-                Vector3 c2 = (v2 - v0).Cross(v1 - v0);
-
-                // 원본과 동일하게 winding 으로 구한 법선을 그대로 쓴다. 중심 바깥쪽으로 강제 보정하면
-                // 함몰/뒤집힌 형태의 통과벽(원본 BoardBlock) 판정이 깨져 통과 불가가 된다.
-                faceNormals[f] = (c1.LengthSquared() > c2.LengthSquared() ? c1 : c2).Normalized();
-                faceCenters[f] = (v0 + v1 + v2 + v3) * 0.25f;
-            }
+            ComputeFacePlanes(raw.vertices, faceNormals, faceCenters);
 
             // --- 면별 셰이딩 스칼라: shadow = ‖N + L‖ / 6 + offset (원본 datafile.cpp:253-265) ---
             float offset = darkFlag ? 0.3f : 0.5f;

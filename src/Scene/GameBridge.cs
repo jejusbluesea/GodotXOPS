@@ -378,6 +378,7 @@ namespace GodotXOPS
 
             bool blocks = MapLoader.LoadBlockData(loader.MissionBD1Path);
             MapLoader.LoadSkyData(loader.SkyIndex);
+            MapLoader.SetWeather(loader.MissionWeatherIndex);
             bool points = MapLoader.LoadPointData(loader.MissionPD1Path);
             return blocks && points;
         }

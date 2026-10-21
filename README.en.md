@@ -23,6 +23,7 @@ The goal is to reproduce the feel of the original. Movement, collision, and bull
 - Extended file formats (BD2, PD2, MIF2): no limits on the number of textures, point numbers, or event lines, and map packs and missions can bring their own humans, weapons, small objects, sounds, and images (map packs also sky, events, materials, and effects). The original formats (BD1, PD1, MIF) are still supported
 - Script events: in addition to the ten original events, more are included (variables and branches, spawning, on-screen text, moving small objects and blocks, playing sounds, putting images on the screen, cutscene staging such as the camera, fades, letterbox and pausing the game, and so on), and you can add your own event packs. Scripts only run inside a sandbox
 - Screen scripts: the opening, menu, briefing, in-game screen (HUD), result, and option screens can each be redrawn by a script. The built-in screens stay as they are and only the screens you register are replaced; samples that rewrite all six built-in screens are included. Missions and map packs can also bring their own briefing, HUD, and result screens and font, and a map pack can replace the title on its page of the menu. Scripts only run inside a sandbox
+- Weather and areas: draw scenery and a sun or moon over the sky, and switch weather such as rain, snow, and lightning from events. Mark parts of a map as areas to set the damage, gravity, AI sight range, sound reverb, and hostility between teams inside them
 - [Editor](#editor): edit blocks, points and events, missions, and data, and play-test right away
 - Debug console (set `AllowConsole` to `"true"` in `godotdata/config.json`, then press F11)
 
@@ -62,6 +63,7 @@ These are the defaults. You can change them in OPTION → Input in the menu.
 | Look | Mouse (arrow keys also work) |
 | Fire | Left mouse button |
 | Jump | Space |
+| Crouch (for now, only moves down in the debug console's flight mode) | Left Ctrl |
 | Walk | Tab |
 | Reload | R |
 | Scope | Left Shift |
@@ -111,7 +113,7 @@ This project tries to reproduce the original as closely as possible, using OpenX
 
 ## Roadmap
 
-The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events, data extensions such as armor and melee weapons, and per-mission screens, 1.2.3 added per-texture materials and UV editing in the editor, 1.2.4 added map packs (manifests) and their screens and fonts, and 1.2.5 fixed UI misalignment on large screens such as 4K. 1.3.0, in progress, adds custom bindings and the fog and draw distance settings. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
+The port was completed with 1.0.0, and 1.1.0 added the extended file formats, script events, and the editor, 1.2.0 added screen scripts, and 1.2.2 added cutscene events, data extensions such as armor and melee weapons, and per-mission screens, 1.2.3 added per-texture materials and UV editing in the editor, 1.2.4 added map packs (manifests) and their screens and fonts, and 1.2.5 fixed UI misalignment on large screens such as 4K. 1.3.0, in progress, adds custom bindings, the fog and draw distance settings, and weather and areas, and 1.4.0 is planned to bring rigged humans and weapons (Human 2.0, Weapon 2.0) and an AI 2.0 to match. What goes into the next version will be written in the [roadmap](ROADMAP.md) (in Korean) once it is decided.
 
 ## License and notices
 

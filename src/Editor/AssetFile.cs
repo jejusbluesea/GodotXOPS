@@ -42,10 +42,11 @@ namespace GodotXOPS.Editor
             new Kind("Image data", typeof(ImageParameterData)),
             new Kind("Event pack", typeof(EventPackData)),
             new Kind("Custom bindings", typeof(CustomBindingListData)),
+            new Kind("Weather data", typeof(WeatherParameterData)),
             new Kind("Sky data", typeof(SkyData)),
             new Kind("Mission list", typeof(MissionData)),
             new Kind("Global data", typeof(GlobalData)),
-            new Kind("Block texture list", typeof(BlockTextureListData)),
+            new Kind("Block texture list", typeof(BlockMapData)),
         };
 
         // 파일 경로 (exe 폴더 기준).
