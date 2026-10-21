@@ -262,6 +262,7 @@ namespace GodotXOPS.Dev
             Expect(game.OfficialMissionName(-1) == string.Empty && game.OfficialMissionName(9999) == string.Empty, "범위 밖 공식 미션 이름이 비어 있지 않음");
 
             Expect(game.AddonPageCount() == data.addonMissions.Count, "어드온 페이지 수가 데이터와 다름");
+            Expect(game.AddonPageName(0) == "LEGACY ADDON", $"addon 폴더 페이지의 이름이 LEGACY ADDON 이 아님 (\"{game.AddonPageName(0)}\")");
             Expect(game.AddonMissionCount(0) == data.addonMissions[0].Count, "어드온 미션 수가 데이터와 다름");
             Expect(game.AddonMissionCount(99) == 0 && game.AddonMissionName(99, 0) == string.Empty && game.AddonPageName(99) == string.Empty,
                 "범위 밖 어드온 페이지가 빈 값이 아님");

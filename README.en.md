@@ -88,7 +88,7 @@ Run `GodotXOPS_Editor.bat` (the same as `GodotXOPS.exe -- --scene editor`). It c
 
 ## Addon pages and map packs
 
-The `addon` folder is the first page of the addon list by default (in file name order). The pages after it are map packs. To register a map pack, write the path of its manifest file in `addon.json`. Paths are relative to the folder that contains `GodotXOPS.exe`.
+The `addon` folder is the first page of the addon list, **LEGACY ADDON**, by default (in file name order). The pages after it are map packs. To register a map pack, write the path of its manifest file in `addon.json`. Paths are relative to the folder that contains `GodotXOPS.exe`.
 
 ```json
 {

@@ -171,6 +171,7 @@
 릴리즈됨 (2026-10-22). [내려받기](https://github.com/jejusbluesea/GodotXOPS/releases/tag/v1.3.1)
 
 - [x] 발사와 경계를 이벤트로: 특정 사람이 쏘기를 기다리는 Wait Fire, 특정 사람(구역을 정하면 그 구역 안의 사람)이 경계하거나 싸우기 시작하기를 기다리는 Wait Alert, 특정 사람을 경계시키는 Set Caution 을 더했습니다 ([모딩 문서](docs/modding.md#기본-제공-이벤트)).
+- [x] 메뉴의 에드온 목록에서 `addon` 폴더의 페이지에 이름 LEGACY ADDON 을 붙였습니다 (맵팩 페이지와 구별됩니다).
 
 ## 1.4.0
 

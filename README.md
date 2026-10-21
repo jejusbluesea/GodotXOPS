@@ -86,7 +86,7 @@ GodotXOPS/
 
 ## 에드온 페이지와 맵팩
 
-`addon` 폴더는 기본으로 에드온 목록의 첫 페이지가 됩니다 (파일 이름 순서). 그 뒤의 페이지는 맵팩입니다. 맵팩을 등록하려면 `addon.json`에 맵팩의 Manifest 파일 경로를 적습니다. 경로는 `GodotXOPS.exe`가 있는 폴더 기준입니다.
+`addon` 폴더는 기본으로 에드온 목록의 첫 페이지 **LEGACY ADDON** 이 됩니다 (파일 이름 순서). 그 뒤의 페이지는 맵팩입니다. 맵팩을 등록하려면 `addon.json`에 맵팩의 Manifest 파일 경로를 적습니다. 경로는 `GodotXOPS.exe`가 있는 폴더 기준입니다.
 
 ```json
 {

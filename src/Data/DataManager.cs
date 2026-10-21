@@ -203,7 +203,7 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 어드온 미션을 페이지 단위로 로드한다. 페이지 0은 항상 기본 OpenXOPS 어드온 폴더("addon") 폴백(이름 없음, 파일 이름 순서).
+        /// 어드온 미션을 페이지 단위로 로드한다. 페이지 0은 항상 기본 OpenXOPS 어드온 폴더("addon") 폴백(이름 LEGACY ADDON, 파일 이름 순서. 미션이 없어도 맨 앞에 있다).
         /// 페이지 1~은 addon.json 의 manifests 가 가리키는 맵팩 Manifest 하나씩이다. 이름과 미션의 순서는 Manifest 가 정한다.
         /// 읽지 못한 Manifest 는 페이지가 되지 않는다. 경로는 항상 exe 폴더 기준이며 루트 밖으로 나가는 경로는 무시한다.
         /// </summary>
@@ -213,9 +213,9 @@ namespace GodotXOPS
             MissionData.addonPageNames = new List<string>();
             MissionData.addonPagePacks = new List<MapPackManifestData>();
 
-            // 페이지 0: 항상 존재하는 폴백 = 기본 OpenXOPS 어드온 폴더. 페이지 이름 없음.
+            // 페이지 0: 항상 존재하는 폴백 = 기본 OpenXOPS 어드온 폴더. 이름은 고정이다 (맵팩과 구별하려고. 사용자 결정).
             MissionData.addonMissions.Add(ScanAddonMifs(GamePath.Resolve(GamePath.AddonFolder)));
-            MissionData.addonPageNames.Add(string.Empty);
+            MissionData.addonPageNames.Add(k_legacyAddonPageName);
             MissionData.addonPagePacks.Add(null);
 
             // addon.json은 선택 파일이므로 부재를 먼저 걸러 TryReadJson의 "찾을 수 없습니다" 에러 로그가 상시 뜨는 것을 막는다.

@@ -2,6 +2,8 @@ namespace GodotXOPS
 {
     public partial class DataManager
     {
+        // 에드온 페이지 0(addon 폴더)의 이름. 메뉴의 페이지 막대에 나온다.
+        private const string k_legacyAddonPageName = "LEGACY ADDON";
         private const string k_humanGeneralDataPath = "godotdata/human/general.json";
         private const string k_humanControllerDataPath = "godotdata/human/controller.json";
         private const string k_humanHitboxSizeDataPath = "godotdata/human/hitbox.json";
