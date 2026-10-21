@@ -45,6 +45,10 @@ namespace GodotXOPS
         public Color32 fogColor;
         public float fogStart = 10f;
         public float fogEnd = 79f;
+        // true 면 유저가 설정에서 안개를 꺼도 이 날씨의 안개(fogOverride)를 그린다. 암흑 같은 연출용이다.
+        public bool forceFog;
+        // true 면 하늘·해·풍경을 fogColor 로 칠해 가린다 (암흑에서 하늘만 밝게 보이지 않게).
+        public bool hideSky;
 
         // 되풀이해 트는 소리 (소리 목록의 번호, -1 이면 없음)와 크기. 거리와 무관하게 들린다.
         public int soundIndex = -1;

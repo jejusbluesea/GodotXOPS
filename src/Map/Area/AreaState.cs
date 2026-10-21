@@ -13,6 +13,7 @@ namespace GodotXOPS
         public float aiSightScale = 1f;
         public float soundReverb;
         public bool blockWeather;
+        public int weatherIndex = -1;
         public readonly List<AreaHostilityRule> hostility = new List<AreaHostilityRule>();
 
         /// <summary>
@@ -31,6 +32,7 @@ namespace GodotXOPS
             state.aiSightScale = data.aiSightScale;
             state.soundReverb = data.soundReverb;
             state.blockWeather = data.blockWeather;
+            state.weatherIndex = data.weatherIndex;
             foreach (AreaHostilityRule rule in data.hostility)
             {
                 if (rule != null) state.hostility.Add(new AreaHostilityRule { team = rule.team, targetTeam = rule.targetTeam, mode = rule.mode });

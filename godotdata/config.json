@@ -343,6 +343,14 @@
         "<Keyboard>/escape"
       ],
       "composites": []
+    },
+    {
+      "name": "crouch",
+      "type": "Button",
+      "bindings": [
+        "<Keyboard>/leftCtrl"
+      ],
+      "composites": []
     }
   ],
   "customBindings": []

@@ -13,6 +13,8 @@ namespace GodotXOPS.Dev
     /// 이어서 기본 제공 묶음(godotdata/event/base.json)의 이벤트 전부를 한 미션에서 돌려 본다 (화면 글자, Interact, 카운트다운, 연출 포함).
     /// 명령행 인자("--" 뒤): --armor-sample 미션.pd2 는 점검 대신 그 PD2 에 방어구·헬멧과 재정비 이벤트의 시험용 구성을 더하고 종료한다 (에드온 데이터가 함께 있어야 한다. WriteArmorSample).
     /// --image-sample 미션.pd2 는 점검 대신 그 PD2 에 화면 이미지(이벤트 74, 75)의 시험용 줄을 더하고 종료한다 (미션이 속한 맵팩의 이미지 목록에 10000 과 10001 이 있어야 한다).
+    /// --input-sample 미션.pd2 는 점검 대신 그 PD2 에 Wait Input(27)과 날씨·암전으로 만든 암흑 시야·야간 투시경의 시험용 줄을 더하고 종료한다
+    /// (미션이 속한 맵팩에 커스텀 바인딩 0, 1 과 날씨 10000(암흑), 10001(야간 투시경)이 있어야 한다).
     /// --stage-sample 미션.pd2 는 점검 대신 그 PD2 에 연출 이벤트로 만든 시험용 컷신 줄을 더하고 종료한다 (눈으로 확인하는 용도).
     /// 실행: Godot 콘솔 실행 파일로 --headless --path . res://scenes/dev/event_check.tscn
     /// </summary>
@@ -176,6 +178,15 @@ func bump(p, state):
                 return;
             }
 
+            int inputArg = Array.IndexOf(args, "--input-sample");
+            if (inputArg >= 0)
+            {
+                bool ok = inputArg + 1 < args.Length && WriteInputSample(args[inputArg + 1]);
+                if (!ok) GD.Print("사용법: --input-sample 미션.pd2 (경로는 exe 폴더 기준. 그 파일에 Wait Input 의 시험용 줄을 더해 덮어쓴다)");
+                GetTree().Quit(ok ? 0 : 1);
+                return;
+            }
+
             int imageArg = Array.IndexOf(args, "--image-sample");
             if (imageArg >= 0)
             {
@@ -210,6 +221,7 @@ func bump(p, state):
                 CheckVitals();
                 CheckStaging();
                 CheckScreenText();
+                CheckChainedInteract();
                 CheckScreenImages();
                 CheckCustomInput();
                 CheckAreasAndWeather();
@@ -1385,6 +1397,58 @@ func bump(p, state):
         }
 
         /// <summary>
+        /// PD2 하나에 Wait Input(27)의 시험용 줄 둘을 더해 덮어쓴다 (눈으로 확인하는 용도. 미션이 속한 맵팩에 커스텀 바인딩 0, 1 과 날씨 10000, 10001 이 있어야 한다).
+        /// 줄 하나는 암흑(10000)으로 시작해 버튼 0 을 누를 때마다 야간 투시경(10001)과 오가고, 줄 둘은 버튼 1 을 1 초 누를 때마다 HUD 아래의 초록 암전(Fade Screen)을 켜고 끈다.
+        /// </summary>
+        /// <param name="path">PD2 경로 (exe 폴더 기준).</param>
+        /// <returns>썼으면 true.</returns>
+        private static bool WriteInputSample(string path)
+        {
+            const int waitInput = 27, fadeScreen = 87, setWeather = 120;
+            const int darkLine = 31100, overlayLine = 31200, dark = 10000, nightVision = 10001, green = 0x30FF30;
+
+            string full = GamePath.Resolve(path);
+            if (full == null || !PD2File.Read(full, out PD2File file, out _))
+            {
+                GD.Print($"PD2 를 읽지 못함: {path}");
+                return false;
+            }
+            if (file.points.Exists(point => point.id >= darkLine && point.id < overlayLine + 100))
+            {
+                GD.Print("이미 시험용 줄이 들어 있음");
+                return false;
+            }
+
+            void Add(int type, int id, int p2, int next, params int[] extra)
+            {
+                file.points.Add(new PD2Point { type = type, id = id, param1 = p2, param2 = next, extra = extra });
+            }
+            int Cell(float value) => PD2File.FloatCell(value);
+
+            // 줄 하나: 암흑으로 시작하고, 버튼 0 을 누를 때마다 야간 투시경과 암흑을 오간다 (날씨).
+            file.eventEntryIds.Add(darkLine);
+            Add(setWeather, darkLine, dark, darkLine + 1);
+            Add(waitInput, darkLine + 1, 0, darkLine + 2, Cell(0f));
+            Add(setWeather, darkLine + 2, nightVision, darkLine + 3);
+            Add(waitInput, darkLine + 3, 0, darkLine + 4, Cell(0f));
+            Add(setWeather, darkLine + 4, dark, darkLine + 1);
+            // 줄 둘: 버튼 1 을 1 초 누르고 있을 때마다 HUD 아래의 초록 암전을 켜고 끈다.
+            file.eventEntryIds.Add(overlayLine);
+            Add(waitInput, overlayLine, 1, overlayLine + 1, Cell(1f));
+            Add(fadeScreen, overlayLine + 1, 0, overlayLine + 2, green, Cell(0.3f), Cell(0.2f));
+            Add(waitInput, overlayLine + 2, 1, overlayLine + 3, Cell(1f));
+            Add(fadeScreen, overlayLine + 3, 0, overlayLine, green, Cell(0f), Cell(0.2f));
+
+            if (!file.Write(full, out string error))
+            {
+                GD.Print($"PD2 를 쓰지 못함: {error}");
+                return false;
+            }
+            GD.Print($"Wait Input 의 시험용 줄을 더함: {path} (식별번호 {darkLine}, {overlayLine} 부터)");
+            return true;
+        }
+
+        /// <summary>
         /// PD2 하나에 화면 이미지의 시험용 줄을 더해 덮어쓴다 (눈으로 확인하는 용도. 미션의 이미지 목록에 10000 과 10001 이 있어야 한다).
         /// 1초 뒤 오른쪽 위에 10000 을 서서히 놓고, 3초 뒤 화면 가운데에 10001 을 반투명으로 3초 동안 보여 주고, 다시 5초 뒤 처음 것을 서서히 지운다.
         /// </summary>
@@ -1506,8 +1570,56 @@ func bump(p, state):
         }
 
         /// <summary>
-        /// 커스텀 바인딩의 입력: 미션(MIF2 의 addonInputDataPath)이 등록한 버튼을 API input_pressed / input_held / key_name 으로 읽는다.
-        /// 눌림은 다음 틱 한 번, 누르고 있음은 다음 틱부터이고, 없는 이름은 거짓이다. 미션 정보를 내리면 그 버튼도 없다.
+        /// 이은 Wait Interact(26): 앞의 것을 넘긴 눌림이나 그때부터 누르고 있던 키로는 다음 것이 넘어가지 않고, 키를 한 번 뗀 뒤의 입력만 센다.
+        /// 누르는 순간의 것 둘과 0.1초(3틱) 꾹 누르는 것 둘을 각각 잇는다.
+        /// </summary>
+        private void CheckChainedInteract()
+        {
+            const int waitInteract = 26, setVar = 40;
+            int far = PD2File.FloatCell(1000f), any = PD2File.FloatCell(180f), hold = PD2File.FloatCell(0.1f);
+            PD2File file = BaseFile();
+            file.eventEntryIds.AddRange(new[] { 100, 200 });
+            file.points.Add(Event(waitInteract, 100, 0, 101, far, any, -1));
+            file.points.Add(Event(setVar, 101, 1, 102, 1));
+            file.points.Add(Event(waitInteract, 102, 0, 103, far, any, -1));
+            file.points.Add(Event(setVar, 103, 2, 104, 1));
+            file.points.Add(Event(waitInteract, 200, 0, 201, far, any, -1, hold));
+            file.points.Add(Event(setVar, 201, 3, 202, 1));
+            file.points.Add(Event(waitInteract, 202, 0, 203, far, any, -1, hold));
+            file.points.Add(Event(setVar, 203, 4, 204, 1));
+
+            int errors = Debugger.ErrorCount;
+            if (!WriteAndLoad(BuildPack(), k_script, file))
+            {
+                Expect(false, $"이은 Interact 점검의 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
+                return;
+            }
+
+            EventManager events = EventManager.Instance;
+            events.BeginMission();
+            SimClock.Step();
+            events.QueueInteract();
+            events.SetInteractHeld(true);
+            SimClock.Step();
+            Expect(events.GetVariable(1) == 1 && events.GetVariable(2) == 0, "한 번 누른 것으로 이은 Wait Interact 둘이 함께 넘어감");
+            for (int tick = 0; tick < 8; tick++) SimClock.Step();
+            Expect(events.GetVariable(3) == 1 && events.GetVariable(4) == 0, "꾹 누르는 Wait Interact 를 넘긴 키를 계속 누르고 있었더니 다음 것까지 넘어감");
+
+            events.SetInteractHeld(false);
+            SimClock.Step();
+            events.SetInteractHeld(true);
+            for (int tick = 0; tick < 3; tick++) SimClock.Step();
+            Expect(events.GetVariable(4) == 1 && events.GetVariable(2) == 0, "키를 뗐다가 다시 꾹 눌렀는데 넘어가지 않거나, 누르는 순간의 Interact 가 누르고 있는 것으로 넘어감");
+            events.SetInteractHeld(false);
+            events.QueueInteract();
+            SimClock.Step();
+            Expect(events.GetVariable(2) == 1 && !events.LineStopped(0) && !events.LineStopped(1), "다시 누른 것으로 이은 두 번째 Wait Interact 가 넘어가지 않음");
+            MapLoader.UnloadPointData();
+        }
+
+        /// <summary>
+        /// 커스텀 바인딩의 입력: 맵팩(Manifest 의 inputDataPath)이 등록한 버튼을 API input_pressed / input_held / key_name 으로 읽는다.
+        /// 눌림은 다음 틱 한 번, 누르고 있음은 다음 틱부터이고, 없는 이름은 거짓이다. 미션 정보를 내리면(맵팩이 떨어지면) 그 버튼도 없다.
         /// </summary>
         private void CheckCustomInput()
         {
@@ -1525,6 +1637,8 @@ func keys(p, state):
 		api[""set_var""].call(82, 1)
 	if api[""key_name""].call(""check_key"") == ""K"":
 		api[""set_var""].call(83, 1)
+	if api[""input_binding""].call(0) == ""check_key"" and api[""input_binding""].call(5) == """":
+		api[""set_var""].call(86, 1)
 	return -1
 ";
             File.WriteAllText(Path.Combine(m_folder, "input.json"),
@@ -1532,21 +1646,34 @@ func keys(p, state):
             var pack = new EventPackData { scriptPath = $"{k_workFolder}/pack.sgd" };
             pack.events.Add(Define(10000, "keys"));
             PD2File file = BaseFile();
-            file.eventEntryIds.Add(100);
+            file.eventEntryIds.AddRange(new[] { 100, 300, 400, 500 });
             file.points.Add(Event(10000, 100, 0, 101));
+            // 기본 묶음의 Wait Input: 맵팩 등록 파일의 0 번 바인딩. 줄 300 은 누르는 순간, 줄 400 은 0.1 초(3틱) 누르고 있기.
+            const int waitInput = 27, setVar = 40;
+            file.points.Add(Event(waitInput, 300, 0, 301));
+            file.points.Add(Event(setVar, 301, 84, 302, 1));
+            file.points.Add(Event(waitInput, 400, 0, 401, PD2File.FloatCell(0.1f)));
+            file.points.Add(Event(setVar, 401, 85, 402, 1));
+            // 줄 500: Wait Input 둘을 잇는다. 한 번 누른 것으로는 첫 번째만 넘어간다.
+            file.points.Add(Event(waitInput, 500, 0, 501));
+            file.points.Add(Event(waitInput, 501, 0, 502));
+            file.points.Add(Event(setVar, 502, 87, 503, 1));
 
             int errors = Debugger.ErrorCount;
-            bool loaded = WriteAndLoad(pack, script, file, "pack.sgd", mission => mission.addonInputDataPath = $"{k_workFolder}/input.json");
+            m_mapPack.inputDataPath = $"{k_workFolder}/input.json";
+            bool loaded = WriteAndLoad(pack, script, file);
+            m_mapPack.inputDataPath = string.Empty;
             Expect(loaded, $"커스텀 바인딩 점검의 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
             if (!loaded) return;
 
             InputManager input = InputManager.Instance;
-            Expect(input.IsCustomAction("check_key") && input.GetActionBinding("check_key") == "<Keyboard>/k", "미션의 커스텀 바인딩이 액션이 되지 않음");
+            Expect(input.IsCustomAction("check_key") && input.GetActionBinding("check_key") == "<Keyboard>/k", "맵팩의 커스텀 바인딩이 액션이 되지 않음");
 
             EventManager events = EventManager.Instance;
             events.BeginMission();
             SimClock.Step();
             Expect(events.GetVariable(83) == 1, "key_name 이 커스텀 바인딩의 키를 주지 않음");
+            Expect(events.GetVariable(86) == 1, "input_binding 이 맵팩 등록 파일의 순서대로 이름을 주지 않음");
             Expect(events.GetVariable(80) == 0 && events.GetVariable(81) == 0, "누르지 않았는데 커스텀 바인딩이 눌림");
 
             events.QueueCustomPressed("CHECK_KEY");
@@ -1555,13 +1682,30 @@ func keys(p, state):
             Expect(events.GetVariable(80) == 1 && events.GetVariable(81) == 1, "input_pressed / input_held 가 커스텀 바인딩을 읽지 못함 (이름은 대소문자 무시)");
             SimClock.Step();
             Expect(events.GetVariable(80) == 1 && events.GetVariable(81) == 2, "눌림이 한 틱 넘게 남거나 누르고 있음이 이어지지 않음");
+            Expect(events.GetVariable(84) == 1 && events.GetVariable(85) == 0, "Wait Input 이 누르는 순간에 넘어가지 않거나, 누르는 시간을 채우기 전에 넘어감");
             events.SetCustomHeld("check_key", false);
             SimClock.Step();
             Expect(events.GetVariable(81) == 2 && events.GetVariable(82) == 0 && !events.LineStopped(0), "뗀 뒤에도 누르고 있거나, 없는 이름이 눌림");
 
+            // 떼면 누르는 시간을 처음부터 다시 센다: 다시 누르고 2틱은 아직, 3틱째에 넘어간다.
+            events.SetCustomHeld("check_key", true);
+            SimClock.Step();
+            SimClock.Step();
+            Expect(events.GetVariable(85) == 0, "Wait Input 이 뗀 뒤에 누르는 시간을 처음부터 세지 않음");
+            SimClock.Step();
+            Expect(events.GetVariable(85) == 1 && !events.LineStopped(2), "Wait Input 이 누르는 시간(3틱)을 채웠는데 넘어가지 않음");
+            events.SetCustomHeld("check_key", false);
+
+            // 이은 Wait Input: 앞의 것을 넘긴 눌림과 그때부터 누르고 있던 버튼으로는 넘어가지 않고, 뗀 뒤 다시 누르면 넘어간다.
+            Expect(events.GetVariable(87) == 0, "한 번 누른 것으로 이은 Wait Input 둘이 함께 넘어감");
+            SimClock.Step();
+            events.QueueCustomPressed("check_key");
+            SimClock.Step();
+            Expect(events.GetVariable(87) == 1, "이은 두 번째 Wait Input 이 다시 누른 것으로 넘어가지 않음");
+
             MapLoader.UnloadPointData();
             MapLoader.UnloadMissionData();
-            Expect(!input.IsCustomAction("check_key") && !input.HasAction("check_key"), "미션 정보를 내렸는데 미션의 커스텀 바인딩이 남아 있음");
+            Expect(!input.IsCustomAction("check_key") && !input.HasAction("check_key"), "미션 정보를 내렸는데 맵팩의 커스텀 바인딩이 남아 있음");
         }
 
         /// <summary>
@@ -1595,6 +1739,9 @@ func area_probe(p, state):
 ";
             var pack = new EventPackData { scriptPath = $"{k_workFolder}/pack.sgd" };
             pack.events.Add(Define(10000, "area_probe"));
+            // 맵팩의 날씨 10000: 암흑 (안개를 아주 가깝게, 설정과 무관하게, 하늘을 가린다).
+            File.WriteAllText(Path.Combine(m_folder, "weather.json"),
+                "{ \"weatherData\": [ { \"name\": \"dark\", \"precipitation\": 0, \"fogOverride\": true, \"forceFog\": true, \"hideSky\": true, \"fogStart\": 0.0, \"fogEnd\": 2.0 } ] }");
 
             const int waitAreaEnter = 100, setArea = 102, setWeather = 120, setSky = 121, setVar = 40;
             PD2File file = BaseFile();
@@ -1611,7 +1758,10 @@ func area_probe(p, state):
             file.points.Add(Event((int)EventType.WaitTime, 205, 100000, 206));
 
             int errors = Debugger.ErrorCount;
-            if (!WriteAndLoad(pack, script, file))
+            m_mapPack.weatherDataPath = $"{k_workFolder}/weather.json";
+            bool loaded = WriteAndLoad(pack, script, file);
+            m_mapPack.weatherDataPath = string.Empty;
+            if (!loaded)
             {
                 Expect(false, $"구역 점검의 미션 로드 실패: {Debugger.FirstErrorSince(errors)}");
                 return;
@@ -1621,7 +1771,7 @@ func area_probe(p, state):
             var data = new BlockMapData();
             data.areaTagData.Add(new AreaTagData { name = "hurt", damagePerSecond = 100f });
             data.areaTagData.Add(new AreaTagData { name = "float", gravityScale = -1f });
-            data.areaTagData.Add(new AreaTagData { name = "goal" });
+            data.areaTagData.Add(new AreaTagData { name = "goal", weatherIndex = 10000 });
             var blockFile = new BD2File();
             blockFile.blocks.Add(CheckBox(new Vector3(0f, 0f, 0f), new Vector3(1f, 1f, 1f)));
             blockFile.areas.Add(new BD2Area { vertices = CheckBox(new Vector3(0f, 500f, 0f), new Vector3(3f, 3f, 3f)).vertices, tag = 0 });
@@ -1663,6 +1813,21 @@ func area_probe(p, state):
             Expect(MapLoader.WeatherIndex == 1 && MapLoader.CurrentWeather?.precipitation == WeatherPrecipitation.Rain && MapLoader.WeatherView.Data != null,
                 "Set Weather 가 날씨를 바꾸지 않음");
             Expect(MapLoader.LoadedSkyIndex == 2 && MapLoader.WeatherIndex == 1, "Set Sky 가 하늘을 바꾸지 않았거나 날씨가 지워짐");
+
+            // 구역의 날씨: 그 구역 안에서만 보이는 날씨의 번호 (기준 날씨는 그대로).
+            Expect(MapLoader.AreaWeatherAt(new Vector3(-50f, 500f, 0f)) == 10000 && MapLoader.AreaWeatherAt(new Vector3(0f, 500f, 0f)) == -1
+                && MapLoader.AreaWeatherAt(new Vector3(0f, 800f, 0f)) == -1, "구역의 날씨 번호가 다름");
+            Expect(MapLoader.WeatherIndex == 1, "구역의 날씨가 기준 날씨를 바꿈");
+
+            // 암흑 날씨: 설정에서 안개를 꺼도 forceFog 면 안개가 켜진다. 보통 날씨는 설정대로 꺼진다.
+            ConfigManager config = ConfigManager.Instance;
+            config.SetBool(ConfigManager.SectionGraphic, ConfigManager.KeyEnableFog, false);
+            MapLoader.SetWeather(0);
+            Expect(!MapLoader.FogActive, "안개를 끈 설정에서 보통 날씨에 안개가 켜짐");
+            Expect(MapLoader.SetWeather(10000) && MapLoader.CurrentWeather.hideSky && MapLoader.FogActive && MapLoader.LoadedSkyIndex == 2,
+                "맵팩의 암흑 날씨(forceFog, hideSky)가 안개를 켜지 않거나 하늘을 바꿈");
+            config.RevertToSaved();
+            MapLoader.RefreshFog();
 
             // 블록 데이터를 다시 붙이면 구역의 성질이 처음 값이다. 맵을 내리면 날씨도 지워진다.
             MapLoader.LoadBlockData(blockFile, data);

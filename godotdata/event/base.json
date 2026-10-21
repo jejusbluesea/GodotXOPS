@@ -185,6 +185,30 @@
       ]
     },
     {
+      "type": 27,
+      "name": "Wait Input",
+      "function": "wait_input",
+      "parameters": [
+        {
+          "name": "binding",
+          "slot": "p2",
+          "kind": "binding"
+        },
+        {
+          "name": "hold",
+          "slot": "e0",
+          "kind": "float"
+        }
+      ],
+      "exits": [
+        {
+          "name": "next",
+          "slot": "p3",
+          "kind": "event"
+        }
+      ]
+    },
+    {
       "type": 30,
       "name": "Set HP",
       "function": "set_hp",

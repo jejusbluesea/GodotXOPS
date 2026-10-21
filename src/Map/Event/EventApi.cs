@@ -132,6 +132,7 @@ namespace GodotXOPS
                 ["interact_held"] = Callable.From(() => Enter() && m_events.InteractHeld),
                 ["input_pressed"] = Callable.From((string action) => Enter() && m_events.CustomPressed(action)),
                 ["input_held"] = Callable.From((string action) => Enter() && m_events.CustomHeld(action)),
+                ["input_binding"] = Callable.From((int index) => Enter() ? InputManager.Instance.PackBindingName(index) : string.Empty),
                 ["key_name"] = Callable.From((string action) => Enter() ? KeyLabel(action) : string.Empty),
                 ["set_auto_judge"] = Callable.From((bool enabled) => { if (Enter()) m_events.AutoJudge = enabled; }),
                 ["end_mission"] = Callable.From((bool complete) => { if (Enter()) m_events.ForceEnd(complete); }),

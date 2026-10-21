@@ -91,7 +91,6 @@ namespace GodotXOPS.Editor
             AddMissionPath(grid, "Addon object data", "*.json", m => m.addonObjectDataPath, (m, v) => m.addonObjectDataPath = v);
             AddMissionPath(grid, "Addon sound data", "*.json", m => m.addonSoundDataPath, (m, v) => m.addonSoundDataPath = v);
             AddMissionPath(grid, "Addon image data", "*.json", m => m.addonImageDataPath, (m, v) => m.addonImageDataPath = v);
-            AddMissionPath(grid, "Addon input data", "*.json", m => m.addonInputDataPath, (m, v) => m.addonInputDataPath = v);
             AddMissionPath(grid, "Addon weather data", "*.json", m => m.addonWeatherDataPath, (m, v) => m.addonWeatherDataPath = v);
             AddMissionPath(grid, "Briefing script", "*.sgd", m => m.briefingScriptPath, (m, v) => m.briefingScriptPath = v);
             AddMissionPath(grid, "HUD script", "*.sgd", m => m.hudScriptPath, (m, v) => m.hudScriptPath = v);

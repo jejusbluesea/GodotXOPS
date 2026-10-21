@@ -151,6 +151,19 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 그 자리에서 보여 줄 구역의 날씨. 겹치면 번호가 가장 큰 태그의 값이다. 날씨의 연출이 카메라 자리로 묻는다.
+        /// </summary>
+        /// <param name="point">월드 좌표.</param>
+        /// <returns>날씨 번호. 구역 밖이거나 구역이 날씨를 정하지 않았으면 -1.</returns>
+        public static int AreaWeatherAt(Vector3 point)
+        {
+            if (!Loaded) return -1;
+
+            int tag = TopAreaAt(point);
+            return tag >= 0 ? Instance.m_areaStates[tag].weatherIndex : -1;
+        }
+
+        /// <summary>
         /// 그 자리에서 소리에 거는 울림. 겹치면 번호가 가장 큰 태그의 값이다. 소리가 듣는 자리(카메라)로 묻는다.
         /// </summary>
         /// <param name="point">월드 좌표.</param>

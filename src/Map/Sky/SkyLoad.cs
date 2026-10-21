@@ -8,6 +8,7 @@ namespace GodotXOPS
         private static readonly StringName s_fogColorGlobal = "xops_fog_color";
         private static readonly StringName s_fogRangeGlobal = "xops_fog_range";
         private static readonly StringName s_modelBrightnessGlobal = "xops_model_brightness";
+        private static readonly StringName s_skyCoverGlobal = "xops_sky_cover";
 
         // 어두운 화면 미션에서 스카이와 모델(사람·무기·소물·탄환)에 곱하는 밝기 (원본 D3DGraphics::RenderModel 의 darkflag).
         private const float k_darkModelBrightness = 0.8f;
@@ -220,15 +221,21 @@ namespace GodotXOPS
 
         /// <summary>
         /// 원본 SetFog(true, skynumber) 대응. 선형 안개를 SkyData 의 fogStart ~ fogEnd 범위, 하늘 번호별 색으로 적용한다.
-        /// SkyData.fog 가 false 이거나(날씨가 안개를 덮어쓰지 않을 때) 설정의 enableFog 가 꺼져 있으면 안개를 끈다. 날씨가 안개를 덮어쓰면 그 색과 거리를 쓴다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)와 이펙트 셰이더만 받는다.
+        /// 날씨는 화면에 보이는 날씨(구역의 날씨 포함)를 본다. 그 날씨가 hideSky 면 하늘을 안개 색으로 가린다.
+        /// SkyData.fog 가 false 이거나(날씨가 안개를 덮어쓰지 않을 때) 설정의 enableFog 가 꺼져 있으면(날씨의 forceFog 가 아닐 때) 안개를 끈다. 날씨가 안개를 덮어쓰면 그 색과 거리를 쓴다. 안개는 alpha_clip_blend 셰이더(블록/소물/사람/무기)와 이펙트 셰이더만 받는다.
         /// </summary>
         /// <param name="skyIndex">하늘 번호. 10000 에서 19999 는 맵팩의 하늘이다. 색이 없는 번호면 검정(원본 default).</param>
         public static void ApplySkyFog(int skyIndex)
         {
             SkyData skyData = DataManager.Instance.SkyData;
-            WeatherData weather = CurrentWeather;
+            WeatherData weather = EffectiveWeather;
             bool weatherFog = weather != null && weather.fogOverride;
-            if ((!skyData.fog && !weatherFog) || !ConfigManager.Instance.GetBool(ConfigManager.SectionGraphic, ConfigManager.KeyEnableFog, true))
+            // 하늘 가리기는 안개 설정과 무관하게 건다 (연출이다).
+            Color cover = weather != null && weather.hideSky ? weather.fogColor.ToColor() : Colors.Transparent;
+            RenderingServer.GlobalShaderParameterSet(s_skyCoverGlobal, new Vector4(cover.R, cover.G, cover.B, weather != null && weather.hideSky ? 1f : 0f));
+
+            bool fogAllowed = ConfigManager.Instance.GetBool(ConfigManager.SectionGraphic, ConfigManager.KeyEnableFog, true) || (weatherFog && weather.forceFog);
+            if ((!skyData.fog && !weatherFog) || !fogAllowed)
             {
                 ClearFog();
                 return;
@@ -271,6 +278,7 @@ namespace GodotXOPS
         public static void ClearFog()
         {
             RenderingServer.GlobalShaderParameterSet(s_fogColorGlobal, Vector4.Zero);
+            RenderingServer.GlobalShaderParameterSet(s_skyCoverGlobal, Vector4.Zero);
             if (Loaded) Instance.m_fogActive = false;
         }
     }

@@ -22,6 +22,7 @@ namespace GodotXOPS.Editor
         private SpinBox m_areaSight;
         private SpinBox m_areaReverb;
         private CheckBox m_areaBlockWeather;
+        private SpinBox m_areaWeather;
         private LineEdit m_areaHostility;
         private CheckBox m_areaShow;
 
@@ -88,6 +89,10 @@ namespace GodotXOPS.Editor
                 if (!m_fillingInspector) SetAreaTag("Area weather", tag => tag.blockWeather = pressed);
             };
             tagBox.AddChild(m_areaBlockWeather);
+            m_areaWeather = AddAreaNumber(tagBox, "Weather", "Weather shown while the camera is in the area (number in the weather list, -1: the weather outside). Only the picture changes; the weather's sky number is not used",
+                -1, 99999, value => SetAreaTag("Area weather", tag => tag.weatherIndex = (int)value));
+            m_areaWeather.Step = 1;
+            m_areaWeather.Rounded = true;
             tagBox.AddChild(new Label { Text = "Hostility" });
             m_areaHostility = new LineEdit
             {
@@ -182,6 +187,7 @@ namespace GodotXOPS.Editor
                 m_areaSight.Value = tag.aiSightScale;
                 m_areaReverb.Value = tag.soundReverb;
                 m_areaBlockWeather.ButtonPressed = tag.blockWeather;
+                m_areaWeather.Value = tag.weatherIndex;
                 if (!m_areaHostility.HasFocus()) m_areaHostility.Text = FormatHostility(tag.hostility);
             }
             m_fillingInspector = false;

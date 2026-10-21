@@ -44,6 +44,8 @@ namespace GodotXOPS
         public float soundReverb;
         // 카메라가 구역 안이면 날씨(비, 눈)를 그리지 않고 날씨 소리를 줄인다 (실내).
         public bool blockWeather;
+        // 카메라가 구역 안이면 보여 줄 날씨 번호 (-1 이면 바깥의 날씨 그대로). 화면에만 듣고, 그 날씨의 하늘 번호(skyIndex)는 쓰지 않는다.
+        public int weatherIndex = -1;
         // 구역 안의 AI 가 팀끼리 적대하는 규칙. 규칙이 없는 팀끼리는 늘 적대한다.
         public List<AreaHostilityRule> hostility = new List<AreaHostilityRule>();
     }

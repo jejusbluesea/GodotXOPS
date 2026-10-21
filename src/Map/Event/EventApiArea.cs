@@ -12,6 +12,7 @@ namespace GodotXOPS
         private const string k_areaAiSight = "ai_sight";
         private const string k_areaReverb = "reverb";
         private const string k_areaBlockWeather = "block_weather";
+        private const string k_areaWeather = "weather";
 
         /// <summary>
         /// 사람이 그 구역 태그 안에 있는지 (발 위치, 마지막 틱 기준. 겹친 구역의 어느 것이든).
@@ -54,7 +55,7 @@ namespace GodotXOPS
         /// 구역 태그의 지금 성질.
         /// </summary>
         /// <param name="tag">구역 태그 번호.</param>
-        /// <returns>사전: exists, name, damage, gravity, ai_sight, reverb, block_weather.</returns>
+        /// <returns>사전: exists, name, damage, gravity, ai_sight, reverb, block_weather, weather.</returns>
         private static Godot.Collections.Dictionary AreaInfo(int tag)
         {
             AreaState state = MapLoader.GetAreaState(tag);
@@ -69,14 +70,15 @@ namespace GodotXOPS
                 [k_areaAiSight] = state.aiSightScale,
                 [k_areaReverb] = state.soundReverb,
                 [k_areaBlockWeather] = state.blockWeather,
+                [k_areaWeather] = state.weatherIndex,
             };
         }
 
         /// <summary>
-        /// 구역 태그의 성질 하나를 바꾼다. 값은 확인한다: 데미지와 시야는 0 이상, 울림은 0 에서 1 사이, 날씨 막기는 0 이 아니면 참.
+        /// 구역 태그의 성질 하나를 바꾼다. 값은 확인한다: 데미지와 시야는 0 이상, 울림은 0 에서 1 사이, 날씨 막기는 0 이 아니면 참, 날씨는 음수면 -1(바깥 날씨).
         /// </summary>
         /// <param name="tag">구역 태그 번호.</param>
-        /// <param name="key">성질의 이름 (damage, gravity, ai_sight, reverb, block_weather).</param>
+        /// <param name="key">성질의 이름 (damage, gravity, ai_sight, reverb, block_weather, weather).</param>
         /// <param name="value">값.</param>
         /// <returns>바꿨으면 true. 없는 태그, 모르는 이름, 수가 아닌 값이면 false.</returns>
         private static bool SetArea(int tag, string key, float value)
@@ -100,6 +102,9 @@ namespace GodotXOPS
                     return true;
                 case k_areaBlockWeather:
                     state.blockWeather = value != 0f;
+                    return true;
+                case k_areaWeather:
+                    state.weatherIndex = value < 0f ? -1 : (int)value;
                     return true;
                 default:
                     return false;

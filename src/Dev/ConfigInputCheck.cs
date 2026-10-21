@@ -198,13 +198,12 @@ namespace GodotXOPS.Dev
             Expect("커스텀: 기본 액션은 그대로", input.IsCustomAction(InputManager.Jump), false);
             Expect("커스텀: 전체 액션 목록에 든다", System.Array.IndexOf(input.GetActionNames(), "check_light") >= 0, true);
 
-            // 층의 순서: 맵팩(미션이 붙인 것이 메뉴의 것보다 먼저) → 미션. 같은 이름은 앞의 층의 것을 쓴다.
+            // 층의 순서: 설치형 → 맵팩(미션이 붙인 것이 메뉴의 것보다 먼저). 같은 이름은 앞의 층의 것을 쓴다.
             input.SetCustomLayer(CustomBindingLayer.MenuPack, CheckList(("check_menu", "", "<Keyboard>/m")));
             Expect("커스텀: 메뉴 맵팩 층", input.IsCustomAction("check_menu"), true);
             input.SetCustomLayer(CustomBindingLayer.Pack, CheckList(("check_pack", "", "<Keyboard>/p"), ("check_light", "Other", "<Keyboard>/o")));
-            input.SetCustomLayer(CustomBindingLayer.Mission, CheckList(("check_mission", "", "<Keyboard>/n")));
             Expect("커스텀: 미션의 맵팩이 있으면 메뉴의 맵팩은 쓰지 않는다", string.Join(",", input.GetCustomActionNames()),
-                "check_light,check_radio,check_reserved,check_unknown,check_pack,check_mission");
+                "check_light,check_radio,check_reserved,check_unknown,check_pack");
             Expect("커스텀: 같은 이름은 앞의 층", input.GetCustomLabel("check_light"), "Light");
             input.SetCustomLayer(CustomBindingLayer.Pack, null);
             Expect("커스텀: 미션의 맵팩을 떼면 메뉴의 맵팩", input.IsCustomAction("check_menu") && !input.IsCustomAction("check_pack"), true);
@@ -232,7 +231,6 @@ namespace GodotXOPS.Dev
 
             input.SetCustomLayer(CustomBindingLayer.Installed, null);
             input.SetCustomLayer(CustomBindingLayer.MenuPack, null);
-            input.SetCustomLayer(CustomBindingLayer.Mission, null);
             Expect("커스텀: 층을 다 비우면 없다", input.GetCustomActionNames().Length, 0);
             Expect("커스텀: 비운 뒤 액션도 없다", input.HasAction("check_light"), false);
         }

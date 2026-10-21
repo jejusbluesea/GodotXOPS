@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace GodotXOPS
 {
     /// <summary>
-    /// 커스텀 바인딩 등록 파일(JSON)의 내용. 설치형은 godotdata/input/*.json, 맵팩은 Manifest 의 inputDataPath, 미션은 MIF2 의 addonInputDataPath 다.
+    /// 커스텀 바인딩 등록 파일(JSON)의 내용. 설치형은 godotdata/input/*.json, 맵팩은 Manifest 의 inputDataPath 다 (미션은 들고 오지 않는다. 메뉴에서 알 수 없어서 OPTION 에서 키를 바꿀 수 없기 때문이다).
     /// 등록한 버튼은 OPTION 의 Custom 탭에서 키를 바꿀 수 있고, 스크립트 이벤트와 화면 스크립트가 이름으로 읽는다.
     /// </summary>
     public class CustomBindingListData

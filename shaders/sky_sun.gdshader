@@ -10,6 +10,8 @@ uniform vec3 sun_direction = vec3(0.0, 1.0, 0.0);
 uniform float sun_half_size = 0.1;
 
 global uniform float xops_model_brightness;
+// 날씨가 하늘을 가릴 때(hideSky)의 색(rgb, sRGB)과 가리는 정도(a). 0 이면 가리지 않는다.
+global uniform vec4 xops_sky_cover;
 
 vec3 srgb_to_linear(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
@@ -30,6 +32,6 @@ void vertex() {
 
 void fragment() {
 	vec4 color = texture(main_texture, UV);
-	ALBEDO = srgb_to_linear(color.rgb * xops_model_brightness);
+	ALBEDO = srgb_to_linear(mix(color.rgb * xops_model_brightness, xops_sky_cover.rgb, xops_sky_cover.a));
 	ALPHA = color.a;
 }

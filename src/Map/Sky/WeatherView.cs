@@ -7,6 +7,7 @@ namespace GodotXOPS
     /// 날씨의 연출을 그리는 노드: 카메라 둘레에 내리는 것(비, 눈), 되풀이하는 소리, 번개(화면이 번쩍이고 소리가 난다).
     /// 전부 렌더 프레임의 연출이고 게임 결과에 영향을 주지 않는다 (난수는 GameRandom.Visual). 게임 정지 중에는 멈춘다.
     /// 카메라가 날씨를 막는 구역(실내) 안에 있으면 내리는 것을 감추고 소리를 줄인다.
+    /// 기준 날씨(MapLoader.SetWeather)와 따로, 카메라가 날씨를 정한 구역 안에 있으면 그 구역의 날씨를 그린다 (나오면 기준 날씨로 돌아온다).
     /// </summary>
     public partial class WeatherView : Node3D
     {
@@ -21,12 +22,15 @@ namespace GodotXOPS
         private CanvasLayer m_flashLayer;
         private ColorRect m_flash;
         private WeatherData m_data;
+        // 기준 날씨 (이벤트가 정한 것). 구역의 날씨가 없을 때 그린다.
+        private WeatherData m_base;
+        private Vector3 m_lastCamera;
         private float m_lightningTimer;
         private float m_flashTime = -1f;
         private float m_thunderTimer = -1f;
         private bool m_indoor;
 
-        // 지금 그리는 날씨. null 이면 없다.
+        // 지금 그리는 날씨 (구역의 날씨 포함). null 이면 없다.
         public WeatherData Data => m_data;
         // 카메라가 날씨를 막는 구역 안에 있는지 (마지막 프레임 기준).
         public bool Indoor => m_indoor;
@@ -42,10 +46,19 @@ namespace GodotXOPS
 
         public override void _Process(double delta)
         {
-            if (m_data == null) return;
-
             Camera3D camera = GetViewport().GetCamera3D();
             Vector3 cameraPosition = camera != null ? camera.GlobalPosition : Vector3.Zero;
+            m_lastCamera = cameraPosition;
+
+            // 카메라가 날씨를 정한 구역에 들어가거나 나오면 그리는 날씨를 바꾸고 안개·하늘 가리기를 다시 맞춘다.
+            WeatherData shown = ShownWeather(cameraPosition);
+            if (!ReferenceEquals(shown, m_data))
+            {
+                Show(shown);
+                MapLoader.RefreshFog();
+            }
+            if (m_data == null) return;
+
             m_indoor = MapLoader.WeatherBlockedAt(cameraPosition);
             SoundManager.Instance.SetAmbientScale(m_indoor ? k_indoorSoundScale : 1f);
 
@@ -61,12 +74,34 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 날씨를 바꾼다. 바로 바뀐다 (서서히 바뀌지 않는다).
+        /// 기준 날씨를 바꾼다. 바로 바뀐다 (서서히 바뀌지 않는다). 카메라가 날씨를 정한 구역 안이면 그 구역의 날씨를 계속 그린다.
         /// </summary>
-        /// <param name="data">새 날씨. null 이면 날씨를 지운다 (맑음과 같다).</param>
-        public void Apply(WeatherData data)
+        /// <param name="data">새 기준 날씨. null 이면 기준 날씨가 없다 (맑음과 같다).</param>
+        public void SetBase(WeatherData data)
         {
-            Clear();
+            m_base = data;
+            Show(ShownWeather(m_lastCamera));
+        }
+
+        /// <summary>
+        /// 그 자리에서 그릴 날씨: 날씨를 정한 구역(번호가 가장 큰 태그) 안이면 그 날씨, 아니면 기준 날씨. 구역의 날씨 번호가 목록에 없으면 기준 날씨다.
+        /// </summary>
+        /// <param name="cameraPosition">카메라 자리.</param>
+        /// <returns>날씨. 없으면 null.</returns>
+        private WeatherData ShownWeather(Vector3 cameraPosition)
+        {
+            int index = MapLoader.AreaWeatherAt(cameraPosition);
+            var list = DataManager.Instance.WeatherParameterData.weatherData;
+            return index >= 0 && list.Has(index) ? list[index] : m_base;
+        }
+
+        /// <summary>
+        /// 그리는 날씨를 바꾼다 (내리는 것, 소리, 번개). 안개와 하늘 가리기는 MapLoader 가 맞춘다.
+        /// </summary>
+        /// <param name="data">그릴 날씨. null 이면 아무것도 그리지 않는다.</param>
+        private void Show(WeatherData data)
+        {
+            ClearVisuals();
             m_data = data;
             if (data == null) return;
 
@@ -77,9 +112,18 @@ namespace GodotXOPS
         }
 
         /// <summary>
-        /// 그리던 날씨를 전부 지운다.
+        /// 기준 날씨와 그리던 날씨를 전부 지운다 (맵을 내릴 때).
         /// </summary>
         public void Clear()
+        {
+            m_base = null;
+            ClearVisuals();
+        }
+
+        /// <summary>
+        /// 그리던 날씨를 지운다 (기준 날씨는 남긴다).
+        /// </summary>
+        private void ClearVisuals()
         {
             m_data = null;
             m_indoor = false;

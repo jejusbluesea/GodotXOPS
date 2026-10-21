@@ -71,23 +71,28 @@ func wait_ticks(p, state):
 # Waits for the player to press Interact near this point. hold is how many seconds the key must be kept down; 0 passes on the press.
 # The hold starts over when the key is released or the player steps out of reach or looks away.
 func wait_interact(p, state):
+	# Only a press that starts after the line reaches this point counts. The press that passed a Wait Interact just before (in the same tick)
+	# and a key still held from it do not: the key must be up once first. The prompt shows meanwhile.
+	if not state.get("armed", false) and not api["interact_held"].call() and not api["interact_pressed"].call():
+		state["armed"] = true
 	if not interact_in_reach(p):
 		state["held"] = 0
 		return -1
 	# Whole ticks, rounded like every other time in the game (one second is 100 / 3 ticks).
 	var need = int(p["hold"] * 100.0 / 3.0 + 0.5)
 	var held = 0
-	if need <= 0:
-		if api["interact_pressed"].call():
-			api["hud_clear"].call(31)
-			return 0
-	else:
-		if api["interact_held"].call():
-			held = state.get("held", 0) + 1
-		state["held"] = held
-		if held >= need:
-			api["hud_clear"].call(31)
-			return 0
+	if state.get("armed", false):
+		if need <= 0:
+			if api["interact_pressed"].call():
+				api["hud_clear"].call(31)
+				return 0
+		else:
+			if api["interact_held"].call():
+				held = state.get("held", 0) + 1
+			state["held"] = held
+			if held >= need:
+				api["hud_clear"].call(31)
+				return 0
 	var text = "PRESS " + api["key_name"].call("interact")
 	if need > 0:
 		text = "HOLD " + api["key_name"].call("interact")
@@ -524,9 +529,9 @@ func wait_area_leave(p, state):
 	return -1
 
 # Changes one property of an area until the map is loaded again: 0 damage (HP per second), 1 gravity (scale, may be negative),
-# 2 AI sight (scale), 3 reverb (0 to 1), 4 weather blocked (0 or 1).
+# 2 AI sight (scale), 3 reverb (0 to 1), 4 weather blocked (0 or 1), 5 weather shown inside (number, -1: the weather outside).
 func set_area(p, state):
-	var keys = ["damage", "gravity", "ai_sight", "reverb", "block_weather"]
+	var keys = ["damage", "gravity", "ai_sight", "reverb", "block_weather", "weather"]
 	var k = p["property"]
 	if k >= 0 and k < keys.size():
 		api["set_area"].call(p["area"], keys[k], p["value"])
@@ -547,3 +552,29 @@ func set_weather(p, state):
 func set_sky(p, state):
 	api["set_sky"].call(p["sky"])
 	return 0
+
+# Waits until the player presses a custom binding of the map pack ("binding" is its place in the pack's binding file, from 0).
+# With "hold" (seconds) above 0 the button must be held that long; letting go starts over. Nothing happens without a map pack binding.
+func wait_input(p, state):
+	var name = api["input_binding"].call(p["binding"])
+	if name == "":
+		return -1
+	# Only input that starts after the line reaches this point counts. The press that passed a Wait Input just before (in the same tick)
+	# and a button still held from it do not: the button must be up once first.
+	if not state.get("armed", false):
+		if api["input_held"].call(name) or api["input_pressed"].call(name):
+			return -1
+		state["armed"] = true
+		return -1
+	var need = int(p["hold"] * 100.0 / 3.0 + 0.5)
+	if need <= 0:
+		if api["input_pressed"].call(name):
+			return 0
+		return -1
+	var held = 0
+	if api["input_held"].call(name):
+		held = state.get("held", 0) + 1
+	state["held"] = held
+	if held >= need:
+		return 0
+	return -1

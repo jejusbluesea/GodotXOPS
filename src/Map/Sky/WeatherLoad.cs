@@ -1,6 +1,7 @@
 namespace GodotXOPS
 {
-    // MapLoader 의 날씨 담당 partial: 지금 날씨의 번호를 들고 날씨를 바꾼다. 날씨는 맵에 붙고 맵을 내리면(UnloadSkyData) 지워진다.
+    // MapLoader 의 날씨 담당 partial: 지금 날씨(기준 날씨)의 번호를 들고 날씨를 바꾼다. 날씨는 맵에 붙고 맵을 내리면(UnloadSkyData) 지워진다.
+    // 카메라가 날씨를 정한 구역 안에 있으면 화면에는 그 구역의 날씨를 보여 준다 (보이는 날씨). 기준 날씨는 그대로이고 구역을 나오면 돌아온다.
     // 날씨는 연출만 하고 게임 결과에 영향을 주지 않는다. 바로 바뀐다.
     public partial class MapLoader
     {
@@ -11,8 +12,10 @@ namespace GodotXOPS
 
         // 지금 날씨의 번호. -1 이면 날씨가 없다.
         public static int WeatherIndex => Loaded ? Instance.m_weatherIndex : -1;
-        // 지금 날씨. 없으면 null.
+        // 지금 날씨 (기준 날씨. 이벤트가 정한 것). 없으면 null.
         public static WeatherData CurrentWeather => Loaded ? Instance.m_weather : null;
+        // 화면에 보이는 날씨: 카메라가 날씨를 정한 구역 안이면 그 구역의 날씨, 아니면 기준 날씨. 없으면 null.
+        public static WeatherData EffectiveWeather => Loaded ? Instance.m_weatherView?.Data ?? Instance.m_weather : null;
         // 날씨를 그리는 노드 (점검이 읽는다).
         public static WeatherView WeatherView => Instance.EnsureWeatherView();
 
@@ -34,7 +37,7 @@ namespace GodotXOPS
             MapLoader loader = Instance;
             loader.m_weatherIndex = index;
             loader.m_weather = list[index];
-            loader.EnsureWeatherView().Apply(loader.m_weather);
+            loader.EnsureWeatherView().SetBase(loader.m_weather);
 
             if (loader.m_weather.skyIndex >= 0) LoadSkyData(loader.m_weather.skyIndex);
             else RefreshFog();

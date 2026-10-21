@@ -41,7 +41,7 @@ namespace GodotXOPS.Editor
 
         private static readonly string[] s_compareNames = { "==", "!=", "<", "<=", ">", ">=" };
         // 구역의 성질 (base.sgd 의 set_area 와 같은 순서)과 적대 방식 (AreaHostility).
-        private static readonly string[] s_areaPropertyNames = { "Damage (HP/s)", "Gravity (scale)", "AI sight (scale)", "Reverb (0-1)", "Block weather (0/1)" };
+        private static readonly string[] s_areaPropertyNames = { "Damage (HP/s)", "Gravity (scale)", "AI sight (scale)", "Reverb (0-1)", "Block weather (0/1)", "Weather (number, -1: outside)" };
         private static readonly string[] s_hostilityNames = { "Always hostile", "Never hostile", "Hostile when provoked" };
         private static readonly string[] s_fontNames = { "OS font", "char.dds" };
         private static readonly string[] s_anchorNames =
@@ -438,6 +438,7 @@ namespace GodotXOPS.Editor
                 case "area":
                 case "areaproperty":
                 case "hostility":
+                case "binding":
                 case "weather":
                 case "sky":
                 case k_kindMessage:
@@ -528,6 +529,7 @@ namespace GodotXOPS.Editor
                     foreach (AreaTagData tag in m_document.Textures.areaTagData) names.Add(tag.name);
                     break;
                 case "areaproperty": names.AddRange(s_areaPropertyNames); break;
+                case "binding": names.AddRange(PackBindingNames()); break;
                 case "hostility": names.AddRange(s_hostilityNames); break;
                 case "weather":
                     for (int i = 0; i < data.WeatherParameterData.weatherData.Count; i++) names.Add(data.WeatherParameterData.weatherData[i].name);
@@ -546,6 +548,22 @@ namespace GodotXOPS.Editor
                     foreach (int entry in m_document.Points.eventEntryIds) names.Add($"starts at {entry}");
                     break;
             }
+            return names;
+        }
+
+        /// <summary>
+        /// 문서의 미션이 속한 맵팩의 커스텀 바인딩 이름들 (등록 파일의 순서. Wait Input 이 이 번호로 가리킨다).
+        /// </summary>
+        /// <returns>이름들. 맵팩이 없거나 등록 파일이 없으면 빈 목록.</returns>
+        private List<string> PackBindingNames()
+        {
+            var names = new List<string>();
+            string path = DocumentPack()?.inputDataPath;
+            if (string.IsNullOrEmpty(path)) return names;
+
+            CustomBindingListData data = MapLoader.LoadAddonFile<CustomBindingListData>(path);
+            if (data == null) return names;
+            foreach (CustomBindingData binding in data.bindings) names.Add(binding?.name ?? string.Empty);
             return names;
         }
 

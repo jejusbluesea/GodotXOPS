@@ -13,10 +13,9 @@ namespace GodotXOPS
         Installed,
         MenuPack,
         Pack,
-        Mission,
     }
 
-    // InputManager 의 커스텀 바인딩 담당 partial: 등록 파일이 정한 버튼 액션을 층(설치형, 맵팩, 미션)마다 받아 지금 쓰는 것만 액션으로 만든다.
+    // InputManager 의 커스텀 바인딩 담당 partial: 등록 파일이 정한 버튼 액션을 층(설치형, 맵팩)마다 받아 지금 쓰는 것만 액션으로 만든다.
     // 키는 config.json 의 customBindings(유저가 바꾼 것)가 먼저이고 없으면 등록 파일의 baseValue 다.
     public partial class InputManager
     {
@@ -27,6 +26,8 @@ namespace GodotXOPS
         // 지금 액션으로 만들어 둔 커스텀 바인딩. 이름 → 등록. 순서는 m_customOrder 다 (설치형 → 맵팩 → 미션, 파일에 적은 순서).
         private readonly Dictionary<string, CustomBindingData> m_customActive = new Dictionary<string, CustomBindingData>(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> m_customOrder = new List<string>();
+        // 미션이 붙인 맵팩의 등록 파일에 적힌 이름들 (파일의 순서 그대로, 거절된 것도 자리를 지킨다). 이벤트 Wait Input 이 번호로 가리킨다.
+        private readonly List<string> m_packBindingNames = new List<string>();
 
         /// <summary>
         /// 설치형 등록 파일(godotdata/input/*.json)을 파일 이름 순서로 읽어 설치형 층에 넣는다. 부팅 때 한 번 부른다.
@@ -76,6 +77,15 @@ namespace GodotXOPS
         /// <param name="data">그 층의 등록. null 이면 층을 비운다.</param>
         public void SetCustomLayer(CustomBindingLayer layer, CustomBindingListData data)
         {
+            if (layer == CustomBindingLayer.Pack)
+            {
+                m_packBindingNames.Clear();
+                if (data != null)
+                {
+                    foreach (CustomBindingData binding in data.bindings) m_packBindingNames.Add(binding?.name ?? string.Empty);
+                }
+            }
+
             if (data == null || data.bindings.Count == 0)
             {
                 if (!m_customLayers.Remove(layer)) return;
@@ -124,7 +134,7 @@ namespace GodotXOPS
             var wanted = new List<CustomBindingData>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             CustomBindingLayer packLayer = m_customLayers.ContainsKey(CustomBindingLayer.Pack) ? CustomBindingLayer.Pack : CustomBindingLayer.MenuPack;
-            foreach (CustomBindingLayer layer in new[] { CustomBindingLayer.Installed, packLayer, CustomBindingLayer.Mission })
+            foreach (CustomBindingLayer layer in new[] { CustomBindingLayer.Installed, packLayer })
             {
                 if (!m_customLayers.TryGetValue(layer, out List<CustomBindingData> list)) continue;
                 foreach (CustomBindingData binding in list)
@@ -164,6 +174,16 @@ namespace GodotXOPS
             CustomBindingData binding = m_customActive[entry.definition.name];
             entry.definition.bindings[0] = ConfigManager.Instance.GetCustomBinding(binding.name, out string saved) ? saved : binding.baseValue;
             ApplyButtonBindings(entry);
+        }
+
+        /// <summary>
+        /// 미션이 붙인 맵팩의 커스텀 바인딩 하나의 이름. 번호는 등록 파일에 적힌 순서다 (0 부터).
+        /// </summary>
+        /// <param name="index">번호.</param>
+        /// <returns>이름. 맵팩이 없거나 없는 번호면 빈 문자열.</returns>
+        public string PackBindingName(int index)
+        {
+            return index >= 0 && index < m_packBindingNames.Count ? m_packBindingNames[index] : string.Empty;
         }
 
         // 지금 쓰는 커스텀 바인딩의 이름들. 프레임마다 읽는 쪽(이벤트 입력, HUD 값)이 배열을 만들지 않게 그대로 내준다.
