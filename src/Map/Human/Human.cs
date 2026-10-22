@@ -77,6 +77,10 @@ namespace GodotXOPS
         public int AILevel => m_humanData != null ? m_humanData.aiIndex : 0;
         // AI 경로 시작 웨이포인트 식별번호 — HUMAN 포인트의 param2(=원본 p3).
         public int PathStartId => m_humanParam != null ? m_humanParam.param2 : 0;
+        // 이 사람이 스폰된 사람 정보 포인트의 식별번호 — HUMAN 포인트의 param1.
+        public int InfoId => m_humanParam != null ? m_humanParam.param1 : -1;
+        // 사람 정보 포인트가 가리키는 사람 데이터 번호 (human/list.json) — 정보 포인트의 param1.
+        public int HumanDataIndex => m_humanDataParam != null ? m_humanDataParam.param1 : -1;
 
         /// <summary>
         /// 포인트 데이터와 파라미터로부터 인간 캐릭터를 생성 및 초기화한다. 트리에 추가한 뒤 호출한다.

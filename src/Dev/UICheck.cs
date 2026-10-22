@@ -337,6 +337,36 @@ namespace GodotXOPS.Dev
         }
 
         /// <summary>
+        /// 화면 스크립트에 넘기는 두 무기 슬롯(primary, backup)과 primary_selected 가 사람의 슬롯과 같은지 본다. 다른 슬롯으로 바꿔서도 본다.
+        /// </summary>
+        /// <param name="game">창구.</param>
+        /// <param name="player">플레이어.</param>
+        private void CheckWeaponSlots(GameBridge game, Human player)
+        {
+            bool SlotMatches(Godot.Collections.Dictionary values, int slot)
+            {
+                Weapon weapon = player.GetWeapon(slot);
+                return values["weapon"].AsString() == (weapon.Data.name ?? string.Empty) && values["index"].AsInt32() == weapon.WeaponIndex
+                    && values["magazine"].AsInt32() == weapon.Magazine
+                    && values["reserve"].AsInt32() == weapon.Reserve && values["none"].AsBool() == weapon.IsNone;
+            }
+
+            Godot.Collections.Dictionary values = game.HudValues();
+            Expect(SlotMatches(values["primary"].AsGodotDictionary(), Human.PrimarySlot) && SlotMatches(values["backup"].AsGodotDictionary(), Human.BackupSlot),
+                "화면 스크립트의 primary / backup 이 사람의 무기 슬롯과 다름");
+            Expect(values["primary_selected"].AsBool() == (player.SelectWeapon == Human.PrimarySlot), "primary_selected 가 든 슬롯과 다름");
+            Expect(values["weapon_index"].AsInt32() == player.CurrentWeapon.WeaponIndex, "weapon_index 가 든 무기의 번호와 다름");
+
+            int selected = player.SelectWeapon;
+            player.SetSelectWeapon(Human.PrimarySlot + Human.BackupSlot - selected);
+            for (int i = 0; i < 400 && player.IsChanging; i++) player.TickWeapon();
+            Expect(player.SelectWeapon != selected && game.PrimarySelected() == (player.SelectWeapon == Human.PrimarySlot)
+                && game.WeaponName() == game.WeaponSlot(player.SelectWeapon)["weapon"].AsString(), "슬롯을 바꾼 뒤 primary_selected 나 든 슬롯의 값이 맞지 않음");
+            player.SetSelectWeapon(selected);
+            for (int i = 0; i < 400 && player.IsChanging; i++) player.TickWeapon();
+        }
+
+        /// <summary>
         /// 플레이어 값: HUD 가 읽는 값이 사람의 상태와 같고, 플레이어가 없을 때는 기본값이다.
         /// </summary>
         /// <param name="game">창구.</param>
@@ -345,6 +375,9 @@ namespace GodotXOPS.Dev
             Expect(!game.PlayerExists() && game.PlayerHP() == 0f && game.WeaponName() == string.Empty && game.Magazine() == 0
                 && game.PlayerIndex() == -1 && !game.ConsumeHit() && game.ActiveScope().Count == 0 && game.GetWallBlind() == 0,
                 "플레이어가 없는데 기본값이 아닌 값이 있음");
+            Expect(!game.PrimarySelected() && game.WeaponIndex() == -1 && game.WeaponSlot(Human.PrimarySlot)["none"].AsBool()
+                && game.WeaponSlot(Human.PrimarySlot)["index"].AsInt32() == -1 && game.WeaponSlot(Human.BackupSlot)["weapon"].AsString() == string.Empty,
+                "플레이어가 없는데 무기 슬롯의 값이 기본값이 아님");
 
             if (!game.LoadMission(2, false, 0))
             {
@@ -359,6 +392,7 @@ namespace GodotXOPS.Dev
             Expect(game.PlayerExists() && game.PlayerAlive() && game.PlayerIndex() == MapLoader.PlayerIndex, "플레이어 존재·생존·순번이 맞지 않음");
             Expect(game.PlayerHP() == player.HP && game.Magazine() == weapon.Magazine && game.Reserve() == weapon.Reserve && game.WeaponName() == weapon.Data.name,
                 "체력·탄약·무기 이름이 사람의 상태와 다름");
+            CheckWeaponSlots(game, player);
             Expect(game.ShowsCrosshair() == weapon.Data.crosshair && game.ErrorRange() == player.GunsightErrorRange, "조준선 표시 여부나 조준 오차가 다름");
             Expect(!game.IsFirstPerson(), "조작하는 컨트롤러가 없는데 1인칭으로 나옴");
 

@@ -8,6 +8,9 @@ namespace GodotXOPS
     {
         // 들 수 있는 무기 수. 원본 TOTAL_HAVEWEAPON. 슬롯 0 = 보조, 슬롯 1 = 주 무기.
         public const int WeaponSlotCount = 2;
+        // 주 무기 슬롯(스폰할 때 드는 슬롯)과 보조 무기 슬롯의 번호.
+        public const int PrimarySlot = 1;
+        public const int BackupSlot = 0;
 
         // 무기를 버리거나 떨어뜨릴 때 놓는 자리: 던지는 방향으로 0.5 m, 위로 1.6 m (원본 weapon::Dropoff, object.cpp:2308-2322 — 5.0, 16.0).
         private const float k_dropForwardOffset = 0.5f;
@@ -545,9 +548,9 @@ namespace GodotXOPS
                 m_humanVisual.DynamicWeaponAttachRoot.AddChild(m_weaponVisuals[i]);
             }
 
-            m_selectWeapon = 1;
-            SetWeapon(0, weaponIndex0);
-            SetWeapon(1, weaponIndex1);
+            m_selectWeapon = PrimarySlot;
+            SetWeapon(BackupSlot, weaponIndex0);
+            SetWeapon(PrimarySlot, weaponIndex1);
         }
 
         /// <summary>

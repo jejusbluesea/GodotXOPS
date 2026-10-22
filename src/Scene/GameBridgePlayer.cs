@@ -95,6 +95,44 @@ namespace GodotXOPS
         }
 
         /// <summary>
+        /// 든 무기의 번호 (무기 데이터의 번호. 맵팩 10000, 미션 20000 부터).
+        /// </summary>
+        /// <returns>번호. 플레이어가 없으면 -1.</returns>
+        public int WeaponIndex()
+        {
+            Human player = Player;
+            return player != null ? player.CurrentWeapon.WeaponIndex : -1;
+        }
+
+        /// <summary>
+        /// 무기 슬롯 하나의 무기 이름과 탄 수. 화면 스크립트가 들지 않은 슬롯까지 그릴 때 쓴다.
+        /// </summary>
+        /// <param name="slot">슬롯 번호 (Human.PrimarySlot, Human.BackupSlot).</param>
+        /// <returns>weapon(이름), index(무기 번호), magazine, reserve, none(맨손 슬롯인지). 플레이어가 없으면 빈 이름, -1, 0, 0, true.</returns>
+        public Godot.Collections.Dictionary WeaponSlot(int slot)
+        {
+            Weapon weapon = Player?.GetWeapon(slot);
+            return new Godot.Collections.Dictionary
+            {
+                { "weapon", weapon != null ? weapon.Data.name ?? string.Empty : string.Empty },
+                { "index", weapon != null ? weapon.WeaponIndex : -1 },
+                { "magazine", weapon != null ? weapon.Magazine : 0 },
+                { "reserve", weapon != null ? weapon.Reserve : 0 },
+                { "none", weapon == null || weapon.IsNone },
+            };
+        }
+
+        /// <summary>
+        /// 주 무기 슬롯을 들고 있는지.
+        /// </summary>
+        /// <returns>주 무기 슬롯이면 true. 플레이어가 없으면 false.</returns>
+        public bool PrimarySelected()
+        {
+            Human player = Player;
+            return player != null && player.SelectWeapon == Human.PrimarySlot;
+        }
+
+        /// <summary>
         /// 재장전 중인지.
         /// </summary>
         /// <returns>재장전 중이면 true.</returns>

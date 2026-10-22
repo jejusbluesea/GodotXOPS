@@ -86,6 +86,9 @@ func probe(p, state):
 		api[""set_var""].call(45, 1)
 	api[""set_var""].call(46, api[""tick""].call())
 	api[""set_var""].call(47, api[""line_count""].call())
+	var e = api[""human""].call(api[""find_human""].call(500))
+	api[""set_var""].call(48, e[""info""])
+	api[""set_var""].call(49, e[""data""] + 100)
 	return 0
 
 func act(p, state):
@@ -456,6 +459,8 @@ func bump(p, state):
             Expect(events.GetVariable(43) == 1 && events.GetVariable(44) == 1, "사람 정보나 소물 정보 조회가 다름");
             Expect(events.GetVariable(45) == 1, "파라미터(실수, 불, 식별번호, 위치)가 스크립트에 그대로 가지 않음");
             Expect(events.GetVariable(46) == 5 && events.GetVariable(47) == 13, "틱 수나 줄 수 조회가 다름");
+            // 적은 사람 정보 포인트 2(사람 데이터 0)로 서 있다.
+            Expect(events.GetVariable(48) == 2 && events.GetVariable(49) == 100, $"human() 의 info / data 가 다름 ({events.GetVariable(48)}, {events.GetVariable(49) - 100})");
 
             // 조작.
             Human enemy = MapLoader.SearchHuman(k_enemyId);

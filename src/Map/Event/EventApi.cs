@@ -171,7 +171,7 @@ namespace GodotXOPS
         /// </summary>
         /// <param name="index">MapLoader.Humans 의 인덱스.</param>
         /// <returns>
-        /// alive, hp, hp_max, armor, armor_max, helmet, helmet_max(_max 는 사람 데이터의 처음 값), team, x, y, z, yaw, pitch, weapon(든 무기의 번호), id(식별번호), invincible, infinite_ammo,
+        /// alive, hp, hp_max, armor, armor_max, helmet, helmet_max(_max 는 사람 데이터의 처음 값), team, x, y, z, yaw, pitch, weapon(든 무기의 번호), id(식별번호), info(스폰된 사람 정보 포인트의 식별번호), data(사람 데이터 번호), invincible, infinite_ammo,
         /// directed(이벤트의 지시를 받는 중인지), shots_left(지시받은 사격에서 남은 발 수). 없는 인덱스면 빈 사전.
         /// </returns>
         private static Godot.Collections.Dictionary HumanInfo(int index)
@@ -196,6 +196,8 @@ namespace GodotXOPS
             result["pitch"] = human.Controller.Pitch;
             result["weapon"] = human.CurrentWeapon.WeaponIndex;
             result["id"] = human.Identifier;
+            result["info"] = human.InfoId;
+            result["data"] = human.HumanDataIndex;
             result["invincible"] = human.Invincible;
             result["infinite_ammo"] = human.InfiniteAmmo;
             result["directed"] = human.Brain != null && human.Brain.Directed;

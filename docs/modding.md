@@ -1225,7 +1225,7 @@ func wait_enemies_near(p, state):
 | 함수 | 돌려주는 것 |
 |---|---|
 | `human_count()` | 사람 수 |
-| `human(인덱스)` | 사전: `alive`, `hp`, `armor`, `helmet`(남은 방어구 / 헬멧 포인트), `hp_max`, `armor_max`, `helmet_max`(사람 데이터에 적힌 처음 값), `team`, `x`, `y`, `z`, `yaw`, `pitch`, `weapon`(손에 든 무기 번호), `id`(식별번호), `invincible`, `infinite_ammo`, `directed`(`ai_look` / `ai_fire` 의 지시를 받는 중인지), `shots_left`(지시받은 사격에서 남은 발 수), `shots`(스폰한 뒤 쏜 수. 수류탄·근접 무기 포함, 산탄 한 번은 1), `ai_mode`(AI 의 상태: -1 죽음, 0 평소, 1 경계, 2 전투. 플레이어는 0). 없는 인덱스면 빈 사전 |
+| `human(인덱스)` | 사전: `alive`, `hp`, `armor`, `helmet`(남은 방어구 / 헬멧 포인트), `hp_max`, `armor_max`, `helmet_max`(사람 데이터에 적힌 처음 값), `team`, `x`, `y`, `z`, `yaw`, `pitch`, `weapon`(손에 든 무기 번호), `id`(식별번호), `info`(그 사람이 스폰된 사람 정보 포인트의 식별번호), `data`(사람 정보 포인트가 가리키는 사람 데이터 번호. 맵팩 10000, 미션 20000 부터), `invincible`, `infinite_ammo`, `directed`(`ai_look` / `ai_fire` 의 지시를 받는 중인지), `shots_left`(지시받은 사격에서 남은 발 수), `shots`(스폰한 뒤 쏜 수. 수류탄·근접 무기 포함, 산탄 한 번은 1), `ai_mode`(AI 의 상태: -1 죽음, 0 평소, 1 경계, 2 전투. 플레이어는 0). 없는 인덱스면 빈 사전 |
 | `find_human(식별번호)` | 그 식별번호의 첫 사람의 인덱스. 없으면 -1 |
 | `player()` | 플레이어의 인덱스. 없으면 -1 |
 | `team_alive(팀)` | 그 팀의 살아 있는 사람 수 |
@@ -1683,6 +1683,9 @@ api["hud_text"].call(0, "02:35", {"font": 1, "anchor": 2, "x": -10.0, "y": -10.0
 | `helmet`, `helmet_max` | 남은 헬멧 포인트와 처음 값 |
 | `magazine`, `reserve` | 탄창의 탄 수, 예비 탄 수 |
 | `weapon` | 든 무기의 이름 |
+| `weapon_index` | 든 무기의 번호 (무기 데이터의 번호. 맵팩 10000, 미션 20000 부터). 조작하는 사람이 없으면 −1. 무기마다 다른 그림을 고를 때 씁니다 (이름은 글자 비교라 피하는 편이 좋습니다) |
+| `primary`, `backup` | 주 무기 슬롯(미션을 시작할 때 드는 슬롯)과 보조 무기 슬롯. 사전: `weapon`(이름), `index`(무기 번호, 없으면 −1), `magazine`, `reserve`, `none`(빈 슬롯이면 참). 들지 않은 슬롯의 무기까지 그릴 때 씁니다 |
+| `primary_selected` | 지금 주 무기 슬롯을 들고 있는지 |
 | `reloading`, `switching` | 재장전 중인지, 무기를 바꾸는 중인지 |
 | `first_person` | 1인칭 시점인지 |
 | `crosshair` | 든 무기가 조준선을 보여 주는지 |
